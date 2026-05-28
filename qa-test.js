@@ -74,7 +74,7 @@ const localStore = new Map();
 const context = {
   document,
   window: {
-    location: { hash: "" },
+    location: { hash: "", href: "" },
     addEventListener() {},
     scrollTo(options) { context.lastScrollTo = options; },
     localStorage: null
@@ -93,7 +93,7 @@ const context = {
     context.lastFetch = { url, options };
     return {
       ok: true,
-      json: async () => ({ ok: true, sent: true, id: "LL-TEST", results: [] })
+      json: async () => ({ ok: true, id: "LL-TEST", checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123", total: 100, deposit: 30 })
     };
   },
   setTimeout(fn) { fn(); },
@@ -108,6 +108,7 @@ context.FormData = class {
       ["phone", "(555) 123-4567"],
       ["date", "2026-06-01"],
       ["preferredContact", "text_email"],
+      ["smsOptIn", "on"],
       ["specialRequests", "Test booking notes"],
       ["policyAcknowledgement", "on"]
     ]);
@@ -175,13 +176,51 @@ test("version route renders rollback options", () => {
   assert((html.match(/data-version=/g) || []).length >= 8, "version buttons missing");
 });
 
+test("payment success route renders Stripe deposit confirmation", () => {
+  context.window.location.hash = "#payment-success";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes("Deposit Received"), "payment success heading missing");
+  assert(html.includes("Stripe deposit was submitted"), "payment success copy missing");
+  assert(html.includes("pending final availability confirmation"), "manual confirmation language missing");
+});
+
 test("contact route renders public business contact", () => {
   context.window.location.hash = "#contact";
   context.render(context.currentRoute());
   const html = appHtml();
-  assert(html.includes("timaslovelylocs@gmail.com"), "email missing");
+  assert(html.includes("lovely2locs@gmail.com"), "email missing");
   assert(html.includes("(336)-471-1098"), "phone missing");
   assert(html.includes("Piedmont Triad"), "location missing");
+});
+
+test("privacy and terms routes render SMS safeguards", () => {
+  context.window.location.hash = "#privacy";
+  context.render(context.currentRoute());
+  let html = appHtml();
+  assert(html.includes("Privacy Policy"), "privacy page missing");
+  assert(html.includes("does not sell, rent, or share SMS opt-in data"), "SMS no-sharing privacy language missing");
+  assert(html.includes("replying STOP"), "privacy opt-out language missing");
+
+  context.window.location.hash = "#terms";
+  context.render(context.currentRoute());
+  html = appHtml();
+  assert(html.includes("Terms &amp; Conditions"), "terms page missing");
+  assert(html.includes("Rewards, Discounts &amp; Free Product Offers"), "offer safeguards missing");
+  assert(html.includes("not guaranteed for every client"), "non-guarantee terms missing");
+});
+
+test("sms opt-in route renders consent proof form", () => {
+  context.window.location.hash = "#sms-opt-in";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes("SMS Opt-In"), "sms opt-in page missing");
+  assert(html.includes("Lovely Locs Text Message Opt-In"), "sms consent form heading missing");
+  assert(html.includes('name="smsConsent" type="checkbox"'), "sms consent checkbox missing");
+  assert(!html.includes('name="smsConsent" type="checkbox" checked'), "sms consent checkbox must not be preselected");
+  assert(html.includes("Message frequency may vary"), "message frequency disclosure missing");
+  assert(html.includes("Reply STOP to opt out"), "STOP disclosure missing");
+  assert(html.includes("HELP for help"), "HELP disclosure missing");
 });
 
 test("adding a service updates cart and booking modal", () => {
@@ -256,6 +295,9 @@ test("route links include policies and explicit route handling", () => {
   const html = fs.readFileSync("index.html", "utf8");
   const script = fs.readFileSync("script.js", "utf8");
   assert(html.includes('href="#policies" data-route="policies"'), "header policies link should have explicit route data");
+  assert(html.includes('href="#privacy" data-route="privacy"'), "privacy link should have explicit route data");
+  assert(html.includes('href="#terms" data-route="terms"'), "terms link should have explicit route data");
+  assert(html.includes('href="#sms-opt-in" data-route="sms-opt-in"'), "sms opt-in link should have explicit route data");
   assert(script.includes('document.querySelectorAll("[data-route]")'), "route link handler missing");
   context.window.location.hash = "#policies";
   context.render(context.currentRoute());
@@ -290,13 +332,15 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="phone" required'), "phone not required");
   assert(html.includes('name="date" required'), "date not required");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
+  assert(html.includes('name="smsOptIn"'), "optional SMS opt-in checkbox missing");
   assert(html.includes('value="text"'), "text contact option missing");
   assert(html.includes('value="email"'), "email contact option missing");
   assert(html.includes('Text + Email'), "text plus email contact option missing");
   assert(!html.includes('name="address"'), "address field should not be shown for studio-only bookings");
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
-  assert(html.includes("Revisit policies"), "checkout should link back to policies");
+  assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
+  assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });
 
 test("anchor route maps to home for section navigation", () => {
@@ -352,6 +396,7 @@ test("booking submission requires policy acknowledgement", async () => {
 
 test("booking submission sends booking to backend and shows confirmation", async () => {
   context.lastAlert = "";
+  context.window.location.href = "";
   elements.bookingError.textContent = "previous error";
   elements.policyAcknowledgement.checked = true;
   await context.submitBooking();
@@ -359,9 +404,18 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
   assert(context.lastFetch.options.body.includes("Test Client"), "booking backend payload should include client details");
   assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
-  assert(appHtml().includes("Confirmation ready"), "confirmation panel missing");
-  assert(appHtml().includes("Send Text Confirmation"), "text confirmation action missing");
-  assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until confirmation is sent");
+  assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
+  assert(context.window.location.href === "https://checkout.stripe.com/c/pay/cs_test_123", "valid booking should redirect to Stripe Checkout");
+  assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until Stripe deposit is paid");
+});
+
+test("server includes Stripe Checkout and webhook endpoints", () => {
+  const server = fs.readFileSync("local-server.js", "utf8");
+  assert(server.includes('require("stripe")'), "Stripe dependency should be loaded by the backend");
+  assert(server.includes("createCheckoutSession"), "Stripe Checkout Session helper missing");
+  assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
+  assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
+  assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
 });
 
 test("referral share link copies the booking page", async () => {

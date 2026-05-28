@@ -9,7 +9,7 @@ const categories = [
 
 const business = {
   name: "Lovely Locs",
-  email: "timaslovelylocs@gmail.com",
+  email: "lovely2locs@gmail.com",
   phone: "(336)-471-1098",
   area: "Piedmont Triad, North Carolina",
   studio: "Private in-home studio"
@@ -93,19 +93,19 @@ const visualVersions = [
 ];
 
 const policies = {
-  deposit: "A non-refundable deposit is required to secure all appointments. Deposits are due at the time of booking. Remaining balance is due after the service is completed. No refunds for cancellations after booking is confirmed.",
+  deposit: "A non-refundable Stripe deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Remaining balance is due after the service is completed.",
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
   emergency_fee: "Clients must add the Emergency Fee ($45) if booking within 24 hours, on Sundays, or on holidays and key dates outside of regular availability. Visit our policies to know when this applies to your appointment.",
-  payment_options: "Buy Now, Apple Pay, and Venmo are available. All connected to the following number: (336)-471-1098."
+  payment_options: "Deposits are paid online through Stripe Checkout. Remaining balances are handled directly with Lovely Locs after service."
 };
 
 const faq = [
-  { question: "Do you repair locs?", answer: "Yes. Please contact us at timaslovelylocs@gmail.com to discuss your specific needs and schedule a consultation." },
+  { question: "Do you repair locs?", answer: "Yes. Please contact us at lovely2locs@gmail.com to discuss your specific needs and schedule a consultation." },
   { question: "How long do services take?", answer: "Service durations vary from 1.5 to 6.5 hours depending on the type and complexity of service." },
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
-  { question: "What payment methods do you accept?", answer: "Buy Now, Apple Pay, and Venmo are available through (336)-471-1098." },
+  { question: "What payment methods do you accept?", answer: "Appointment deposits are paid through Stripe Checkout. Remaining balances are handled directly with Lovely Locs after service." },
   { question: "What about emergency or holiday appointments?", answer: "A $45 Emergency Fee applies for same-day bookings, Sunday bookings, and major holidays. Your appointment is subject to being declined if not pre-cleared." }
 ];
 
@@ -519,7 +519,7 @@ function processSection() {
   const steps = [
     ["1", "Choose your service", "Pick the service that fits your current loc stage, from maintenance to starter locs and add-ons."],
     ["2", "Share your notes", "Tell us your product preference, style goal, timing needs, and anything important about your loc history."],
-    ["3", "Confirm your deposit", "Your appointment is secured after the required non-refundable deposit is confirmed."],
+    ["3", "Pay your Stripe deposit", "Your request is sent to Stripe Checkout for the required non-refundable deposit."],
     ["4", "Arrive relaxed", "The studio address is shared after confirmation, and your appointment is handled one-on-one."]
   ];
   return `
@@ -603,6 +603,140 @@ function productsPage() {
   `;
 }
 
+function privacyPage() {
+  return `
+    <section class="hero route-page" id="privacy-page">
+      <h1>Privacy Policy</h1>
+      <p class="subtitle">How Lovely Locs handles booking, contact, and SMS information.</p>
+    </section>
+    <section class="section">
+      <div class="narrow legal-stack">
+        <div class="policy-box">
+          <p class="eyebrow">Effective Date</p>
+          <h2>Lovely Locs Privacy Policy</h2>
+          <p>This Privacy Policy explains how Lovely Locs collects, uses, and protects information provided through this booking website, appointment forms, text messages, emails, and direct client communication.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Information We Collect</h2>
+          <p>Lovely Locs may collect your name, email address, phone number, preferred appointment date, selected services, product or parting preferences, special requests, referral notes, SMS opt-in status, and message history related to your appointment.</p>
+        </div>
+        <div class="policy-box">
+          <h2>How We Use Information</h2>
+          <p>Your information is used to process appointment requests, confirm booking details, send service-related updates, answer questions, provide loc care follow-up messages, manage referrals, and share occasional opt-in offers or chances for bonuses, discounts, or product promotions.</p>
+          <p>Promotional opportunities are not guaranteed and may vary based on availability, eligibility, timing, and active promotions.</p>
+        </div>
+        <div class="policy-box">
+          <h2>SMS Privacy &amp; Consent</h2>
+          <p>By choosing to receive texts from Lovely Locs, you consent to receive appointment updates, booking reminders, follow-up messages, care tips, and occasional promotional or referral-related messages from Lovely Locs. Message frequency may vary. Message and data rates may apply.</p>
+          <p><strong>Lovely Locs does not sell, rent, or share SMS opt-in data, phone numbers, or text messaging consent with third parties for their own marketing or promotional purposes.</strong></p>
+        </div>
+        <div class="policy-box">
+          <h2>Opt-Out &amp; Help</h2>
+          <p>You can opt out of SMS messages at any time by replying STOP. You can request help by replying HELP. After opting out, you may receive one final message confirming your opt-out.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Service Providers</h2>
+          <p>Lovely Locs may use trusted service providers, such as SMS, email, hosting, booking, or payment processors, only as needed to operate the booking process and client communication. These providers are not authorized to use your information for their own unrelated marketing.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Data Care</h2>
+          <p>Lovely Locs keeps client information only as long as reasonably needed for booking, client care, business records, legal compliance, and dispute prevention. No online system is perfect, but Lovely Locs takes reasonable steps to protect booking and contact information.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Contact</h2>
+          <p>Questions about this Privacy Policy can be sent to <a href="mailto:${business.email}">${business.email}</a> or by contacting Lovely Locs at ${business.phone}.</p>
+        </div>
+      </div>
+    </section>
+    ${cartMarkup()}
+    ${bookingModal()}
+  `;
+}
+
+function termsPage() {
+  return `
+    <section class="hero route-page" id="terms-page">
+      <h1>Terms &amp; Conditions</h1>
+      <p class="subtitle">Booking, payment, cancellation, and SMS terms for Lovely Locs clients.</p>
+    </section>
+    <section class="section">
+      <div class="narrow legal-stack">
+        <div class="policy-box">
+          <p class="eyebrow">Effective Date</p>
+          <h2>Lovely Locs Terms &amp; Conditions</h2>
+          <p>By submitting an appointment request, using this website, or opting in to Lovely Locs messages, you agree to these Terms &amp; Conditions and the Lovely Locs Privacy Policy.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Appointment Requests</h2>
+          <p>Submitting a request does not guarantee an appointment. Your appointment is pending until Lovely Locs reviews the request, confirms availability, and receives the required deposit or payment when applicable.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Deposits, Payments &amp; Cancellations</h2>
+          <p>${policies.deposit}</p>
+          <p>${policies.cancellation}</p>
+          <p>${policies.emergency_fee}</p>
+        </div>
+        <div class="policy-box">
+          <h2>Client Accuracy &amp; Service Fit</h2>
+          <p>Clients are responsible for providing accurate hair history, timing, contact information, preferred dates, product preferences, and service notes. Lovely Locs may recommend a different service or price if the selected service does not match the condition, timing, or needs of the client's hair.</p>
+        </div>
+        <div class="policy-box">
+          <h2>SMS Terms</h2>
+          <p>By opting in to Lovely Locs SMS messages, you agree to receive appointment updates, booking confirmations, reminders, follow-up messages, loc care tips, and occasional promotional or referral-related messages. Message frequency may vary. Message and data rates may apply.</p>
+          <p>Reply STOP to opt out. Reply HELP for help. Opting out of promotional messages may limit our ability to send some text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Rewards, Discounts &amp; Free Product Offers</h2>
+          <p>Referral bonuses, discounts, rewards, and free product offers are occasional opportunities only. They are not guaranteed for every client, service, booking, referral, or opt-in. Offers may vary based on availability, eligibility, timing, promotion rules, and Lovely Locs discretion.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Studio Policy</h2>
+          <p>All appointments are held at the Lovely Locs private in-home studio by appointment only. The studio address is shared after booking is confirmed. Clients are expected to arrive on time, prepared, and respectful of the private studio environment.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Contact</h2>
+          <p>Questions about these Terms can be sent to <a href="mailto:${business.email}">${business.email}</a> or by contacting Lovely Locs at ${business.phone}.</p>
+        </div>
+      </div>
+    </section>
+    ${cartMarkup()}
+    ${bookingModal()}
+  `;
+}
+
+function smsOptInPage() {
+  return `
+    <section class="hero route-page" id="sms-opt-in-page">
+      <h1>SMS Opt-In</h1>
+      <p class="subtitle">Choose whether you want Lovely Locs text updates, care tips, and occasional offer opportunities.</p>
+    </section>
+    <section class="section">
+      <div class="narrow legal-stack">
+        <div class="policy-box sms-optin-proof">
+          <p class="eyebrow">Consent Form</p>
+          <h2>Lovely Locs Text Message Opt-In</h2>
+          <p>Complete this form if you would like to receive text messages from Lovely Locs. Texts may include appointment updates, booking reminders, service follow-ups, loc care tips, referral updates, and occasional chances for discounts, rewards, or free product offers.</p>
+          <p>Offers are not guaranteed and may vary by availability, eligibility, timing, and active promotion rules.</p>
+          <form class="sms-optin-form">
+            <label>Full Name<input name="smsOptInName" placeholder="Your name"></label>
+            <label>Mobile Number<input name="smsOptInPhone" placeholder="(555) 123-4567"></label>
+            <label class="full policy-ack sms-consent"><input name="smsConsent" type="checkbox"><span>Yes, I agree to receive recurring text messages from Lovely Locs at the phone number provided. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out and HELP for help. I agree to the <a href="#privacy" data-route="privacy">Privacy Policy</a> and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>.</span></label>
+            <button class="primary-btn" type="button" data-copy-optin-proof>Copy Opt-In Link</button>
+          </form>
+          <p class="duration">This opt-in checkbox is intentionally not preselected. Clients must choose it themselves.</p>
+        </div>
+        <div class="policy-box">
+          <h2>For Twilio Proof of Consent</h2>
+          <p>Use this page as the consent form URL after your public Render website is live. You can also screenshot this form showing the unchecked consent box and disclosures.</p>
+          <p>Public opt-in URL format: <strong>https://your-render-url.onrender.com/#sms-opt-in</strong></p>
+        </div>
+      </div>
+    </section>
+    ${cartMarkup()}
+    ${bookingModal()}
+  `;
+}
+
 function contactCard() {
   return `
     <div class="contact-card">
@@ -628,6 +762,25 @@ function contactPage() {
       </div>
     </section>
     <section class="section"><div class="narrow">${contactCard()}</div></section>
+  `;
+}
+
+function paymentSuccessPage() {
+  return `
+    <section class="hero route-page" id="payment-success-page">
+      <h1>Deposit Received</h1>
+      <p class="subtitle">Thank you. Your Stripe deposit was submitted and your appointment request is pending final availability confirmation.</p>
+    </section>
+    <section class="section">
+      <div class="narrow policy-stack">
+        <div class="policy-box">
+          <p class="eyebrow">Next Step</p>
+          <h2>Lovely Locs will review your request.</h2>
+          <p>Your appointment is not fully confirmed until Lovely Locs verifies availability and sends final confirmation. Keep your Stripe receipt for your records.</p>
+        </div>
+        ${contactCard()}
+      </div>
+    </section>
   `;
 }
 
@@ -697,13 +850,8 @@ function bookingModal() {
   const deposit = cart.length ? Math.max(Math.round(total * 0.3), 30) : 30;
   const confirmationMarkup = bookingConfirmation ? `
         <div class="confirmation-panel">
-          <strong>Confirmation ready</strong>
+          <strong>Payment step ready</strong>
           <p>${bookingConfirmation.message}</p>
-          <div class="confirmation-actions">
-            <a class="primary-btn" href="${bookingConfirmation.mailto}">Send Email Confirmation</a>
-            <a class="outline-btn" href="${bookingConfirmation.sms}">Send Text Confirmation</a>
-          </div>
-          <p class="duration">If SMS/email provider keys are not connected yet, use these fallback buttons so the request can still be sent manually.</p>
         </div>
   ` : "";
   return `
@@ -739,15 +887,16 @@ function bookingModal() {
             <label><input name="preferredContact" type="radio" value="email"> Email</label>
             <p>Lovely Locs will still send both confirmation types when text and email providers are connected.</p>
           </fieldset>
+          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox"><span>I agree to receive Lovely Locs text messages for appointment updates, reminders, follow-ups, loc care tips, and occasional chances for referral bonuses, discounts, or free product offers. Offers are not guaranteed. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes..."></textarea></label>
-          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs policies before submitting this appointment request. <a href="#policies" data-route="policies">Revisit policies</a></span></label>
+          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a> before submitting this appointment request.</span></label>
         </form>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
         <div class="modal-summary">
           <strong>Before You Submit</strong>
           <p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p>
-          <p>After submitting, Lovely Locs will attempt to send automatic email/text confirmations. Your booking is not fully confirmed until the message and deposit are received.</p>
+          <p>After submitting, you will be sent to Stripe Checkout to pay the required deposit. Your appointment request is pending until the Stripe deposit is paid and Lovely Locs confirms availability.</p>
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
@@ -762,6 +911,10 @@ function render(route = currentRoute()) {
   if (route === "policies") app.innerHTML = policiesPage();
   else if (route === "products") app.innerHTML = productsPage();
   else if (route === "contact") app.innerHTML = contactPage();
+  else if (route === "sms-opt-in") app.innerHTML = smsOptInPage();
+  else if (route === "privacy") app.innerHTML = privacyPage();
+  else if (route === "terms") app.innerHTML = termsPage();
+  else if (route === "payment-success") app.innerHTML = paymentSuccessPage();
   else if (route === "versions") app.innerHTML = versionsPage();
   else app.innerHTML = homePage();
   bindDynamic();
@@ -780,9 +933,9 @@ function scrollRouteToTop(route) {
 }
 
 function currentRoute() {
-  const hash = window.location.hash.replace("#", "");
-  const route = ["policies", "products", "contact", "versions"].includes(hash) ? hash : "home";
-  if (!["policies", "products", "contact", "versions", "home", ""].includes(hash)) {
+  const hash = window.location.hash.replace("#", "").split("?")[0];
+  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "versions"].includes(hash) ? hash : "home";
+  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
   return route;
@@ -947,6 +1100,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-submit-booking]").forEach(button => button.addEventListener("click", submitBooking));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
+  document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
   document.getElementById("cartButton")?.addEventListener("click", openCart);
   document.querySelectorAll("[data-close-cart]").forEach(item => item.addEventListener("click", closeCart));
   document.querySelectorAll(".faq-item button").forEach(button => button.addEventListener("click", () => button.parentElement.classList.toggle("open")));
@@ -1056,6 +1210,17 @@ async function shareBookingSite() {
   await copyBookingLink();
 }
 
+async function copySmsOptInLink() {
+  const origin = window.location.origin || "http://127.0.0.1:4175";
+  const url = `${origin}/#sms-opt-in`;
+  try {
+    await navigator.clipboard?.writeText(url);
+    setShareStatus("SMS opt-in link copied.");
+  } catch {
+    setShareStatus(`Copy this SMS opt-in link: ${url}`);
+  }
+}
+
 function bookingSummaryFromForm(form) {
   const booking = bookingPayloadFromForm(form);
   const { client, selectedServices, addOns, total, deposit } = booking;
@@ -1105,6 +1270,7 @@ function bookingPayloadFromForm(form) {
       phone: data.get("phone") || "",
       date: data.get("date") || "",
       preferredContact: data.get("preferredContact") || "text_email",
+      smsOptIn: Boolean(data.get("smsOptIn")),
       specialRequests: data.get("specialRequests") || ""
     },
     cart,
@@ -1149,10 +1315,9 @@ async function submitBooking() {
   if (error) error.textContent = "";
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.textContent = "Sending...";
+    submitButton.dataset.originalText = submitButton.textContent;
+    submitButton.textContent = "Opening Stripe Checkout...";
   }
-  const summary = bookingSummaryFromForm(form);
-  const links = confirmationLinks(summary);
   try {
     const response = await fetch("/api/bookings", {
       method: "POST",
@@ -1160,27 +1325,20 @@ async function submitBooking() {
       body: JSON.stringify(bookingPayloadFromForm(form))
     });
     const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "Booking could not be sent.");
+    if (!result.ok || !result.checkoutUrl) throw new Error(result.error || "Stripe Checkout could not be opened.");
     bookingConfirmation = {
-      ...links,
-      message: result.sent
-        ? "Appointment request sent. Lovely Locs and the client should receive confirmation through the connected message system."
-        : "Appointment request saved. Automatic SMS is not turned on yet because the Twilio SMS account keys still need to be added in the backend settings. Use the fallback buttons below until those keys are connected."
+      message: "Your appointment request was saved. Redirecting to Stripe Checkout for the required deposit."
     };
+    window.location.href = result.checkoutUrl;
+    return;
   } catch (bookingError) {
-    bookingConfirmation = {
-      ...links,
-      message: "The automatic message system could not complete this request. Use the email/text buttons below while the provider connection is checked."
-    };
     if (error) error.textContent = bookingError.message;
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = submitButton.dataset.originalText || submitButton.textContent.replace("Sending...", "Submit Request");
+      submitButton.textContent = submitButton.dataset.originalText || "Submit Request & Pay Deposit";
     }
   }
-  render(currentRoute());
-  openBooking();
 }
 
 document.getElementById("menuButton").addEventListener("click", () => drawer.classList.add("open"));
@@ -1205,6 +1363,7 @@ document.querySelectorAll("[data-route]").forEach(link => {
     closeCart();
     closeAdvisory();
     closeProductPreference();
+    closePartingPreference();
     pendingAnchor = null;
     window.location.hash = route;
     render(route);

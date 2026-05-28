@@ -9,6 +9,12 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
+      - key: PUBLIC_SITE_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: BOOKING_OWNER_EMAIL
         sync: false
       - key: BOOKING_OWNER_PHONE

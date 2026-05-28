@@ -24,7 +24,10 @@ Health Check Path: /healthz
 4. Add these environment variables in Render:
 
 ```text
-BOOKING_OWNER_EMAIL=timaslovelylocs@gmail.com
+PUBLIC_SITE_URL=https://lovely-locs-booking.onrender.com
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+BOOKING_OWNER_EMAIL=lovely2locs@gmail.com
 BOOKING_OWNER_PHONE=3364711098
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
@@ -34,7 +37,8 @@ CONFIRMATION_FROM_EMAIL=
 ```
 
 5. Deploy.
-6. Use the Render URL as the website URL in Twilio.
+6. In Stripe, add a webhook endpoint for `https://lovely-locs-booking.onrender.com/api/stripe/webhook` and subscribe to `checkout.session.completed`.
+7. Use the Render URL as the website URL in Twilio.
 
 ## Twilio URL
 
@@ -48,6 +52,12 @@ The booking backend endpoint is:
 
 ```text
 https://your-render-url.onrender.com/api/bookings
+```
+
+The Stripe webhook endpoint is:
+
+```text
+https://your-render-url.onrender.com/api/stripe/webhook
 ```
 
 Do not use `127.0.0.1` or `localhost` in Twilio. Those only work on your computer.

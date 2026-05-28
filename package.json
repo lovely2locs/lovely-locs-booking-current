@@ -8,6 +8,9 @@
     "start": "node local-server.js",
     "test": "node qa-test.js"
   },
+  "dependencies": {
+    "stripe": "^18.0.0"
+  },
   "engines": {
     "node": ">=20"
   }

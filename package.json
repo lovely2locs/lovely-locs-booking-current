@@ -1,0 +1,14 @@
+{
+  "name": "lovely-locs-booking-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lovely Locs booking website with SMS/email confirmation backend.",
+  "main": "local-server.js",
+  "scripts": {
+    "start": "node local-server.js",
+    "test": "node qa-test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

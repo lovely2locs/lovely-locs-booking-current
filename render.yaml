@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: lovely-locs-booking
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: BOOKING_OWNER_EMAIL
+        sync: false
+      - key: BOOKING_OWNER_PHONE
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: CONFIRMATION_FROM_EMAIL
+        sync: false

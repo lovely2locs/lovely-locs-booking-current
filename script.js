@@ -23,12 +23,6 @@ const manualPaymentFallbackOptions = [
     note: "Include your booking ID in the payment note so the deposit can be matched quickly."
   },
   {
-    id: "cash-app",
-    label: "Cash App",
-    handle: "Confirm current Cash App tag with Lovely Locs before sending.",
-    note: "Include your booking ID in the payment note so the deposit can be matched quickly."
-  },
-  {
     id: "apple-pay",
     label: "Apple Pay",
     handle: "Confirm current Apple Pay contact with Lovely Locs before sending.",
@@ -282,11 +276,11 @@ const visualVersions = [
 ];
 
 const policies = {
-  deposit: "A non-refundable deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo, Cash App, or Apple Pay details after submitting.",
+  deposit: "A non-refundable deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo or Apple Pay details after submitting.",
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
   emergency_fee: "Clients must add the Emergency Fee ($45) if booking within 24 hours, on Sundays, or on holidays and key dates outside of regular availability. Visit our policies to know when this applies to your appointment.",
-  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo, Cash App, or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt in Gmail."
+  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt in Gmail."
 };
 
 const faq = [
@@ -294,7 +288,7 @@ const faq = [
   { question: "How long do services take?", answer: "Service durations vary from 1.5 to 6.5 hours depending on the type and complexity of service." },
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
-  { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo, Cash App, or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
+  { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
   { question: "What about emergency or holiday appointments?", answer: "A $45 Emergency Fee applies for same-day bookings, Sunday bookings, and major holidays. Your appointment is subject to being declined if not pre-cleared." }
 ];
 
@@ -777,7 +771,7 @@ function processSection() {
   const steps = [
     ["1", "Choose your service", "Pick the service that fits your current loc stage, from maintenance to starter locs and add-ons."],
     ["2", "Share your notes", "Tell us your product preference, style goal, timing needs, and anything important about your loc history."],
-    ["3", "Pay from the options page", "Use Venmo, Cash App, or Apple Pay and include your booking ID so the deposit can be matched."],
+    ["3", "Pay from the options page", "Use Venmo or Apple Pay and include your booking ID so the deposit can be matched."],
     ["4", "Arrive relaxed", "The studio address is shared after confirmation, and your appointment is handled one-on-one."]
   ];
   return `
@@ -1111,7 +1105,7 @@ function paymentOptionsPage() {
   return `
     <section class="hero route-page" id="payment-options-page">
       <h1>Pay Your Lovely Locs Deposit</h1>
-      <p class="subtitle">Use Venmo, Cash App, or Apple Pay, then Lovely Locs will verify the receipt before sending the official confirmation.</p>
+      <p class="subtitle">Use Venmo or Apple Pay, then Lovely Locs will verify the receipt before sending the official confirmation.</p>
     </section>
     <section class="section payment-options-section">
       <div class="container">
@@ -1314,7 +1308,7 @@ function bookingModal() {
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
-            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will see the Venmo, Cash App, and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail and confirms availability.</p>`}
+            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail and confirms availability.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>

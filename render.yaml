@@ -13,8 +13,6 @@ services:
         sync: false
       - key: VENMO_HANDLE
         sync: false
-      - key: CASH_APP_TAG
-        sync: false
       - key: APPLE_PAY_CONTACT
         sync: false
       - key: MANUAL_DEPOSIT_CONFIRM_TOKEN

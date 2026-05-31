@@ -74,7 +74,7 @@ const localStore = new Map();
 const context = {
   document,
   window: {
-    location: { hash: "", href: "" },
+    location: { hash: "", href: "", search: "" },
     addEventListener() {},
     scrollTo(options) { context.lastScrollTo = options; },
     localStorage: null
@@ -93,9 +93,21 @@ const context = {
     context.lastFetch = { url, options };
     return {
       ok: true,
-      json: async () => ({ ok: true, id: "LL-TEST", checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123", total: 100, deposit: 30 })
+      json: async () => ({
+        ok: true,
+        id: "LL-TEST",
+        payOptionsUrl: "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options",
+        paymentOptions: [
+          { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
+          { id: "cash-app", label: "Cash App", handle: "$LovelyLocs", note: "Include your booking ID." },
+          { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
+        ],
+        total: 100,
+        deposit: 30
+      })
     };
   },
+  URLSearchParams,
   setTimeout(fn) { fn(); },
   alert(message) { context.lastAlert = message; }
 };
@@ -142,6 +154,8 @@ test("home renders core client sections", () => {
   assert(html.includes("Portfolio Preview"), "portfolio missing");
   assert(html.includes("Client Notes"), "testimonials missing");
   assert(html.includes("How Booking Works"), "booking process missing");
+  assert(html.includes("Booking Prep Checklist"), "prep checklist missing");
+  assert(html.includes("Mini Service Quiz"), "service quiz missing");
   assert(html.includes("Referral Rewards"), "referral share section missing");
   assert(html.includes("data-share-booking"), "share booking button missing");
   assert(html.includes("ios-share-icon"), "iphone-style share icon missing");
@@ -167,6 +181,8 @@ test("products route renders products and cart", () => {
   assert(html.includes("Recommended Hair Products"), "recommended hair products section missing");
   assert(html.includes("Loc Jewels &amp; Accessories"), "accessories section missing");
   assert(html.includes("Review source"), "review source links missing");
+  assert(html.includes("data-product-filter"), "product filter controls missing");
+  assert(html.includes("product-visual"), "product visual badges missing");
   assert(html.includes("Locsanity Rosewater & Peppermint Spray"), "recommended loc product missing");
   assert((html.match(/Add to Cart/g) || []).length >= 4, "product add buttons missing");
   assert(html.includes("Your Cart"), "cart markup missing");
@@ -186,7 +202,7 @@ test("admin route offers free no-charge test booking", () => {
   let html = appHtml();
   assert(html.includes("Admin Test Booking"), "admin test page missing");
   assert(html.includes("Free Admin Test Booking"), "free test service missing");
-  assert(html.includes("No Stripe deposit"), "no-charge Stripe note missing");
+  assert(html.includes("No deposit"), "no-charge deposit note missing");
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
@@ -194,13 +210,26 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("Submit No-Charge Test Booking"), "admin no-charge submit button missing");
 });
 
-test("payment success route renders Stripe deposit confirmation", () => {
-  context.window.location.hash = "#payment-success";
+test("payment options route renders manual deposit instructions", () => {
+  context.window.location.hash = "#payment-options";
+  context.window.location.search = "?booking=LL-TEST&deposit=30";
+  localStore.set("lovelyLocsPendingPayment", JSON.stringify({
+    id: "LL-TEST",
+    deposit: 30,
+    paymentOptions: [
+      { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
+      { id: "cash-app", label: "Cash App", handle: "$LovelyLocs", note: "Include your booking ID." },
+      { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
+    ]
+  }));
   context.render(context.currentRoute());
   const html = appHtml();
-  assert(html.includes("Deposit Received"), "payment success heading missing");
-  assert(html.includes("Stripe deposit was submitted"), "payment success copy missing");
-  assert(html.includes("pending final availability confirmation"), "manual confirmation language missing");
+  assert(html.includes("Pay Your Lovely Locs Deposit"), "payment options heading missing");
+  assert(html.includes("Venmo"), "Venmo option missing");
+  assert(html.includes("Cash App"), "Cash App option missing");
+  assert(html.includes("Apple Pay"), "Apple Pay option missing");
+  assert(html.includes("verify the receipt"), "manual verification language missing");
+  context.window.location.search = "";
 });
 
 test("contact route renders public business contact", () => {
@@ -248,7 +277,7 @@ test("adding a service updates cart and booking modal", () => {
   const html = appHtml();
   assert(html.includes("Cart (1)"), "cart count did not update");
   assert(html.includes("Services: QA Service"), "booking modal did not use selected service");
-  assert(html.includes("Submit Request &amp; Pay $30"), "deposit button missing");
+  assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
   assert(html.includes("Finalize Cart &amp; Enter Details"), "final cart CTA missing");
 });
 
@@ -424,11 +453,12 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes("Test Client"), "booking backend payload should include client details");
   assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
   assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
-  assert(context.window.location.href === "https://checkout.stripe.com/c/pay/cs_test_123", "valid booking should redirect to Stripe Checkout");
-  assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until Stripe deposit is paid");
+  assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
+  assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
+  assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until deposit is confirmed");
 });
 
-test("admin no-charge booking submission does not require Stripe checkout URL", async () => {
+test("admin no-charge booking submission does not require pay options URL", async () => {
   const previousFetch = context.fetch;
   context.fetch = async (url, options) => {
     context.lastFetch = { url, options };
@@ -445,15 +475,17 @@ test("admin no-charge booking submission does not require Stripe checkout URL", 
   assert(context.lastFetch.url === "/api/bookings", "admin test should post to booking backend");
   assert(context.lastFetch.options.body.includes("admin-test-booking"), "admin test payload missing service id");
   assert(context.lastFetch.options.body.includes('"deposit":0'), "admin test payload should carry zero deposit");
-  assert(context.window.location.href === "", "admin test should not redirect to Stripe");
+  assert(context.window.location.href === "", "admin test should not redirect to pay options");
   assert(appHtml().includes("Free admin test booking saved."), "admin test confirmation message missing");
   context.fetch = previousFetch;
 });
 
-test("server includes Stripe Checkout and webhook endpoints", () => {
+test("server includes manual deposit confirmation and legacy Stripe webhook endpoints", () => {
   const server = fs.readFileSync("local-server.js", "utf8");
-  assert(server.includes('require("stripe")'), "Stripe dependency should be loaded by the backend");
-  assert(server.includes("createCheckoutSession"), "Stripe Checkout Session helper missing");
+  assert(server.includes("manualPaymentOptions"), "manual payment options helper missing");
+  assert(server.includes("notifyManualPaymentPending"), "manual pending owner notification missing");
+  assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
+  assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");

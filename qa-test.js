@@ -99,7 +99,6 @@ const context = {
         payOptionsUrl: "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options",
         paymentOptions: [
           { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
-          { id: "cash-app", label: "Cash App", handle: "$LovelyLocs", note: "Include your booking ID." },
           { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
         ],
         total: 100,
@@ -218,7 +217,6 @@ test("payment options route renders manual deposit instructions", () => {
     deposit: 30,
     paymentOptions: [
       { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
-      { id: "cash-app", label: "Cash App", handle: "$LovelyLocs", note: "Include your booking ID." },
       { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
     ]
   }));
@@ -226,7 +224,7 @@ test("payment options route renders manual deposit instructions", () => {
   const html = appHtml();
   assert(html.includes("Pay Your Lovely Locs Deposit"), "payment options heading missing");
   assert(html.includes("Venmo"), "Venmo option missing");
-  assert(html.includes("Cash App"), "Cash App option missing");
+  assert(!html.includes("Cash App"), "Cash App should be hidden until re-enabled");
   assert(html.includes("Apple Pay"), "Apple Pay option missing");
   assert(html.includes("verify the receipt"), "manual verification language missing");
   context.window.location.search = "";

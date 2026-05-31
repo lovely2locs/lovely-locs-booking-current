@@ -164,6 +164,10 @@ test("products route renders products and cart", () => {
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes("Products"), "products page missing");
+  assert(html.includes("Recommended Hair Products"), "recommended hair products section missing");
+  assert(html.includes("Loc Jewels &amp; Accessories"), "accessories section missing");
+  assert(html.includes("Review source"), "review source links missing");
+  assert(html.includes("Locsanity Rosewater & Peppermint Spray"), "recommended loc product missing");
   assert((html.match(/Add to Cart/g) || []).length >= 4, "product add buttons missing");
   assert(html.includes("Your Cart"), "cart markup missing");
 });
@@ -174,6 +178,20 @@ test("version route renders rollback options", () => {
   const html = appHtml();
   assert(html.includes("Version History"), "version page missing");
   assert((html.match(/data-version=/g) || []).length >= 8, "version buttons missing");
+});
+
+test("admin route offers free no-charge test booking", () => {
+  context.window.location.hash = "#admin";
+  context.render(context.currentRoute());
+  let html = appHtml();
+  assert(html.includes("Admin Test Booking"), "admin test page missing");
+  assert(html.includes("Free Admin Test Booking"), "free test service missing");
+  assert(html.includes("No Stripe deposit"), "no-charge Stripe note missing");
+  context.addAdminTestBooking();
+  html = appHtml();
+  assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
+  assert(html.includes("Deposit Required to Hold Slot: $0"), "admin test deposit should be zero");
+  assert(html.includes("Submit No-Charge Test Booking"), "admin no-charge submit button missing");
 });
 
 test("payment success route renders Stripe deposit confirmation", () => {
@@ -225,6 +243,7 @@ test("sms opt-in route renders consent proof form", () => {
 
 test("adding a service updates cart and booking modal", () => {
   context.window.location.hash = "";
+  context.clearCart();
   context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
   const html = appHtml();
   assert(html.includes("Cart (1)"), "cart count did not update");
@@ -409,6 +428,28 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until Stripe deposit is paid");
 });
 
+test("admin no-charge booking submission does not require Stripe checkout URL", async () => {
+  const previousFetch = context.fetch;
+  context.fetch = async (url, options) => {
+    context.lastFetch = { url, options };
+    return {
+      ok: true,
+      json: async () => ({ ok: true, id: "LL-TEST-FREE", noCharge: true, total: 0, deposit: 0, message: "Free admin test booking saved." })
+    };
+  };
+  context.window.location.hash = "#admin";
+  context.window.location.href = "";
+  context.addAdminTestBooking();
+  elements.policyAcknowledgement.checked = true;
+  await context.submitBooking();
+  assert(context.lastFetch.url === "/api/bookings", "admin test should post to booking backend");
+  assert(context.lastFetch.options.body.includes("admin-test-booking"), "admin test payload missing service id");
+  assert(context.lastFetch.options.body.includes('"deposit":0'), "admin test payload should carry zero deposit");
+  assert(context.window.location.href === "", "admin test should not redirect to Stripe");
+  assert(appHtml().includes("Free admin test booking saved."), "admin test confirmation message missing");
+  context.fetch = previousFetch;
+});
+
 test("server includes Stripe Checkout and webhook endpoints", () => {
   const server = fs.readFileSync("local-server.js", "utf8");
   assert(server.includes('require("stripe")'), "Stripe dependency should be loaded by the backend");
@@ -416,6 +457,8 @@ test("server includes Stripe Checkout and webhook endpoints", () => {
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
+  assert(server.includes("notifyNoChargeTestBooking"), "no-charge test booking notifier missing");
+  assert(server.includes("no_charge_test"), "no-charge test status missing");
 });
 
 test("referral share link copies the booking page", async () => {

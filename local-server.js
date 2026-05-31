@@ -225,6 +225,14 @@ function appendBookingRecord(record) {
   fs.appendFileSync(bookingsFile, `${JSON.stringify(record)}\n`, "utf8");
 }
 
+function sendHtml(res, status, html) {
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(html);
+}
+
 function findBookingById(id) {
   if (!id || !fs.existsSync(bookingsFile)) return null;
   const lines = fs.readFileSync(bookingsFile, "utf8").split(/\r?\n/).filter(Boolean);
@@ -241,6 +249,53 @@ function findBookingById(id) {
 
 function isAdminTestBooking(cart = []) {
   return cart.length === 1 && cart[0]?.id === "admin-test-booking";
+}
+
+function manualPaymentOptions() {
+  return [
+    {
+      id: "venmo",
+      label: "Venmo",
+      handle: process.env.VENMO_HANDLE || "",
+      note: "Send the deposit through Venmo and include your booking ID in the note.",
+    },
+    {
+      id: "cash-app",
+      label: "Cash App",
+      handle: process.env.CASH_APP_TAG || "",
+      note: "Send the deposit through Cash App and include your booking ID in the note.",
+    },
+    {
+      id: "apple-pay",
+      label: "Apple Pay",
+      handle: process.env.APPLE_PAY_CONTACT || "",
+      note: "Send the deposit through Apple Pay and include your booking ID in the note.",
+    },
+  ];
+}
+
+function publicManualPaymentOptions() {
+  return manualPaymentOptions().map(option => ({
+    ...option,
+    handle: option.handle || "Confirm current payment tag with Lovely Locs before sending.",
+  }));
+}
+
+function paymentOptionsText(booking) {
+  return publicManualPaymentOptions().map(option => [
+    `${option.label}: ${option.handle}`,
+    option.note,
+  ].join("\n")).join("\n\n");
+}
+
+function manualConfirmUrl(req, booking, method = "manual") {
+  const token = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN;
+  if (!token) return "";
+  const url = new URL("/api/manual-payment/confirm", publicSiteUrl(req));
+  url.searchParams.set("booking", booking.id);
+  url.searchParams.set("method", method);
+  url.searchParams.set("token", token);
+  return url.toString();
 }
 
 function sanitizeClient(client = {}) {
@@ -390,9 +445,70 @@ async function notifyDepositPaid(booking, session) {
   return results;
 }
 
+async function notifyManualPaymentPending(booking, req) {
+  const details = bookingText(booking);
+  const confirmLink = manualConfirmUrl(req, booking);
+  const ownerText = [
+    `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}.`,
+    `Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`,
+    "",
+    "Payment options shown to the client:",
+    paymentOptionsText(booking),
+    "",
+    "After you see the matching Venmo, Cash App, or Apple Pay receipt in Gmail, approve the deposit here:",
+    confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN in Render to enable one-click approval links.",
+    "",
+    details,
+  ].join("\n");
+  const results = [];
+
+  for (const task of [
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText)],
+    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. Check Gmail for the Venmo/Cash App/Apple Pay receipt before confirming.`)],
+  ]) {
+    try {
+      results.push({ channel: task[0], ...(await task[1]()) });
+    } catch (error) {
+      results.push({ channel: task[0], failed: true, error: error.message });
+    }
+  }
+
+  return results;
+}
+
+async function notifyManualDepositPaid(booking, method) {
+  const confirmedAt = new Date().toISOString();
+  const details = bookingText({
+    ...booking,
+    status: "deposit_paid",
+    manualPayment: {
+      method,
+      confirmedAt,
+    },
+  });
+  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date}. Your appointment request is paid and pending final availability confirmation from Lovely Locs.`;
+  const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date: ${booking.client.date}.`;
+  const results = [];
+
+  for (const task of [
+    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs deposit received", `${clientText}\n\n${details}`)],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs manual deposit confirmed: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
+    ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)],
+    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
+  ]) {
+    try {
+      results.push({ channel: task[0], ...(await task[1]()) });
+    } catch (error) {
+      results.push({ channel: task[0], failed: true, error: error.message });
+    }
+  }
+
+  return results;
+}
+
 async function notifyNoChargeTestBooking(booking) {
   const details = bookingText(booking);
-  const clientText = `Lovely Locs test booking received for ${booking.client.date}. This was a no-charge admin test, so no Stripe deposit was requested.`;
+  const clientText = `Lovely Locs test booking received for ${booking.client.date}. This was a no-charge admin test, so no deposit was requested.`;
   const ownerText = `No-charge admin test booking submitted for ${booking.client.fullName}. Preferred date: ${booking.client.date}.`;
   const results = [];
 
@@ -434,34 +550,67 @@ async function handleBooking(req, res) {
         noCharge: true,
         total: pendingBooking.total,
         deposit: pendingBooking.deposit,
-        message: "Free admin test booking saved. No Stripe deposit was requested. Confirmation messages were attempted with the connected providers.",
+        message: "Free admin test booking saved. No deposit was requested. Confirmation messages were attempted with the connected providers.",
         notificationResults,
       });
       return;
     }
 
-    const session = await createCheckoutSession(req, pendingBooking);
     const savedBooking = {
       ...pendingBooking,
-      stripe: {
-        checkoutSessionId: session.id,
-        checkoutUrl: session.url,
-        paymentStatus: session.payment_status || "unpaid",
-      },
+      status: "pending_manual_payment",
+      paymentOptions: publicManualPaymentOptions(),
     };
-    appendBookingRecord(savedBooking);
+    const notificationResults = await notifyManualPaymentPending(savedBooking, req);
+    appendBookingRecord({ ...savedBooking, notificationResults });
 
     sendJson(res, 200, {
       ok: true,
       id,
       status: savedBooking.status,
-      checkoutUrl: session.url,
+      payOptionsUrl: `${publicSiteUrl(req)}/?booking=${encodeURIComponent(id)}&deposit=${encodeURIComponent(savedBooking.deposit)}#payment-options`,
+      paymentOptions: savedBooking.paymentOptions,
       total: savedBooking.total,
       deposit: savedBooking.deposit,
+      message: "Appointment request saved. Pay options are ready; Lovely Locs will send the official confirmation after the deposit receipt is verified in Gmail.",
     });
   } catch (error) {
-    const status = /Stripe Checkout is not configured|Stripe package is not installed/.test(error.message) ? 503 : 400;
-    sendJson(res, status, { ok: false, error: error.message });
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleManualPaymentConfirm(req, res) {
+  try {
+    const siteUrl = publicSiteUrl(req);
+    const url = new URL(req.url || "/", siteUrl);
+    const token = url.searchParams.get("token") || "";
+    const expectedToken = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
+    if (!expectedToken || token !== expectedToken) {
+      sendHtml(res, 403, "<h1>Manual deposit confirmation unavailable</h1><p>The owner confirmation token is missing or invalid.</p>");
+      return;
+    }
+
+    const bookingId = url.searchParams.get("booking") || "";
+    const method = url.searchParams.get("method") || "manual";
+    const booking = findBookingById(bookingId);
+    if (!booking) {
+      sendHtml(res, 404, "<h1>Booking not found</h1><p>No matching Lovely Locs booking was found for this confirmation link.</p>");
+      return;
+    }
+
+    const notificationResults = await notifyManualDepositPaid(booking, method);
+    appendBookingRecord({
+      type: "manual.deposit.confirmed",
+      bookingId,
+      receivedAt: new Date().toISOString(),
+      status: "deposit_paid",
+      manualPayment: { method },
+      notificationResults,
+    });
+
+    sendHtml(res, 200, `<h1>Deposit confirmed</h1><p>Lovely Locs confirmation messages were attempted for booking ${bookingId}.</p>`);
+  } catch (error) {
+    sendHtml(res, 400, `<h1>Confirmation failed</h1><p>${error.message}</p>`);
   }
 }
 
@@ -516,6 +665,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/stripe/webhook") {
     handleStripeWebhook(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/manual-payment/confirm") {
+    handleManualPaymentConfirm(req, res);
     return;
   }
 

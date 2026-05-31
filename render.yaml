@@ -11,6 +11,14 @@ services:
         value: 20
       - key: PUBLIC_SITE_URL
         sync: false
+      - key: VENMO_HANDLE
+        sync: false
+      - key: CASH_APP_TAG
+        sync: false
+      - key: APPLE_PAY_CONTACT
+        sync: false
+      - key: MANUAL_DEPOSIT_CONFIRM_TOKEN
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET

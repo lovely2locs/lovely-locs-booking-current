@@ -6,6 +6,30 @@ Your deploy-ready zip is:
 lovely-locs-booking-deploy.zip
 ```
 
+## After Each Website Update
+
+Run this file before uploading changes to GitHub:
+
+```text
+PREPARE_LIVE_UPDATE.bat
+```
+
+It runs the QA tests, rebuilds `lovely-locs-booking-deploy.zip`, and refreshes the local GitHub upload folder when it exists. After you upload/commit the updated files to GitHub, Render redeploys the live site from the connected repository.
+
+If you have a temporary GitHub token, run this instead:
+
+```text
+DEPLOY_LIVE_UPDATE.bat
+```
+
+It runs the same QA/update prep, uploads the changed files to `lovely2locs/lovely-locs-booking`, and can trigger a Render deploy when a temporary Render API key is provided. Do not save real tokens inside website files.
+
+For the full cross-platform setup map, see:
+
+```text
+AUTOMATION_SETUP.md
+```
+
 ## Upload To GitHub
 
 1. Go to `https://github.com/new`

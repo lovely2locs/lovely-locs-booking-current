@@ -50,6 +50,7 @@ const serviceCatalog = [
   { id: "consultation", duration: "1h 15min", price: 30, name: "Consultation", category: "add-ons" },
   { id: "small-adult-starter", duration: "5h 30min", price: 225, name: "Small Adult Starter Locs", category: "starter-locs" },
   { id: "overdue-retwist", duration: "4-5 hours", price: 125, name: "Overdue Retwist (4+ Months)", category: "loc-maintenance" },
+  { id: "admin-test-booking", duration: "15 min", price: 0, name: "Free Admin Test Booking", category: "admin-test" },
 ];
 
 const productCatalog = [
@@ -238,6 +239,10 @@ function findBookingById(id) {
   return null;
 }
 
+function isAdminTestBooking(cart = []) {
+  return cart.length === 1 && cart[0]?.id === "admin-test-booking";
+}
+
 function sanitizeClient(client = {}) {
   return {
     fullName: String(client.fullName || "").trim(),
@@ -300,7 +305,7 @@ function priceBooking(booking) {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
   const total = cart.reduce((sum, item) => sum + item.price, 0);
-  const deposit = Math.max(Math.round(total * 0.3), 30);
+  const deposit = isAdminTestBooking(cart) ? 0 : Math.max(Math.round(total * 0.3), 30);
 
   return {
     client,
@@ -385,6 +390,28 @@ async function notifyDepositPaid(booking, session) {
   return results;
 }
 
+async function notifyNoChargeTestBooking(booking) {
+  const details = bookingText(booking);
+  const clientText = `Lovely Locs test booking received for ${booking.client.date}. This was a no-charge admin test, so no Stripe deposit was requested.`;
+  const ownerText = `No-charge admin test booking submitted for ${booking.client.fullName}. Preferred date: ${booking.client.date}.`;
+  const results = [];
+
+  for (const task of [
+    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs test booking received", `${clientText}\n\n${details}`)],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs test booking: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
+    ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)],
+    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
+  ]) {
+    try {
+      results.push({ channel: task[0], ...(await task[1]()) });
+    } catch (error) {
+      results.push({ channel: task[0], failed: true, error: error.message });
+    }
+  }
+
+  return results;
+}
+
 async function handleBooking(req, res) {
   try {
     const raw = await readBody(req);
@@ -394,9 +421,25 @@ async function handleBooking(req, res) {
     const pendingBooking = {
       id,
       receivedAt: new Date().toISOString(),
-      status: "pending_payment",
+      status: pricedBooking.deposit === 0 ? "no_charge_test" : "pending_payment",
       ...pricedBooking,
     };
+    if (pricedBooking.deposit === 0 && isAdminTestBooking(pricedBooking.cart)) {
+      const notificationResults = await notifyNoChargeTestBooking(pendingBooking);
+      appendBookingRecord({ ...pendingBooking, notificationResults });
+      sendJson(res, 200, {
+        ok: true,
+        id,
+        status: pendingBooking.status,
+        noCharge: true,
+        total: pendingBooking.total,
+        deposit: pendingBooking.deposit,
+        message: "Free admin test booking saved. No Stripe deposit was requested. Confirmation messages were attempted with the connected providers.",
+        notificationResults,
+      });
+      return;
+    }
+
     const session = await createCheckoutSession(req, pendingBooking);
     const savedBooking = {
       ...pendingBooking,

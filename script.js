@@ -33,11 +33,146 @@ const services = [
   { id: "overdue-retwist", duration: "4-5 hours", featured: true, price: 125, name: "Overdue Retwist (4+ Months)", description: "For clients who haven't had a retwist in over 3 months. Includes full retwist and basic style.", category: "loc-maintenance" }
 ];
 
+const adminTestService = {
+  id: "admin-test-booking",
+  duration: "15 min",
+  featured: false,
+  price: 0,
+  name: "Free Admin Test Booking",
+  description: "Owner-only test service for checking the booking form and confirmation messages without charging a Stripe deposit.",
+  category: "admin-test"
+};
+
 const products = [
   { name: "Gold Sparkle Sprinkles", price: 12, description: "Premium gold glitter loc accessories for a touch of elegance." },
   { name: "Silver Shimmer Sprinkles", price: 12, description: "Shimmering silver loc charms perfect for any occasion." },
   { name: "Rose Gold Sprinkles", price: 12, description: "Soft rose gold accents that complement any loc style." },
   { name: "Custom Color Sprinkles", price: 15, description: "Choose your custom color to match your unique style." }
+];
+
+const recommendedHairProducts = [
+  {
+    name: "Made For Locs Vegan Apple Cider Vinegar Shampoo",
+    shelf: "Cleanse",
+    category: "Clarifying shampoo",
+    bestFor: "Buildup-prone locs, mature locs, and wash days after gels or oils.",
+    note: "A loc-focused clarifying wash option for clients whose hair feels heavy or coated.",
+    review: "Walmart/Shop App-style purchaser reviews and Made For Locs reviews mention cleaner locs and buildup removal.",
+    url: "https://business.walmart.com/ip/Made-For-Locs-Vegan-Apple-Cider-Vinegar-Shampoo/1128203990"
+  },
+  {
+    name: "Dr Locs Yasin Shampoo",
+    shelf: "Cleanse",
+    category: "Loc shampoo",
+    bestFor: "Clients who want a professional loc shampoo that rinses clean.",
+    note: "A loctician-created shampoo option for routine cleansing without a heavy coated feel.",
+    review: "Shop App and verified-buyer Dr Locs reviews support this as a niche loc product with lighter big-box retail proof.",
+    url: "https://shop.app/products/9084609361"
+  },
+  {
+    name: "Locsanity Rosewater & Peppermint Spray",
+    shelf: "Hydrate",
+    category: "Daily moisture spray",
+    bestFor: "Dry locs, light refreshes, dyed locs, and between-appointment moisture.",
+    note: "A light rosewater-peppermint mist for clients who need moisture without heavy creams.",
+    review: "Walmart customer reviews mention use on locs, dreadlocks, dyed locs, and family members' locs.",
+    url: "https://www.walmart.com/reviews/product/1227218001"
+  },
+  {
+    name: "Made For Locs Aloe Moisturizing Hair Spray",
+    shelf: "Hydrate",
+    category: "Aloe hydration spray",
+    bestFor: "Loc clients who want a simple spray routine between retwists.",
+    note: "A lightweight aloe spray for keeping locs feeling hydrated without over-layering product.",
+    review: "CVS customer reviews include loc-client comments about daily use and locs flourishing.",
+    url: "https://www.cvs.com/shop/made-for-locs-aloe-moisturizing-hydrating-curl-enhancing-hair-spray-8-oz-prodid-614711-reviews"
+  },
+  {
+    name: "FreeTheRoots Aloe Hydrating Mist",
+    shelf: "Hydrate",
+    category: "Botanical mist",
+    bestFor: "Clients avoiding heavy oils, silicones, waxes, or buildup-prone products.",
+    note: "A clean-feeling mist for loc clients who want moisture without product heaviness.",
+    review: "Shop App/store reviews include loc clients mentioning starter locs, softer dreadlocks, and hydration.",
+    url: "https://shop.app/products/7347969093704"
+  },
+  {
+    name: "Dr Locs Imani Locking Spray",
+    shelf: "Retwist",
+    category: "Retwist hold spray",
+    bestFor: "Clients who prefer spray hold over gel or want a lighter retwist product.",
+    note: "A lighter retwist-hold option for neat roots without heavy gel buildup.",
+    review: "Shop App and verified-buyer Dr Locs reviews mention hold, scent, sensitive-scalp use, and loctician work.",
+    url: "https://shop.app/products/9084836177"
+  },
+  {
+    name: "Taliah Waajid Lock It Up",
+    shelf: "Retwist",
+    category: "Retwist gel",
+    bestFor: "Starter locs, two-strand twists, and budget-friendly loc grooming.",
+    note: "A beauty-supply staple that can work well when used with a light hand.",
+    review: "Walmart and Influenster customer reviews include loc and natural-style feedback about lightweight hold and lower residue.",
+    url: "https://www.influenster.com/reviews/taliah-waajid-black-earth-products-lock-it-up-hair-gel"
+  },
+  {
+    name: "Jamaican Mango & Lime Locking Gel",
+    shelf: "Retwist",
+    category: "Strong hold gel",
+    bestFor: "Retwist clients who need firmer hold and an easy-to-find option.",
+    note: "A stronger-hold budget gel; best used sparingly to reduce buildup risk.",
+    review: "Walmart customer reviews provide outside-review proof, with official reviews adding loc-specific hold feedback.",
+    url: "https://www.walmart.com/ip/Jamaican-Mango-Lime-Locking-Hair-Gel-6-Oz/10450991"
+  },
+  {
+    name: "Cecred Scalp Refreshing Spray",
+    shelf: "Scalp + Style Support",
+    category: "Scalp refresher",
+    bestFor: "Protective styles, scalp freshness, and cooling between scheduled wash days.",
+    note: "A premium scalp refresher for clients wearing locs, braids, wigs, or extensions.",
+    review: "Ulta customer reviews and Cecred verified-buyer reviews mention scalp comfort, cooling, coily hair, and protective styles.",
+    url: "https://www.ulta.com/p/scalp-refreshing-spray-pimprod2054143"
+  },
+  {
+    name: "tgin Rose Water Curl Refresher",
+    shelf: "Scalp + Style Support",
+    category: "Natural hair refresher",
+    bestFor: "Loose naturals, curls, braids, protective styles, and select mature loc clients.",
+    note: "A natural-hair substitute option for light refreshing when loc-specific reviews are thinner.",
+    review: "Ulta and Walmart customer reviews are mostly from loose natural or curly clients, with some protective-style mentions.",
+    url: "https://www.ulta.com/p/rose-water-curl-refresher-pimprod2005385"
+  },
+  {
+    name: "Mielle Rosemary Mint Scalp & Hair Strengthening Oil",
+    shelf: "Scalp + Style Support",
+    category: "Scalp oil",
+    bestFor: "Dry scalp support or a light pre-wash scalp massage.",
+    note: "A popular oil option that should be used lightly and never marketed as guaranteed hair growth.",
+    review: "Ulta and Target customer reviews provide a large natural-hair review base, including both praise and irritation concerns.",
+    url: "https://www.ulta.com/p/rosemary-mint-scalp-hair-strengthening-oil-pimprod2033947"
+  },
+  {
+    name: "Lion Locs 2-in-1 Co-Wash",
+    shelf: "Cleanse",
+    category: "Co-wash conditioner",
+    bestFor: "Mature locs needing softness between stronger shampoo days.",
+    note: "A softness-focused option, not the first pick when heavy buildup is the main issue.",
+    review: "Walmart and Lion Locs customer reviews include loc-client feedback about softness, scent, body, and wash-day feel.",
+    url: "https://www.walmart.com/ip/Lion-Locs-Shampoo-Conditioner-Co-Wash-8-oz/943692278"
+  }
+];
+
+const productShelfGroups = [
+  { name: "Cleanse", summary: "Wash-day picks for buildup, routine cleansing, and mature loc softness." },
+  { name: "Hydrate", summary: "Water-based sprays and mists for light moisture between appointments." },
+  { name: "Retwist", summary: "Hold products for neat roots, chosen with buildup risk in mind." },
+  { name: "Scalp + Style Support", summary: "Support products for scalp comfort, protective styles, and natural-hair substitutes." }
+];
+
+const productCarePrinciples = [
+  "Cleanse before layering more product.",
+  "Use water-based moisture first, then oil lightly only when needed.",
+  "Keep gels and strong-hold products at the roots instead of packing the loc shaft.",
+  "Patch test anything new before making it part of your routine."
 ];
 
 const testimonials = [
@@ -156,6 +291,15 @@ const drawer = document.getElementById("drawer");
 
 function money(value) {
   return `$${Number(value).toFixed(0)}`;
+}
+
+function isAdminTestBooking(items = cart) {
+  return items.length === 1 && items[0]?.id === adminTestService.id;
+}
+
+function bookingDeposit(total, items = cart) {
+  if (isAdminTestBooking(items)) return 0;
+  return items.length ? Math.max(Math.round(total * 0.3), 30) : 30;
 }
 
 function serviceDetails(service) {
@@ -577,16 +721,71 @@ function policiesPage() {
 function productsPage() {
   return `
     <section class="hero route-page" id="products-page">
-      <h1>Products</h1>
-      <p class="subtitle">Premium loc accessories to enhance your style</p>
+      <h1>Lovely Locs Product Shelf</h1>
+      <p class="subtitle">Client-friendly hair care picks, loc jewels, and accessories</p>
     </section>
-    <section class="section">
+    <section class="section product-shelf-section">
       <div class="container">
-        <h2 class="section-title">Loc Sprinkles</h2>
-        <p class="section-subtitle">Add sparkle and personality to your locs with our premium loc sprinkles.</p>
+        <div class="product-shelf-intro">
+          <div>
+            <p class="eyebrow">Recommended Hair Products</p>
+            <h2>Simple products for cleaner, softer-feeling locs.</h2>
+            <p>Lovely Locs favors lightweight products that rinse clean, support moisture, and avoid unnecessary buildup. These recommendations use real customer review signals from retailer or purchaser-review sources whenever possible.</p>
+          </div>
+          <div class="product-principles">
+            ${productCarePrinciples.map(principle => `<span>${principle}</span>`).join("")}
+          </div>
+        </div>
+        <div class="product-shelf-stack">
+          ${productShelfGroups.map(group => `
+            <div class="product-shelf-group">
+              <div class="group-title product-group-title">
+                <span>${group.name === "Cleanse" ? "Wash" : group.name === "Hydrate" ? "Mist" : group.name === "Retwist" ? "Hold" : "Care"}</span>
+                <h3>${group.name}</h3>
+              </div>
+              <p class="product-group-summary">${group.summary}</p>
+              <div class="recommended-products-grid">
+                ${recommendedHairProducts.filter(product => product.shelf === group.name).map(product => `
+                  <article class="card product-card recommended-product-card">
+                    <div class="product-card-head">
+                      <p class="product-type">${product.category}</p>
+                      <a class="source-link" href="${product.url}" target="_blank" rel="noopener">Review source</a>
+                    </div>
+                    <h4>${product.name}</h4>
+                    <p>${product.note}</p>
+                    <div class="product-detail">
+                      <strong>Best for</strong>
+                      <span>${product.bestFor}</span>
+                    </div>
+                    <div class="product-detail review-proof">
+                      <strong>Review proof</strong>
+                      <span>${product.review}</span>
+                    </div>
+                  </article>
+                `).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="product-consult-strip">
+          <p><strong>Not sure what to buy?</strong> Bring your current routine or product questions to your appointment notes so Lovely Locs can help you keep it simple.</p>
+          <a class="outline-btn" href="#services" data-route="home">Book with product notes</a>
+        </div>
+        <p class="product-disclaimer">Patch test new products first. Ingredients, prices, availability, and reviews can change, so check the current product page before purchasing.</p>
+      </div>
+    </section>
+    <section class="section accessories-section">
+      <div class="container">
+        <div class="split-heading">
+          <div>
+            <p class="eyebrow">Loc Jewels &amp; Accessories</p>
+            <h2 class="section-title left">Finish the style with shine.</h2>
+          </div>
+          <p>Add sparkle and personality to your locs with premium sprinkles, shimmer, charms, and custom accessory colors.</p>
+        </div>
         <div class="products-grid">
           ${products.map(product => `
-            <article class="card product-card">
+            <article class="card product-card accessory-card">
               <h3>${product.name}</h3>
               <p>${product.description}</p>
               <p class="price">${money(product.price)}</p>
@@ -784,6 +983,43 @@ function paymentSuccessPage() {
   `;
 }
 
+function adminPage() {
+  const alreadyAdded = cart.some(item => item.id === adminTestService.id);
+  return `
+    <section class="hero route-page" id="admin-page">
+      <h1>Admin Test Booking</h1>
+      <p class="subtitle">Run a no-charge booking test without sending the client to Stripe Checkout.</p>
+    </section>
+    <section class="section">
+      <div class="narrow policy-stack">
+        <div class="policy-box">
+          <p class="eyebrow">Owner Testing</p>
+          <h2>Free testing service</h2>
+          <p>Use this when you want to test the booking form, saved request, and confirmation message setup without collecting the normal non-refundable deposit.</p>
+          <p>This service is hidden from the public service menu. Only use it for test client details.</p>
+          <div class="service-card admin-test-card">
+            <div class="service-top">
+              <h4>${adminTestService.name}</h4>
+              <span class="price">${money(adminTestService.price)}</span>
+            </div>
+            <div class="service-meta"><span>${adminTestService.duration}</span><span>No Stripe deposit</span></div>
+            <p class="description">${adminTestService.description}</p>
+            <button class="book-small ${alreadyAdded ? "added" : ""}" data-add-admin-test>
+              ${alreadyAdded ? "Test Service Selected" : "Add Free Test Booking"}
+            </button>
+          </div>
+        </div>
+        <div class="policy-box">
+          <h2>How to use it</h2>
+          <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
+        </div>
+      </div>
+    </section>
+    ${cartMarkup()}
+    ${bookingModal()}
+  `;
+}
+
 function versionsPage() {
   const activeVersion = localStorage.getItem("visualVersion") || "v0";
   return `
@@ -847,10 +1083,11 @@ function bookingModal() {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
   const total = cart.reduce((sum, item) => sum + item.price, 0);
-  const deposit = cart.length ? Math.max(Math.round(total * 0.3), 30) : 30;
+  const deposit = bookingDeposit(total, cart);
+  const adminTest = isAdminTestBooking(cart);
   const confirmationMarkup = bookingConfirmation ? `
         <div class="confirmation-panel">
-          <strong>Payment step ready</strong>
+          <strong>${adminTest ? "Test booking saved" : "Payment step ready"}</strong>
           <p>${bookingConfirmation.message}</p>
         </div>
   ` : "";
@@ -874,6 +1111,7 @@ function bookingModal() {
           ${addOns.length ? `<p>Add-ons / products: ${addOns.map(item => item.name).join(", ")}</p>` : ""}
           <p>Estimated Total: ${money(total)}</p>
           <p>Deposit Required to Hold Slot: ${money(deposit)}</p>
+          ${adminTest ? `<p class="advisory-copy">Admin test mode: no Stripe payment will be requested for this booking.</p>` : ""}
         </div>
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name"></label>
@@ -895,12 +1133,13 @@ function bookingModal() {
         ${confirmationMarkup}
         <div class="modal-summary">
           <strong>Before You Submit</strong>
-          <p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p>
-          <p>After submitting, you will be sent to Stripe Checkout to pay the required deposit. Your appointment request is pending until the Stripe deposit is paid and Lovely Locs confirms availability.</p>
+          ${adminTest
+            ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a Stripe Checkout deposit.</p>`
+            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will be sent to Stripe Checkout to pay the required deposit. Your appointment request is pending until the Stripe deposit is paid and Lovely Locs confirms availability.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
-          <button class="primary-btn" type="button" data-submit-booking>Submit Request &amp; Pay ${money(deposit)}</button>
+          <button class="primary-btn" type="button" data-submit-booking>${adminTest ? "Submit No-Charge Test Booking" : `Submit Request &amp; Pay ${money(deposit)}`}</button>
         </div>
       </div>
     </div>
@@ -915,6 +1154,7 @@ function render(route = currentRoute()) {
   else if (route === "privacy") app.innerHTML = privacyPage();
   else if (route === "terms") app.innerHTML = termsPage();
   else if (route === "payment-success") app.innerHTML = paymentSuccessPage();
+  else if (route === "admin") app.innerHTML = adminPage();
   else if (route === "versions") app.innerHTML = versionsPage();
   else app.innerHTML = homePage();
   bindDynamic();
@@ -934,8 +1174,8 @@ function scrollRouteToTop(route) {
 
 function currentRoute() {
   const hash = window.location.hash.replace("#", "").split("?")[0];
-  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "versions"].includes(hash) ? hash : "home";
-  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "versions", "home", ""].includes(hash)) {
+  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "admin", "versions"].includes(hash) ? hash : "home";
+  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "admin", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
   return route;
@@ -946,6 +1186,25 @@ function addToCart(item) {
   if (!cart.some(existing => existing.id === item.id)) cart.push(item);
   saveCart();
   render(currentRoute());
+}
+
+function clearCart() {
+  cart = [];
+  selectedService = null;
+  bookingConfirmation = null;
+  saveCart();
+  render(currentRoute());
+}
+
+function addAdminTestBooking() {
+  cart = [{ ...adminTestService, type: "service" }];
+  advisoryMessage = "";
+  baseProductMessage = "";
+  partingMessage = "";
+  bookingConfirmation = null;
+  saveCart();
+  render("admin");
+  openCart();
 }
 
 function addServiceFromAdvisory(service) {
@@ -1076,6 +1335,10 @@ function bindDynamic() {
       const product = products.find(item => item.name === button.dataset.addProduct);
       addToCart({ ...product, id: `product-${product.name}`, type: "product" });
     });
+  });
+
+  document.querySelectorAll("[data-add-admin-test]").forEach(button => {
+    button.addEventListener("click", addAdminTestBooking);
   });
 
   document.querySelectorAll("[data-remove]").forEach(button => {
@@ -1262,7 +1525,7 @@ function bookingPayloadFromForm(form) {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
   const total = cart.reduce((sum, item) => sum + item.price, 0);
-  const deposit = cart.length ? Math.max(Math.round(total * 0.3), 30) : 30;
+  const deposit = bookingDeposit(total, cart);
   return {
     client: {
       fullName: data.get("fullName") || "",
@@ -1316,7 +1579,7 @@ async function submitBooking() {
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.dataset.originalText = submitButton.textContent;
-    submitButton.textContent = "Opening Stripe Checkout...";
+    submitButton.textContent = isAdminTestBooking(cart) ? "Saving Test Booking..." : "Opening Stripe Checkout...";
   }
   try {
     const response = await fetch("/api/bookings", {
@@ -1325,7 +1588,16 @@ async function submitBooking() {
       body: JSON.stringify(bookingPayloadFromForm(form))
     });
     const result = await response.json();
-    if (!result.ok || !result.checkoutUrl) throw new Error(result.error || "Stripe Checkout could not be opened.");
+    if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
+    if (result.noCharge) {
+      bookingConfirmation = {
+        message: result.message || "Free admin test booking saved. No Stripe deposit was requested."
+      };
+      render(currentRoute());
+      openBooking();
+      return;
+    }
+    if (!result.checkoutUrl) throw new Error(result.error || "Stripe Checkout could not be opened.");
     bookingConfirmation = {
       message: "Your appointment request was saved. Redirecting to Stripe Checkout for the required deposit."
     };

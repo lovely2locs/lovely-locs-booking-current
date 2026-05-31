@@ -260,12 +260,6 @@ function manualPaymentOptions() {
       note: "Send the deposit through Venmo and include your booking ID in the note.",
     },
     {
-      id: "cash-app",
-      label: "Cash App",
-      handle: process.env.CASH_APP_TAG || "",
-      note: "Send the deposit through Cash App and include your booking ID in the note.",
-    },
-    {
       id: "apple-pay",
       label: "Apple Pay",
       handle: process.env.APPLE_PAY_CONTACT || "",
@@ -455,7 +449,7 @@ async function notifyManualPaymentPending(booking, req) {
     "Payment options shown to the client:",
     paymentOptionsText(booking),
     "",
-    "After you see the matching Venmo, Cash App, or Apple Pay receipt in Gmail, approve the deposit here:",
+    "After you see the matching Venmo or Apple Pay receipt in Gmail, approve the deposit here:",
     confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN in Render to enable one-click approval links.",
     "",
     details,
@@ -464,7 +458,7 @@ async function notifyManualPaymentPending(booking, req) {
 
   for (const task of [
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText)],
-    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. Check Gmail for the Venmo/Cash App/Apple Pay receipt before confirming.`)],
+    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. Check Gmail for the Venmo or Apple Pay receipt before confirming.`)],
   ]) {
     try {
       results.push({ channel: task[0], ...(await task[1]()) });

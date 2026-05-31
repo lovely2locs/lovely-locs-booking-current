@@ -15,6 +15,27 @@ const business = {
   studio: "Private in-home studio"
 };
 
+const manualPaymentFallbackOptions = [
+  {
+    id: "venmo",
+    label: "Venmo",
+    handle: "Confirm current Venmo with Lovely Locs before sending.",
+    note: "Include your booking ID in the payment note so the deposit can be matched quickly."
+  },
+  {
+    id: "cash-app",
+    label: "Cash App",
+    handle: "Confirm current Cash App tag with Lovely Locs before sending.",
+    note: "Include your booking ID in the payment note so the deposit can be matched quickly."
+  },
+  {
+    id: "apple-pay",
+    label: "Apple Pay",
+    handle: "Confirm current Apple Pay contact with Lovely Locs before sending.",
+    note: "Include your booking ID in the payment note so the deposit can be matched quickly."
+  }
+];
+
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
   { id: "emergency-fee", duration: "3h", featured: false, price: 45, name: "Emergency Fee", description: "Additional fee for emergency bookings. Applies to same-day, within 24 hours, and major holiday appointments.", category: "add-ons" },
@@ -39,7 +60,7 @@ const adminTestService = {
   featured: false,
   price: 0,
   name: "Free Admin Test Booking",
-  description: "Owner-only test service for checking the booking form and confirmation messages without charging a Stripe deposit.",
+  description: "Owner-only test service for checking the booking form and confirmation messages without charging a deposit.",
   category: "admin-test"
 };
 
@@ -197,23 +218,56 @@ const serviceGuide = [
   {
     id: "new-locs",
     label: "I am starting locs",
-    recommendation: "Start with a Consultation if you are unsure about size, parting, or method. If you are ready, choose Children's Starter Locs, Medium Adult Starter Locs, or Small Adult Starter Locs based on your desired size."
+    recommendation: "Start with a Consultation if you are unsure about size, parting, or method. If you are ready, choose Children's Starter Locs, Medium Adult Starter Locs, or Small Adult Starter Locs based on your desired size.",
+    serviceIds: ["consultation", "child-starter-coils", "medium-adult-starter", "small-adult-starter"]
   },
   {
     id: "maintenance",
     label: "I need a fresh retwist",
-    recommendation: "Choose Adult Retwist or Children Retwist. If it has been more than 3 months, choose Overdue Retwist so enough time is reserved."
+    recommendation: "Choose Adult Retwist or Children Retwist. If it has been more than 3 months, choose Overdue Retwist so enough time is reserved.",
+    serviceIds: ["adult-retwist", "children-retwist", "overdue-retwist"]
   },
   {
     id: "instant",
     label: "I want instant/crochet work",
-    recommendation: "Choose Adult Instant Locs or Children's Instant Loc. These services use crochet needle work and need a longer appointment window."
+    recommendation: "Choose Adult Instant Locs or Children's Instant Loc. These services use crochet needle work and need a longer appointment window.",
+    serviceIds: ["adult-instant", "child-instant", "children-instant-starter"]
   },
   {
     id: "extra-style",
     label: "I want accessories or a style",
-    recommendation: "Add Style, Loc Sprinkle Installation, or Loc Sprinkles alongside your main service. Add color/style preferences in your booking notes."
+    recommendation: "Add Style, Loc Sprinkle Installation, or Loc Sprinkles alongside your main service. Add color/style preferences in your booking notes.",
+    serviceIds: ["style-addon", "sprinkle-install", "sprinkles-addon"]
   }
+];
+
+const serviceQuizQuestions = [
+  {
+    id: "stage",
+    label: "Hair stage",
+    options: [
+      { value: "starter", label: "Starting locs", guide: "new-locs" },
+      { value: "maintenance", label: "Maintaining locs", guide: "maintenance" },
+      { value: "instant", label: "Instant/crochet", guide: "instant" }
+    ]
+  },
+  {
+    id: "timing",
+    label: "Timing",
+    options: [
+      { value: "fresh", label: "On schedule", guide: "maintenance" },
+      { value: "overdue", label: "4+ months since retwist", guide: "maintenance", highlight: "Overdue Retwist" },
+      { value: "extra", label: "Style or sparkle too", guide: "extra-style" }
+    ]
+  }
+];
+
+const bookingPrepItems = [
+  { title: "Send recent hair photos", copy: "Clear front, side, back, and root photos help Lovely Locs prepare for your current loc stage." },
+  { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
+  { title: "Choose product preferences", copy: "Maintenance clients can note Oil and Water, Foam, or Gel so the finish matches their scalp and style goals." },
+  { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
+  { title: "Wait for final confirmation", copy: "The official confirmation is sent after Lovely Locs verifies your deposit receipt and appointment availability." }
 ];
 
 const visualVersions = [
@@ -228,11 +282,11 @@ const visualVersions = [
 ];
 
 const policies = {
-  deposit: "A non-refundable Stripe deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Remaining balance is due after the service is completed.",
+  deposit: "A non-refundable deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo, Cash App, or Apple Pay details after submitting.",
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
   emergency_fee: "Clients must add the Emergency Fee ($45) if booking within 24 hours, on Sundays, or on holidays and key dates outside of regular availability. Visit our policies to know when this applies to your appointment.",
-  payment_options: "Deposits are paid online through Stripe Checkout. Remaining balances are handled directly with Lovely Locs after service."
+  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo, Cash App, or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt in Gmail."
 };
 
 const faq = [
@@ -240,7 +294,7 @@ const faq = [
   { question: "How long do services take?", answer: "Service durations vary from 1.5 to 6.5 hours depending on the type and complexity of service." },
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
-  { question: "What payment methods do you accept?", answer: "Appointment deposits are paid through Stripe Checkout. Remaining balances are handled directly with Lovely Locs after service." },
+  { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo, Cash App, or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
   { question: "What about emergency or holiday appointments?", answer: "A $45 Emergency Fee applies for same-day bookings, Sunday bookings, and major holidays. Your appointment is subject to being declined if not pre-cleared." }
 ];
 
@@ -280,6 +334,9 @@ let pendingAnchor = null;
 let pendingAdvisoryService = null;
 let pendingProductService = null;
 let pendingPartingService = null;
+let activeProductShelf = "All";
+let activeGuideId = "new-locs";
+let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
 let advisoryMessage = "";
 let baseProductMessage = "";
 let partingMessage = "";
@@ -468,6 +525,7 @@ function homePage() {
     ${serviceGuideSection()}
     ${servicesSection()}
     ${referralShareSection()}
+    ${bookingPrepSection()}
     ${firstTimeClientSection()}
     ${portfolioSection()}
     ${testimonialsSection()}
@@ -539,6 +597,17 @@ function referralShareSection() {
 }
 
 function serviceGuideSection() {
+  const activeGuide = serviceGuide.find(item => item.id === activeGuideId) || serviceGuide[0];
+  const quizMatches = serviceQuizQuestions.map(question => {
+    const selectedValue = serviceQuizAnswers[question.id];
+    const selected = question.options.find(option => option.value === selectedValue) || question.options[0];
+    return selected;
+  });
+  const highlighted = quizMatches.find(option => option.highlight)?.highlight;
+  const suggestedServices = activeGuide.serviceIds
+    .map(id => services.find(service => service.id === id))
+    .filter(Boolean)
+    .slice(0, 3);
   return `
     <section class="section guide-section">
       <div class="container">
@@ -551,13 +620,58 @@ function serviceGuideSection() {
         </div>
         <div class="service-guide">
           <div class="guide-options">
-            ${serviceGuide.map((item, index) => `<button class="${index === 0 ? "active" : ""}" data-guide="${item.id}">${item.label}</button>`).join("")}
+            ${serviceGuide.map(item => `<button class="${activeGuide.id === item.id ? "active" : ""}" data-guide="${item.id}">${item.label}</button>`).join("")}
+            <div class="guide-quiz-card">
+              <p class="eyebrow">Mini Service Quiz</p>
+              ${serviceQuizQuestions.map(question => `
+                <div class="quiz-question">
+                  <strong>${question.label}</strong>
+                  <div class="quiz-options">
+                    ${question.options.map(option => `<button class="${serviceQuizAnswers[question.id] === option.value ? "active" : ""}" data-quiz-question="${question.id}" data-quiz-value="${option.value}" data-quiz-guide="${option.guide}">${option.label}</button>`).join("")}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
           </div>
           <div class="guide-result" id="guideResult">
             <span>Recommended next step</span>
-            <p>${serviceGuide[0].recommendation}</p>
+            <p>${activeGuide.recommendation}${highlighted ? ` Ask for ${highlighted} if that timing matches your hair.` : ""}</p>
+            <div class="guide-service-list">
+              ${suggestedServices.map(service => `
+                <article>
+                  <strong>${service.name}</strong>
+                  <span>${service.duration} | ${money(service.price)}</span>
+                  <button data-add-service="${service.id}">Add</button>
+                </article>
+              `).join("")}
+            </div>
             <button class="primary-btn" data-view-services>View Matching Services</button>
           </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function bookingPrepSection() {
+  return `
+    <section class="section prep-section">
+      <div class="container">
+        <div class="split-heading">
+          <div>
+            <p class="eyebrow">Booking Prep Checklist</p>
+            <h2 class="section-title left">Bring the right details before you book.</h2>
+          </div>
+          <p>A little prep keeps your appointment request clear, especially for starter locs, overdue retwists, accessories, and payment verification.</p>
+        </div>
+        <div class="prep-grid">
+          ${bookingPrepItems.map((item, index) => `
+            <article class="prep-card">
+              <span>${index + 1}</span>
+              <h3>${item.title}</h3>
+              <p>${item.copy}</p>
+            </article>
+          `).join("")}
         </div>
       </div>
     </section>
@@ -663,7 +777,7 @@ function processSection() {
   const steps = [
     ["1", "Choose your service", "Pick the service that fits your current loc stage, from maintenance to starter locs and add-ons."],
     ["2", "Share your notes", "Tell us your product preference, style goal, timing needs, and anything important about your loc history."],
-    ["3", "Pay your Stripe deposit", "Your request is sent to Stripe Checkout for the required non-refundable deposit."],
+    ["3", "Pay from the options page", "Use Venmo, Cash App, or Apple Pay and include your booking ID so the deposit can be matched."],
     ["4", "Arrive relaxed", "The studio address is shared after confirmation, and your appointment is handled one-on-one."]
   ];
   return `
@@ -718,7 +832,12 @@ function policiesPage() {
   `;
 }
 
+function productInitials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").toUpperCase();
+}
+
 function productsPage() {
+  const visibleGroups = productShelfGroups.filter(group => activeProductShelf === "All" || group.name === activeProductShelf);
   return `
     <section class="hero route-page" id="products-page">
       <h1>Lovely Locs Product Shelf</h1>
@@ -736,8 +855,11 @@ function productsPage() {
             ${productCarePrinciples.map(principle => `<span>${principle}</span>`).join("")}
           </div>
         </div>
+        <div class="product-filter-row" aria-label="Product shelf filters">
+          ${["All", ...productShelfGroups.map(group => group.name)].map(filter => `<button class="${activeProductShelf === filter ? "active" : ""}" data-product-filter="${filter}">${filter}</button>`).join("")}
+        </div>
         <div class="product-shelf-stack">
-          ${productShelfGroups.map(group => `
+          ${visibleGroups.map(group => `
             <div class="product-shelf-group">
               <div class="group-title product-group-title">
                 <span>${group.name === "Cleanse" ? "Wash" : group.name === "Hydrate" ? "Mist" : group.name === "Retwist" ? "Hold" : "Care"}</span>
@@ -747,6 +869,10 @@ function productsPage() {
               <div class="recommended-products-grid">
                 ${recommendedHairProducts.filter(product => product.shelf === group.name).map(product => `
                   <article class="card product-card recommended-product-card">
+                    <div class="product-visual ${product.shelf.toLowerCase().replace(/[^a-z0-9]+/g, "-")}">
+                      <span>${productInitials(product.name)}</span>
+                      <small>${product.shelf}</small>
+                    </div>
                     <div class="product-card-head">
                       <p class="product-type">${product.category}</p>
                       <a class="source-link" href="${product.url}" target="_blank" rel="noopener">Review source</a>
@@ -964,18 +1090,71 @@ function contactPage() {
   `;
 }
 
+function pendingPaymentDetails() {
+  const params = new URLSearchParams(window.location.search || "");
+  let stored = {};
+  try {
+    stored = JSON.parse(localStorage.getItem("lovelyLocsPendingPayment") || "{}");
+  } catch {
+    stored = {};
+  }
+  return {
+    bookingId: params.get("booking") || stored.id || "Your booking ID",
+    deposit: Number(params.get("deposit") || stored.deposit || 0),
+    total: Number(stored.total || 0),
+    paymentOptions: Array.isArray(stored.paymentOptions) && stored.paymentOptions.length ? stored.paymentOptions : manualPaymentFallbackOptions
+  };
+}
+
+function paymentOptionsPage() {
+  const details = pendingPaymentDetails();
+  return `
+    <section class="hero route-page" id="payment-options-page">
+      <h1>Pay Your Lovely Locs Deposit</h1>
+      <p class="subtitle">Use Venmo, Cash App, or Apple Pay, then Lovely Locs will verify the receipt before sending the official confirmation.</p>
+    </section>
+    <section class="section payment-options-section">
+      <div class="container">
+        <div class="payment-summary-panel">
+          <div>
+            <p class="eyebrow">Deposit Step</p>
+            <h2>${details.deposit ? money(details.deposit) : "Deposit amount shown after booking"}</h2>
+            <p>Booking ID: <strong>${details.bookingId}</strong></p>
+          </div>
+          <p>Put the booking ID in the payment note when your payment app allows it. Lovely Locs will check the matching receipt in Gmail before sending the official client confirmation.</p>
+        </div>
+        <div class="payment-options-grid">
+          ${details.paymentOptions.map(option => `
+            <article class="payment-option-card">
+              <span>${option.label}</span>
+              <h3>${option.handle}</h3>
+              <p>${option.note}</p>
+            </article>
+          `).join("")}
+        </div>
+        <div class="payment-proof-box">
+          <strong>Confirmation timing</strong>
+          <p>This page is not the final appointment confirmation. Your confirmation message is sent only after Lovely Locs confirms the deposit receipt in Gmail and reviews availability.</p>
+        </div>
+      </div>
+    </section>
+    ${cartMarkup()}
+    ${bookingModal()}
+  `;
+}
+
 function paymentSuccessPage() {
   return `
     <section class="hero route-page" id="payment-success-page">
       <h1>Deposit Received</h1>
-      <p class="subtitle">Thank you. Your Stripe deposit was submitted and your appointment request is pending final availability confirmation.</p>
+      <p class="subtitle">Thank you. Your deposit was received and your appointment request is pending final availability confirmation.</p>
     </section>
     <section class="section">
       <div class="narrow policy-stack">
         <div class="policy-box">
           <p class="eyebrow">Next Step</p>
           <h2>Lovely Locs will review your request.</h2>
-          <p>Your appointment is not fully confirmed until Lovely Locs verifies availability and sends final confirmation. Keep your Stripe receipt for your records.</p>
+          <p>Your appointment is not fully confirmed until Lovely Locs verifies availability and sends final confirmation. Keep your payment receipt for your records.</p>
         </div>
         ${contactCard()}
       </div>
@@ -988,7 +1167,7 @@ function adminPage() {
   return `
     <section class="hero route-page" id="admin-page">
       <h1>Admin Test Booking</h1>
-      <p class="subtitle">Run a no-charge booking test without sending the client to Stripe Checkout.</p>
+      <p class="subtitle">Run a no-charge booking test without sending the client to the pay options page.</p>
     </section>
     <section class="section">
       <div class="narrow policy-stack">
@@ -1002,7 +1181,7 @@ function adminPage() {
               <h4>${adminTestService.name}</h4>
               <span class="price">${money(adminTestService.price)}</span>
             </div>
-            <div class="service-meta"><span>${adminTestService.duration}</span><span>No Stripe deposit</span></div>
+            <div class="service-meta"><span>${adminTestService.duration}</span><span>No deposit</span></div>
             <p class="description">${adminTestService.description}</p>
             <button class="book-small ${alreadyAdded ? "added" : ""}" data-add-admin-test>
               ${alreadyAdded ? "Test Service Selected" : "Add Free Test Booking"}
@@ -1111,7 +1290,7 @@ function bookingModal() {
           ${addOns.length ? `<p>Add-ons / products: ${addOns.map(item => item.name).join(", ")}</p>` : ""}
           <p>Estimated Total: ${money(total)}</p>
           <p>Deposit Required to Hold Slot: ${money(deposit)}</p>
-          ${adminTest ? `<p class="advisory-copy">Admin test mode: no Stripe payment will be requested for this booking.</p>` : ""}
+          ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name"></label>
@@ -1134,12 +1313,12 @@ function bookingModal() {
         <div class="modal-summary">
           <strong>Before You Submit</strong>
           ${adminTest
-            ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a Stripe Checkout deposit.</p>`
-            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will be sent to Stripe Checkout to pay the required deposit. Your appointment request is pending until the Stripe deposit is paid and Lovely Locs confirms availability.</p>`}
+            ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
+            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will see the Venmo, Cash App, and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail and confirms availability.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
-          <button class="primary-btn" type="button" data-submit-booking>${adminTest ? "Submit No-Charge Test Booking" : `Submit Request &amp; Pay ${money(deposit)}`}</button>
+          <button class="primary-btn" type="button" data-submit-booking>${adminTest ? "Submit No-Charge Test Booking" : `Submit Request &amp; View Pay Options`}</button>
         </div>
       </div>
     </div>
@@ -1153,6 +1332,7 @@ function render(route = currentRoute()) {
   else if (route === "sms-opt-in") app.innerHTML = smsOptInPage();
   else if (route === "privacy") app.innerHTML = privacyPage();
   else if (route === "terms") app.innerHTML = termsPage();
+  else if (route === "payment-options") app.innerHTML = paymentOptionsPage();
   else if (route === "payment-success") app.innerHTML = paymentSuccessPage();
   else if (route === "admin") app.innerHTML = adminPage();
   else if (route === "versions") app.innerHTML = versionsPage();
@@ -1174,8 +1354,8 @@ function scrollRouteToTop(route) {
 
 function currentRoute() {
   const hash = window.location.hash.replace("#", "").split("?")[0];
-  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "admin", "versions"].includes(hash) ? hash : "home";
-  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-success", "admin", "versions", "home", ""].includes(hash)) {
+  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "versions"].includes(hash) ? hash : "home";
+  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
   return route;
@@ -1337,6 +1517,13 @@ function bindDynamic() {
     });
   });
 
+  document.querySelectorAll("[data-product-filter]").forEach(button => {
+    button.addEventListener("click", () => {
+      activeProductShelf = button.dataset.productFilter || "All";
+      render("products");
+    });
+  });
+
   document.querySelectorAll("[data-add-admin-test]").forEach(button => {
     button.addEventListener("click", addAdminTestBooking);
   });
@@ -1371,12 +1558,20 @@ function bindDynamic() {
   document.querySelectorAll("[data-guide]").forEach(button => {
     button.addEventListener("click", () => {
       const item = serviceGuide.find(option => option.id === button.dataset.guide);
-      document.querySelectorAll("[data-guide]").forEach(option => option.classList.remove("active"));
-      button.classList.add("active");
-      const result = document.getElementById("guideResult");
-      if (result && item) {
-        result.querySelector("p").textContent = item.recommendation;
-      }
+      if (!item) return;
+      activeGuideId = item.id;
+      render(currentRoute());
+    });
+  });
+
+  document.querySelectorAll("[data-quiz-question]").forEach(button => {
+    button.addEventListener("click", () => {
+      serviceQuizAnswers = {
+        ...serviceQuizAnswers,
+        [button.dataset.quizQuestion]: button.dataset.quizValue
+      };
+      activeGuideId = button.dataset.quizGuide || activeGuideId;
+      render(currentRoute());
     });
   });
 
@@ -1579,7 +1774,7 @@ async function submitBooking() {
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.dataset.originalText = submitButton.textContent;
-    submitButton.textContent = isAdminTestBooking(cart) ? "Saving Test Booking..." : "Opening Stripe Checkout...";
+    submitButton.textContent = isAdminTestBooking(cart) ? "Saving Test Booking..." : "Opening Pay Options...";
   }
   try {
     const response = await fetch("/api/bookings", {
@@ -1591,24 +1786,30 @@ async function submitBooking() {
     if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
     if (result.noCharge) {
       bookingConfirmation = {
-        message: result.message || "Free admin test booking saved. No Stripe deposit was requested."
+        message: result.message || "Free admin test booking saved. No deposit was requested."
       };
       render(currentRoute());
       openBooking();
       return;
     }
-    if (!result.checkoutUrl) throw new Error(result.error || "Stripe Checkout could not be opened.");
+    if (!result.payOptionsUrl) throw new Error(result.error || "Pay options could not be opened.");
+    localStorage.setItem("lovelyLocsPendingPayment", JSON.stringify({
+      id: result.id,
+      deposit: result.deposit,
+      total: result.total,
+      paymentOptions: result.paymentOptions || manualPaymentFallbackOptions
+    }));
     bookingConfirmation = {
-      message: "Your appointment request was saved. Redirecting to Stripe Checkout for the required deposit."
+      message: "Your appointment request was saved. Redirecting to the Lovely Locs pay options page for the required deposit."
     };
-    window.location.href = result.checkoutUrl;
+    window.location.href = result.payOptionsUrl;
     return;
   } catch (bookingError) {
     if (error) error.textContent = bookingError.message;
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = submitButton.dataset.originalText || "Submit Request & Pay Deposit";
+      submitButton.textContent = submitButton.dataset.originalText || "Submit Request & View Pay Options";
     }
   }
 }

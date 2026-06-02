@@ -67,6 +67,19 @@ const allowedPartingFees = new Map([
   ["Triangle Parts", 40],
 ]);
 
+const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
+const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
+const holidayDates = new Set([
+  "2026-01-01",
+  "2026-05-25",
+  "2026-07-04",
+  "2026-09-07",
+  "2026-11-26",
+  "2026-12-24",
+  "2026-12-25",
+  "2026-12-31",
+]);
+
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -119,6 +132,8 @@ function bookingText(booking) {
     `Email: ${booking.client?.email || ""}`,
     `Phone: ${booking.client?.phone || ""}`,
     `Preferred date: ${booking.client?.date || ""}`,
+    `Preferred time: ${timeLabel(booking.client?.time)}`,
+    `Appointment type: ${booking.client?.appointmentType || "standard"}`,
     `Preferred contact: ${contactPreferenceLabel(booking.client?.preferredContact)}`,
     "",
     "Services / products:",
@@ -132,6 +147,16 @@ function bookingText(booking) {
     "Policy acknowledgement: Client confirmed they read the Lovely Locs policies.",
     "Studio note: Address is shared after booking and deposit are confirmed.",
   ].join("\n");
+}
+
+function timeLabel(value) {
+  const [hourText, minuteText] = String(value || "").split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return "";
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
 function contactPreferenceLabel(value) {
@@ -153,8 +178,12 @@ async function postJson(url, body, headers = {}) {
   return response.json().catch(() => ({}));
 }
 
+function emailConfigured() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.CONFIRMATION_FROM_EMAIL);
+}
+
 async function sendEmail(to, subject, text) {
-  if (!process.env.RESEND_API_KEY || !process.env.CONFIRMATION_FROM_EMAIL) {
+  if (!emailConfigured()) {
     return { provider: "resend", skipped: true, reason: "RESEND_API_KEY and CONFIRMATION_FROM_EMAIL are not set" };
   }
 
@@ -247,6 +276,73 @@ function findBookingById(id) {
   return null;
 }
 
+function bookedTimesForDate(date) {
+  if (!date || !fs.existsSync(bookingsFile)) return new Set();
+  const booked = new Set();
+  const lines = fs.readFileSync(bookingsFile, "utf8").split(/\r?\n/).filter(Boolean);
+  for (const line of lines) {
+    try {
+      const record = JSON.parse(line);
+      const status = String(record.status || "");
+      const isBookingRecord = record.client && Array.isArray(record.cart);
+      if (!isBookingRecord || record.client.date !== date || !record.client.time) continue;
+      if (["pending_manual_payment", "pending_payment", "deposit_paid", "no_charge_test"].includes(status)) {
+        booked.add(record.client.time);
+      }
+    } catch {
+      // Ignore malformed historical lines.
+    }
+  }
+  return booked;
+}
+
+function isHoliday(date) {
+  return holidayDates.has(date);
+}
+
+function dayOfWeek(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
+}
+
+function classifyAppointmentTime(date, time) {
+  const weekday = dayOfWeek(date);
+  const holiday = isHoliday(date);
+  const isSunday = weekday === 0;
+  const regular = !holiday && !isSunday && regularAppointmentTimes.includes(time);
+  return {
+    type: regular ? "standard" : "emergency",
+    emergency: !regular,
+    reason: regular ? "Within regular Lovely Locs evening hours." : holiday ? "Holiday/key date appointment proposal." : isSunday ? "Sunday appointment proposal." : "Outside regular Lovely Locs evening hours.",
+  };
+}
+
+function availabilityForDate(date) {
+  const booked = bookedTimesForDate(date);
+  const holiday = isHoliday(date);
+  const isSunday = dayOfWeek(date) === 0;
+  const regularSlots = holiday || isSunday ? [] : regularAppointmentTimes.map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "standard",
+    status: booked.has(time) ? "booked" : "open",
+    note: "Open appointment time.",
+  }));
+  const emergencySlots = emergencyProposalTimes.map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "emergency",
+    status: booked.has(time) ? "booked" : "open",
+    note: holiday ? "Holiday emergency proposal. $45 emergency fee applies." : isSunday ? "Sunday emergency proposal. $45 emergency fee applies." : "Outside business hours. $45 emergency fee applies.",
+  }));
+  return {
+    date,
+    holiday,
+    regularHours: holiday || isSunday ? "Emergency proposals only" : "6:30 PM - 10:30 PM",
+    slots: [...regularSlots, ...emergencySlots],
+  };
+}
+
 function isAdminTestBooking(cart = []) {
   return cart.length === 1 && cart[0]?.id === "admin-test-booking";
 }
@@ -293,11 +389,18 @@ function manualConfirmUrl(req, booking, method = "manual") {
 }
 
 function sanitizeClient(client = {}) {
+  const date = String(client.date || "").trim();
+  const time = String(client.time || "").trim();
+  const slot = date && time ? classifyAppointmentTime(date, time) : { type: "standard", emergency: false, reason: "" };
   return {
     fullName: String(client.fullName || "").trim(),
     email: String(client.email || "").trim(),
     phone: String(client.phone || "").trim(),
-    date: String(client.date || "").trim(),
+    date,
+    time,
+    appointmentType: slot.type,
+    emergencySlot: slot.emergency,
+    emergencyReason: slot.reason,
     preferredContact: ["text", "email", "text_email"].includes(client.preferredContact) ? client.preferredContact : "text_email",
     smsOptIn: Boolean(client.smsOptIn),
     specialRequests: String(client.specialRequests || "").trim(),
@@ -344,13 +447,20 @@ function pricedCartItem(item = {}) {
 
 function priceBooking(booking) {
   const client = sanitizeClient(booking.client);
-  const required = ["fullName", "email", "phone", "date"];
+  const required = ["fullName", "email", "phone", "date", "time"];
   const missing = required.filter(field => !client[field]);
   if (missing.length) throw new Error(`Missing required booking fields: ${missing.join(", ")}.`);
+  const slot = availabilityForDate(client.date).slots.find(item => item.time === client.time);
+  if (!slot) throw new Error("Selected appointment time is not available.");
+  if (slot.status === "booked") throw new Error("That appointment time was just booked. Please choose another time.");
   if (!Array.isArray(booking.cart) || booking.cart.length === 0) throw new Error("Booking must include at least one cart item.");
   if (!booking.policyAcknowledgement) throw new Error("Policy acknowledgement is required.");
 
   const cart = booking.cart.map(pricedCartItem);
+  if (client.emergencySlot && !cart.some(item => item.id === "emergency-fee")) {
+    const emergencyFee = serviceCatalog.find(service => service.id === "emergency-fee");
+    if (emergencyFee) cart.push({ ...emergencyFee, type: "service", autoEmergencyFee: true });
+  }
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
   const total = cart.reduce((sum, item) => sum + item.price, 0);
@@ -419,7 +529,7 @@ async function notifyDepositPaid(booking, session) {
       paidAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date}. Your appointment request is paid and pending final availability confirmation from Lovely Locs.`;
+  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your selected appointment slot is held. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
   const ownerText = `Stripe deposit paid for ${booking.client.fullName}: $${booking.deposit}. Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`;
   const results = [];
 
@@ -444,7 +554,8 @@ async function notifyManualPaymentPending(booking, req) {
   const confirmLink = manualConfirmUrl(req, booking);
   const ownerText = [
     `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}.`,
-    `Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`,
+    `Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}. Total estimate: $${booking.total}.`,
+    booking.client.emergencySlot ? `Emergency proposal: ${booking.client.emergencyReason} The $45 emergency fee is included.` : "Standard evening appointment slot selected.",
     "",
     "Payment options shown to the client:",
     paymentOptionsText(booking),
@@ -458,7 +569,7 @@ async function notifyManualPaymentPending(booking, req) {
 
   for (const task of [
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText)],
-    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. Check Gmail for the Venmo or Apple Pay receipt before confirming.`)],
+    ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. ${booking.client.date} ${timeLabel(booking.client.time)}. Confirm link: ${confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN."}`)],
   ]) {
     try {
       results.push({ channel: task[0], ...(await task[1]()) });
@@ -480,8 +591,8 @@ async function notifyManualDepositPaid(booking, method) {
       confirmedAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date}. Your appointment request is paid and pending final availability confirmation from Lovely Locs.`;
-  const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date: ${booking.client.date}.`;
+  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your selected appointment slot is held. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
+  const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}.`;
   const results = [];
 
   for (const task of [
@@ -649,6 +760,28 @@ async function handleStripeWebhook(req, res) {
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/healthz") {
     sendJson(res, 200, { ok: true, service: "lovely-locs" });
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/notification-status") {
+    sendJson(res, 200, {
+      ok: true,
+      emailConfigured: emailConfigured(),
+      ownerEmail,
+      smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/availability") {
+    const siteUrl = publicSiteUrl(req);
+    const url = new URL(req.url || "/", siteUrl);
+    const date = String(url.searchParams.get("date") || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      sendJson(res, 400, { ok: false, error: "A valid date is required." });
+      return;
+    }
+    sendJson(res, 200, { ok: true, ...availabilityForDate(date) });
     return;
   }
 

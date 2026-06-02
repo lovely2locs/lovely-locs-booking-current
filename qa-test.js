@@ -57,9 +57,12 @@ const elements = {
   bookingForm: new FakeElement("bookingForm"),
   bookingError: new FakeElement("bookingError"),
   policyAcknowledgement: new FakeElement("policyAcknowledgement"),
+  bookingTime: new FakeElement("bookingTime"),
+  bookingEmergencySlot: new FakeElement("bookingEmergencySlot"),
   services: new FakeElement("services")
 };
 elements.bookingForm.reportValidity = () => true;
+elements.bookingTime.value = "18:30";
 
 const document = {
   documentElement: new FakeElement("html"),
@@ -118,6 +121,8 @@ context.FormData = class {
       ["email", "client@example.com"],
       ["phone", "(555) 123-4567"],
       ["date", "2026-06-01"],
+      ["time", "18:30"],
+      ["emergencySlot", ""],
       ["preferredContact", "text_email"],
       ["smsOptIn", "on"],
       ["specialRequests", "Test booking notes"],
@@ -377,6 +382,9 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="email" required'), "email not required");
   assert(html.includes('name="phone" required'), "phone not required");
   assert(html.includes('name="date" required'), "date not required");
+  assert(html.includes('id="bookingTime" name="time"'), "preferred time slot input missing");
+  assert(html.includes("time-slot-grid"), "time slot picker missing");
+  assert(html.includes("Emergency proposal"), "emergency slot legend missing");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
   assert(html.includes('name="smsOptIn"'), "optional SMS opt-in checkbox missing");
   assert(html.includes('value="text"'), "text contact option missing");
@@ -449,6 +457,7 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(elements.bookingError.textContent === "", "valid booking should clear error");
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
   assert(context.lastFetch.options.body.includes("Test Client"), "booking backend payload should include client details");
+  assert(context.lastFetch.options.body.includes('"time":"18:30"'), "booking backend payload should include selected time");
   assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
   assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
@@ -484,6 +493,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("notifyManualPaymentPending"), "manual pending owner notification missing");
   assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
+  assert(server.includes("/api/availability"), "availability endpoint missing");
+  assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
+  assert(server.includes("emailConfigured"), "email configuration status helper missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");

@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 let Stripe = null;
 try {
@@ -33,6 +34,9 @@ const bookingsFile = path.join(root, "bookings.jsonl");
 const settingsFile = path.join(root, "site-settings.json");
 const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lovely2locs@gmail.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
+const dayMs = 24 * 60 * 60 * 1000;
+const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
+const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
 let stripeClient = null;
 
 const defaultSiteSettings = {
@@ -43,6 +47,12 @@ const defaultSiteSettings = {
     fit: "cover",
     x: 50,
     y: 50,
+  },
+  discount: {
+    code: "LOVELY10",
+    percent: 10,
+    enabled: false,
+    expiresAt: "",
   },
 };
 
@@ -145,12 +155,19 @@ function bookingText(booking) {
     `Phone: ${booking.client?.phone || ""}`,
     `Preferred date: ${booking.client?.date || ""}`,
     `Preferred time: ${timeLabel(booking.client?.time)}`,
+    booking.client?.birthday ? `Birthday: ${booking.client.birthday}` : "",
     `Appointment type: ${booking.client?.appointmentType || "standard"}`,
     `Preferred contact: ${contactPreferenceLabel(booking.client?.preferredContact)}`,
+    `Monthly referral campaign opt-in: ${booking.client?.marketingEmailOptIn ? "Yes" : "No"}`,
+    `Referral reminders opt-in: ${booking.client?.referralOptIn ? "Yes" : "No"}`,
+    booking.client?.referralCode ? `Client referral code: ${booking.client.referralCode}` : "",
+    booking.client?.referredByCode ? `Referred by code: ${booking.client.referredByCode}` : "",
     "",
     "Services / products:",
     serviceLines.length ? serviceLines.join("\n") : "- No cart items included",
     "",
+    booking.subtotal && booking.discountAmount ? `Subtotal before promo: $${booking.subtotal}` : "",
+    booking.discountAmount ? `Promo code: ${booking.discountCode || ""} (${booking.discountPercent || 0}% off, -$${booking.discountAmount})` : "",
     `Estimated total: $${booking.total || 0}`,
     `Deposit required: $${booking.deposit || 0}`,
     "",
@@ -266,6 +283,155 @@ function appendBookingRecord(record) {
   fs.appendFileSync(bookingsFile, `${JSON.stringify(record)}\n`, "utf8");
 }
 
+function readBookingRecords() {
+  if (!fs.existsSync(bookingsFile)) return [];
+  return fs.readFileSync(bookingsFile, "utf8").split(/\r?\n/).filter(Boolean).flatMap(line => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function bookingRecordId(record = {}) {
+  return record.bookingId || (record.client && Array.isArray(record.cart) ? record.id : "");
+}
+
+function latestBookingRecords(records = readBookingRecords()) {
+  const bookings = new Map();
+  for (const record of records) {
+    if (record.id && record.client && Array.isArray(record.cart)) {
+      bookings.set(record.id, record);
+    }
+  }
+  return [...bookings.values()];
+}
+
+function bookingStatus(booking, records) {
+  let status = booking.status || "";
+  for (const record of records) {
+    if (bookingRecordId(record) !== booking.id) continue;
+    if (record.status === "deposit_paid" || record.type === "stripe.checkout.session.completed" || record.type === "manual.deposit.confirmed") {
+      status = "deposit_paid";
+    } else if (record.status === "no_charge_test") {
+      status = "no_charge_test";
+    }
+  }
+  return status;
+}
+
+function calendarDay(date) {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+}
+
+function dateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function daysUntilDate(dateText, now = new Date()) {
+  const parsed = new Date(`${dateText}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return Math.round((calendarDay(parsed) - calendarDay(now)) / dayMs);
+}
+
+function hoursSince(isoDate, now = new Date()) {
+  const parsed = new Date(isoDate || 0);
+  if (Number.isNaN(parsed.getTime())) return 0;
+  return (now - parsed) / (60 * 60 * 1000);
+}
+
+function clientFirstName(booking = {}) {
+  return String(booking.client?.fullName || "there").trim().split(/\s+/)[0] || "there";
+}
+
+function appointmentLine(booking = {}) {
+  return `${booking.client?.date || ""} at ${timeLabel(booking.client?.time)}`;
+}
+
+function bookingPaymentOptionsUrl(booking) {
+  const siteUrl = (process.env.PUBLIC_SITE_URL || "").replace(/\/+$/, "") || `http://127.0.0.1:${port}`;
+  return `${siteUrl}/?booking=${encodeURIComponent(booking.id)}&deposit=${encodeURIComponent(booking.deposit || 0)}#payment-options`;
+}
+
+function automationTokenIsValid(token) {
+  const expected = process.env.AUTOMATION_RUN_TOKEN || process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
+  return Boolean(expected && token === expected);
+}
+
+function automationAlreadySent(records, automationType, recipientKey, cycleKey = "") {
+  return records.some(record => (
+    record.type === "automation.notification.sent"
+    && record.automationType === automationType
+    && record.recipientKey === recipientKey
+    && String(record.cycleKey || "") === String(cycleKey || "")
+  ));
+}
+
+function automationSentCount(records, automationType, recipientKey) {
+  return records.filter(record => (
+    record.type === "automation.notification.sent"
+    && record.automationType === automationType
+    && record.recipientKey === recipientKey
+  )).length;
+}
+
+async function runNotificationTasks(tasks) {
+  const results = [];
+  for (const task of tasks) {
+    try {
+      results.push({ channel: task[0], ...(await task[1]()) });
+    } catch (error) {
+      results.push({ channel: task[0], failed: true, error: error.message });
+    }
+  }
+  return results;
+}
+
+function clientEmailTask(booking, subject, text) {
+  if (!booking.client?.email) return null;
+  return ["clientEmail", () => sendEmail(booking.client.email, subject, text)];
+}
+
+function clientSmsTask(booking, text) {
+  if (!booking.client?.smsOptIn || !booking.client?.phone) return null;
+  return ["clientSms", () => sendSms(normalizePhone(booking.client.phone), text)];
+}
+
+async function sendClientAutomation(booking, automationType, cycleKey, subject, emailText, smsText = emailText, options = {}) {
+  const records = readBookingRecords();
+  const recipientKey = booking.id;
+  if (automationAlreadySent(records, automationType, recipientKey, cycleKey)) {
+    return { skipped: true, reason: "already_sent", automationType, bookingId: booking.id };
+  }
+  const tasks = [
+    clientEmailTask(booking, subject, emailText),
+    options.emailOnly ? null : clientSmsTask(booking, smsText),
+  ].filter(Boolean);
+  if (!tasks.length) {
+    return { skipped: true, reason: "no_available_client_channel", automationType, bookingId: booking.id };
+  }
+  const notificationResults = await runNotificationTasks(tasks);
+  appendBookingRecord({
+    type: "automation.notification.sent",
+    automationType,
+    recipientKey,
+    bookingId: booking.id,
+    cycleKey,
+    sentAt: new Date().toISOString(),
+    notificationResults,
+  });
+  return { sent: true, automationType, bookingId: booking.id, cycleKey, notificationResults };
+}
+
 function sendHtml(res, status, html) {
   res.writeHead(status, {
     "Content-Type": "text/html; charset=utf-8",
@@ -293,6 +459,81 @@ function sanitizeLogoSettings(logo = {}) {
   };
 }
 
+function normalizeDiscountCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "")
+    .slice(0, 24);
+}
+
+function normalizeReferralCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 16);
+}
+
+function phoneDigits(phone) {
+  return String(phone || "").replace(/[^0-9]/g, "");
+}
+
+function clientIdentityKey(client = {}) {
+  const email = String(client.email || "").trim().toLowerCase();
+  const phone = phoneDigits(client.phone);
+  if (!email || !phone) return "";
+  return `${email}|${phone}`;
+}
+
+function referralCodeForClient(client = {}) {
+  const identity = clientIdentityKey(client);
+  if (!identity) return "";
+  return `LL${crypto.createHash("sha1").update(identity).digest("hex").slice(0, 6).toUpperCase()}`;
+}
+
+function birthdayMonthDay(value) {
+  const clean = String(value || "").trim();
+  const match = clean.match(/^\d{4}-(\d{2})-(\d{2})$/) || clean.match(/^(\d{2})-(\d{2})$/);
+  return match ? `${match[1]}-${match[2]}` : "";
+}
+
+function sameClient(left = {}, right = {}) {
+  return Boolean(clientIdentityKey(left) && clientIdentityKey(left) === clientIdentityKey(right));
+}
+
+function latestClientBooking(client, records = readBookingRecords()) {
+  const key = clientIdentityKey(client);
+  if (!key) return null;
+  const bookings = latestBookingRecords(records);
+  for (let index = bookings.length - 1; index >= 0; index -= 1) {
+    if (clientIdentityKey(bookings[index].client) === key) return bookings[index];
+  }
+  return null;
+}
+
+function findReferrerByCode(code, records = readBookingRecords()) {
+  const cleanCode = normalizeReferralCode(code);
+  if (!cleanCode) return null;
+  const bookings = latestBookingRecords(records);
+  for (let index = bookings.length - 1; index >= 0; index -= 1) {
+    const booking = bookings[index];
+    const bookingCode = normalizeReferralCode(booking.client?.referralCode || referralCodeForClient(booking.client));
+    if (bookingCode === cleanCode) return booking;
+  }
+  return null;
+}
+
+function sanitizeDiscountSettings(discount = {}) {
+  const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(discount.expiresAt || "") ? discount.expiresAt : "";
+  return {
+    code: normalizeDiscountCode(discount.code || defaultSiteSettings.discount.code) || defaultSiteSettings.discount.code,
+    percent: clampNumber(discount.percent, 0, 100, defaultSiteSettings.discount.percent),
+    enabled: Boolean(discount.enabled),
+    expiresAt,
+  };
+}
+
 function readSiteSettings() {
   if (!fs.existsSync(settingsFile)) return defaultSiteSettings;
   try {
@@ -301,17 +542,20 @@ function readSiteSettings() {
       ...defaultSiteSettings,
       ...saved,
       logo: sanitizeLogoSettings(saved.logo || {}),
+      discount: sanitizeDiscountSettings(saved.discount || {}),
     };
   } catch {
     return defaultSiteSettings;
   }
 }
 
-function saveSiteSettings(settings) {
+function saveSiteSettings(settings = {}) {
+  const current = readSiteSettings();
   const clean = {
     ...defaultSiteSettings,
-    ...settings,
-    logo: sanitizeLogoSettings(settings.logo || {}),
+    ...current,
+    logo: sanitizeLogoSettings(settings.logo || current.logo),
+    discount: sanitizeDiscountSettings(settings.discount || current.discount),
   };
   fs.writeFileSync(settingsFile, JSON.stringify(clean, null, 2), "utf8");
   return clean;
@@ -320,6 +564,164 @@ function saveSiteSettings(settings) {
 function tokenIsValid(token) {
   const expectedToken = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
   return Boolean(expectedToken && token === expectedToken);
+}
+
+function discountIsExpired(discount) {
+  if (!discount?.expiresAt) return false;
+  const expiration = new Date(`${discount.expiresAt}T23:59:59`);
+  return Number.isNaN(expiration.getTime()) ? true : expiration.getTime() < Date.now();
+}
+
+function activeDiscountForCode(code) {
+  const settings = readSiteSettings().discount;
+  const requestedCode = normalizeDiscountCode(code);
+  if (!requestedCode) return null;
+  if (!settings.enabled) return null;
+  if (discountIsExpired(settings)) return null;
+  if (normalizeDiscountCode(settings.code) !== requestedCode) return null;
+  return settings;
+}
+
+function discountAmountForTotal(total, discount) {
+  if (discount?.amountOff) return Math.min(total, Math.max(0, Math.round(Number(discount.amountOff))));
+  if (!discount?.percent) return 0;
+  return Math.min(total, Math.max(0, Math.round(total * Number(discount.percent) / 100)));
+}
+
+function creditIsUnavailable(records, creditId) {
+  return records.some(record => (
+    ["discount.credit.reserved", "discount.credit.redeemed"].includes(record.type)
+    && record.creditId === creditId
+  ));
+}
+
+function availableClientCredit(client, total, records = readBookingRecords()) {
+  const key = clientIdentityKey(client);
+  if (!key) return null;
+  const credits = records.filter(record => (
+    ["referral.reward.approved", "birthday.reward.approved"].includes(record.type)
+    && record.clientKey === key
+    && record.creditId
+    && !creditIsUnavailable(records, record.creditId)
+  ));
+  if (!credits.length) return null;
+  const best = credits.reduce((winner, credit) => (
+    Number(credit.amountOff || 0) > Number(winner.amountOff || 0) ? credit : winner
+  ), credits[0]);
+  const amountOff = Math.min(total, Math.max(0, Math.round(Number(best.amountOff || 0))));
+  if (!amountOff) return null;
+  return {
+    type: best.type === "birthday.reward.approved" ? "birthday" : "referral",
+    creditId: best.creditId,
+    code: best.discountCode || best.creditId,
+    amountOff,
+  };
+}
+
+function chooseBookingDiscount(subtotal, saleDiscount, clientCredit) {
+  const saleAmount = discountAmountForTotal(subtotal, saleDiscount);
+  const creditAmount = clientCredit ? discountAmountForTotal(subtotal, clientCredit) : 0;
+  if (clientCredit && creditAmount > saleAmount) {
+    return {
+      code: clientCredit.code,
+      type: clientCredit.type,
+      percent: 0,
+      amountOff: creditAmount,
+      creditId: clientCredit.creditId,
+      source: "earned_client_credit",
+    };
+  }
+  if (saleDiscount && saleAmount > 0) {
+    return {
+      code: saleDiscount.code,
+      type: "sale",
+      percent: saleDiscount.percent,
+      amountOff: saleAmount,
+      expiresAt: saleDiscount.expiresAt || "",
+      source: "sale_code",
+    };
+  }
+  return null;
+}
+
+function reserveBookingCredit(booking) {
+  const credit = booking.automaticDiscountCredit;
+  if (!credit?.creditId) return null;
+  const records = readBookingRecords();
+  if (creditIsUnavailable(records, credit.creditId)) return null;
+  const event = {
+    type: "discount.credit.reserved",
+    bookingId: booking.id,
+    clientKey: clientIdentityKey(booking.client),
+    creditId: credit.creditId,
+    creditType: credit.type,
+    amountOff: credit.amountOff,
+    reservedAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  return event;
+}
+
+function redeemBookingCredit(booking) {
+  const credit = booking.automaticDiscountCredit;
+  if (!credit?.creditId) return null;
+  const records = readBookingRecords();
+  if (records.some(record => record.type === "discount.credit.redeemed" && record.creditId === credit.creditId)) return null;
+  const event = {
+    type: "discount.credit.redeemed",
+    bookingId: booking.id,
+    clientKey: clientIdentityKey(booking.client),
+    creditId: credit.creditId,
+    creditType: credit.type,
+    amountOff: credit.amountOff,
+    redeemedAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  return event;
+}
+
+function recordReferralPending(booking) {
+  const code = normalizeReferralCode(booking.client?.referredByCode);
+  if (!code || isAdminTestBooking(booking.cart)) return null;
+  const records = readBookingRecords();
+  const referrer = findReferrerByCode(code, records);
+  if (!referrer || sameClient(referrer.client, booking.client)) return null;
+  if (records.some(record => record.type === "referral.reward.pending" && record.referredBookingId === booking.id)) return null;
+  const event = {
+    type: "referral.reward.pending",
+    referralCode: code,
+    referrerKey: clientIdentityKey(referrer.client),
+    referrerBookingId: referrer.id,
+    referredBookingId: booking.id,
+    referredClientName: booking.client.fullName,
+    amountOff: referralCreditAmount,
+    createdAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  return event;
+}
+
+function approveReferralReward(booking) {
+  const code = normalizeReferralCode(booking.client?.referredByCode);
+  if (!code) return null;
+  const records = readBookingRecords();
+  const pending = records.find(record => record.type === "referral.reward.pending" && record.referredBookingId === booking.id);
+  const referrer = pending ? null : findReferrerByCode(code, records);
+  const referrerKey = pending?.referrerKey || clientIdentityKey(referrer?.client);
+  if (!referrerKey || records.some(record => record.type === "referral.reward.approved" && record.referredBookingId === booking.id)) return null;
+  const creditId = `referral:${booking.id}:${referrerKey}`;
+  const event = {
+    type: "referral.reward.approved",
+    referralCode: code,
+    clientKey: referrerKey,
+    referredBookingId: booking.id,
+    creditId,
+    discountCode: `REF-${code}`,
+    amountOff: referralCreditAmount,
+    approvedAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  return event;
 }
 
 function findBookingById(id) {
@@ -451,6 +853,7 @@ function manualConfirmUrl(req, booking, method = "manual") {
 function sanitizeClient(client = {}) {
   const date = String(client.date || "").trim();
   const time = String(client.time || "").trim();
+  const birthday = String(client.birthday || "").trim();
   const slot = date && time ? classifyAppointmentTime(date, time) : { type: "standard", emergency: false, reason: "" };
   return {
     fullName: String(client.fullName || "").trim(),
@@ -458,11 +861,16 @@ function sanitizeClient(client = {}) {
     phone: String(client.phone || "").trim(),
     date,
     time,
+    birthday: /^\d{4}-\d{2}-\d{2}$/.test(birthday) || /^\d{2}-\d{2}$/.test(birthday) ? birthday : "",
     appointmentType: slot.type,
     emergencySlot: slot.emergency,
     emergencyReason: slot.reason,
     preferredContact: ["text", "email", "text_email"].includes(client.preferredContact) ? client.preferredContact : "text_email",
     smsOptIn: Boolean(client.smsOptIn),
+    marketingEmailOptIn: Boolean(client.marketingEmailOptIn),
+    referralOptIn: Boolean(client.referralOptIn),
+    referralCode: normalizeReferralCode(client.referralCode) || referralCodeForClient(client),
+    referredByCode: normalizeReferralCode(client.referredByCode),
     specialRequests: String(client.specialRequests || "").trim(),
   };
 }
@@ -523,7 +931,12 @@ function priceBooking(booking) {
   }
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
+  const saleDiscount = activeDiscountForCode(booking.discountCode);
+  const clientCredit = availableClientCredit(client, subtotal);
+  const discount = isAdminTestBooking(cart) ? null : chooseBookingDiscount(subtotal, saleDiscount, clientCredit);
+  const discountAmount = isAdminTestBooking(cart) ? 0 : discountAmountForTotal(subtotal, discount);
+  const total = Math.max(0, subtotal - discountAmount);
   const deposit = isAdminTestBooking(cart) ? 0 : Math.max(Math.round(total * 0.3), 30);
 
   return {
@@ -531,6 +944,17 @@ function priceBooking(booking) {
     cart,
     selectedServices,
     addOns,
+    subtotal,
+    discountCode: discount ? discount.code : "",
+    discountType: discount ? discount.type : "",
+    discountPercent: discount ? discount.percent || 0 : 0,
+    discountAmount,
+    automaticDiscountCredit: discount?.creditId ? {
+      type: discount.type,
+      creditId: discount.creditId,
+      code: discount.code,
+      amountOff: discount.amountOff,
+    } : null,
     total,
     deposit,
     policyAcknowledgement: true,
@@ -589,16 +1013,16 @@ async function notifyDepositPaid(booking, session) {
       paidAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your selected appointment slot is held. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
+  const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
   const ownerText = `Stripe deposit paid for ${booking.client.fullName}: $${booking.deposit}. Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`;
   const results = [];
 
   for (const task of [
-    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs deposit received", `${clientText}\n\n${details}`)],
+    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs appointment confirmed", `${clientText}\n\n${details}`)],
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit paid: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
-    ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)],
+    booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
-  ]) {
+  ].filter(Boolean)) {
     try {
       results.push({ channel: task[0], ...(await task[1]()) });
     } catch (error) {
@@ -651,16 +1075,16 @@ async function notifyManualDepositPaid(booking, method) {
       confirmedAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your selected appointment slot is held. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
+  const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
   const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}.`;
   const results = [];
 
   for (const task of [
-    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs deposit received", `${clientText}\n\n${details}`)],
+    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs appointment confirmed", `${clientText}\n\n${details}`)],
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs manual deposit confirmed: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
-    ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)],
+    booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
-  ]) {
+  ].filter(Boolean)) {
     try {
       results.push({ channel: task[0], ...(await task[1]()) });
     } catch (error) {
@@ -680,9 +1104,9 @@ async function notifyNoChargeTestBooking(booking) {
   for (const task of [
     ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs test booking received", `${clientText}\n\n${details}`)],
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs test booking: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
-    ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)],
+    booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
-  ]) {
+  ].filter(Boolean)) {
     try {
       results.push({ channel: task[0], ...(await task[1]()) });
     } catch (error) {
@@ -691,6 +1115,251 @@ async function notifyNoChargeTestBooking(booking) {
   }
 
   return results;
+}
+
+async function runDepositReminderAutomation(booking, records, now) {
+  const status = bookingStatus(booking, records);
+  if (!["pending_manual_payment", "pending_payment"].includes(status)) return null;
+  if (daysUntilDate(booking.client?.date, now) < 0) return null;
+  if (hoursSince(booking.receivedAt, now) < 4) return null;
+  if (automationSentCount(records, "deposit_reminder", booking.id) >= 3) return null;
+
+  const cycleKey = dateKey(now);
+  const payUrl = bookingPaymentOptionsUrl(booking);
+  const text = [
+    `Hi ${clientFirstName(booking)}, this is your Lovely Locs deposit reminder.`,
+    `Your ${appointmentLine(booking)} appointment request is still waiting on the $${booking.deposit} deposit before it is fully confirmed.`,
+    `Booking ID: ${booking.id}`,
+    `Pay options: ${payUrl}`,
+    "Reply if you need help matching your Venmo or Apple Pay receipt.",
+  ].join("\n");
+  const sms = `Lovely Locs reminder: your $${booking.deposit} deposit is still needed to confirm ${booking.client.date} at ${timeLabel(booking.client.time)}. Pay options: ${payUrl}`;
+  return sendClientAutomation(booking, "deposit_reminder", cycleKey, "Lovely Locs deposit reminder", text, sms);
+}
+
+async function runAppointmentReminderAutomation(booking, records, now) {
+  const status = bookingStatus(booking, records);
+  if (!["deposit_paid", "no_charge_test"].includes(status)) return [];
+  const daysOut = daysUntilDate(booking.client?.date, now);
+  const windows = [
+    { days: 3, type: "appointment_reminder_3_day", label: "3-day" },
+    { days: 1, type: "appointment_reminder_1_day", label: "1-day" },
+  ];
+  const sent = [];
+  for (const window of windows) {
+    if (daysOut !== window.days) continue;
+    const text = [
+      `Hi ${clientFirstName(booking)}, your Lovely Locs appointment is coming up ${booking.client.date} at ${timeLabel(booking.client.time)}.`,
+      "Please arrive with your hair ready for the service you selected unless Lovely Locs has told you otherwise.",
+      "The private studio address is shared after confirmation. Reply if you need to update your appointment details.",
+    ].join("\n");
+    const sms = `Lovely Locs ${window.label} reminder: your appointment is ${booking.client.date} at ${timeLabel(booking.client.time)}. Reply if you need to update details.`;
+    sent.push(await sendClientAutomation(booking, window.type, booking.client.date, `Lovely Locs ${window.label} appointment reminder`, text, sms));
+  }
+  return sent;
+}
+
+async function runReviewRequestAutomation(booking, records, now) {
+  const status = bookingStatus(booking, records);
+  if (!["deposit_paid", "no_charge_test"].includes(status)) return null;
+  if (daysUntilDate(booking.client?.date, now) !== -1) return null;
+  const reviewUrl = process.env.REVIEW_REQUEST_URL || process.env.PUBLIC_SITE_URL || "https://lovely-locs-booking.onrender.com";
+  const text = [
+    `Hi ${clientFirstName(booking)}, thank you for trusting Lovely Locs with your appointment.`,
+    "If your service felt good, a quick review helps new loc clients feel confident before booking.",
+    `Review link: ${reviewUrl}`,
+  ].join("\n");
+  const sms = `Thank you for booking Lovely Locs. A quick review helps new loc clients feel confident: ${reviewUrl}`;
+  return sendClientAutomation(booking, "review_request", booking.id, "How was your Lovely Locs appointment?", text, sms);
+}
+
+async function runReferralReminderAutomation(booking, records, now) {
+  const status = bookingStatus(booking, records);
+  if (!["deposit_paid", "no_charge_test"].includes(status)) return null;
+  if (!booking.client?.referralOptIn && !booking.client?.marketingEmailOptIn) return null;
+  const daysOut = daysUntilDate(booking.client?.date, now);
+  if (daysOut === null || daysOut > -14 || daysOut < -60) return null;
+  const siteUrl = (process.env.PUBLIC_SITE_URL || "https://lovely-locs-booking.onrender.com").replace(/\/+$/, "");
+  const text = [
+    "Good People Know Good People",
+    "",
+    `Hi ${clientFirstName(booking)}, refer a friend to Lovely Locs.`,
+    "When they book, they receive the new client rate and you receive $15 off your next service.",
+    `Booking link: ${siteUrl}/#services`,
+    "",
+    "This rewards loyalty without discounting the Lovely Locs brand.",
+  ].join("\n");
+  return sendClientAutomation(booking, "referral_reminder", booking.id, "Good People Know Good People", text, text, { emailOnly: true });
+}
+
+async function runBirthdayCreditAutomation(booking, records, now) {
+  if (!booking.client?.marketingEmailOptIn || !booking.client?.birthday) return null;
+  const key = clientIdentityKey(booking.client);
+  if (!key) return null;
+  const todayMonthDay = dateKey(now).slice(5);
+  if (birthdayMonthDay(booking.client.birthday) !== todayMonthDay) return null;
+  const year = String(now.getFullYear());
+  const creditId = `birthday:${year}:${key}`;
+  const currentRecords = readBookingRecords();
+  if (currentRecords.some(record => record.type === "birthday.reward.approved" && record.creditId === creditId)) return null;
+  const code = `BDAY-${year}-${referralCodeForClient(booking.client)}`;
+  const event = {
+    type: "birthday.reward.approved",
+    clientKey: key,
+    bookingId: booking.id,
+    creditId,
+    discountCode: code,
+    amountOff: birthdayCreditAmount,
+    cycleKey: year,
+    approvedAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  const text = [
+    `Happy birthday, ${clientFirstName(booking)}!`,
+    `Lovely Locs added a $${birthdayCreditAmount} birthday credit to your client settings for this year.`,
+    "Birthday credits are annual and can apply to one future booking while available.",
+  ].join("\n");
+  return sendClientAutomation(booking, "birthday_credit", year, "Your annual Lovely Locs birthday credit", text, text, { emailOnly: true });
+}
+
+async function runMonthlyReferralCampaignAutomation(bookings, records, now) {
+  const cycleKey = monthKey(now);
+  const subject = process.env.REFERRAL_CAMPAIGN_SUBJECT || "Good People Know Good People";
+  const message = process.env.REFERRAL_CAMPAIGN_MESSAGE || [
+    "Good People Know Good People",
+    "",
+    "Refer a friend.",
+    "",
+    "When they book:",
+    "They receive the new client rate",
+    "You receive $15 off your next service",
+    "",
+    "This rewards loyalty without discounting the Lovely Locs brand.",
+    "",
+    `Booking link: ${(process.env.PUBLIC_SITE_URL || "https://lovely-locs-booking.onrender.com").replace(/\/+$/, "")}/#services`,
+  ].join("\n");
+  const latestByEmail = new Map();
+  for (const booking of bookings) {
+    const email = String(booking.client?.email || "").trim().toLowerCase();
+    if (email && booking.client?.marketingEmailOptIn) latestByEmail.set(email, booking);
+  }
+  const results = [];
+  for (const [email, booking] of latestByEmail.entries()) {
+    if (automationAlreadySent(records, "monthly_referral_campaign", email, cycleKey)) continue;
+    const emailText = `Hi ${clientFirstName(booking)},\n\n${message}`;
+    const notificationResults = await runNotificationTasks([
+      ["clientEmail", () => sendEmail(email, subject, emailText)],
+    ]);
+    appendBookingRecord({
+      type: "automation.notification.sent",
+      automationType: "monthly_referral_campaign",
+      recipientKey: email,
+      bookingId: booking.id,
+      cycleKey,
+      sentAt: new Date().toISOString(),
+      notificationResults,
+    });
+    results.push({ sent: true, automationType: "monthly_referral_campaign", recipientKey: email, cycleKey, notificationResults });
+  }
+  return results;
+}
+
+async function runAutomations(options = {}) {
+  const type = options.type || "daily";
+  const now = options.now || new Date();
+  const records = readBookingRecords();
+  const bookings = latestBookingRecords(records);
+  const results = [];
+  const dailyTypes = new Set(["all", "daily", "deposit", "appointment", "review", "referral", "birthday"]);
+
+  if (dailyTypes.has(type)) {
+    for (const booking of bookings) {
+      if (type === "all" || type === "daily" || type === "deposit") {
+        const result = await runDepositReminderAutomation(booking, records, now);
+        if (result) results.push(result);
+      }
+      if (type === "all" || type === "daily" || type === "appointment") {
+        results.push(...(await runAppointmentReminderAutomation(booking, records, now)).filter(Boolean));
+      }
+      if (type === "all" || type === "daily" || type === "review") {
+        const result = await runReviewRequestAutomation(booking, records, now);
+        if (result) results.push(result);
+      }
+      if (type === "all" || type === "daily" || type === "referral") {
+        const result = await runReferralReminderAutomation(booking, records, now);
+        if (result) results.push(result);
+      }
+      if (type === "all" || type === "daily" || type === "birthday") {
+        const result = await runBirthdayCreditAutomation(booking, records, now);
+        if (result) results.push(result);
+      }
+    }
+  }
+
+  if (["all", "monthly", "referral-campaign"].includes(type)) {
+    results.push(...(await runMonthlyReferralCampaignAutomation(bookings, records, now)));
+  }
+
+  return {
+    ok: true,
+    type,
+    checkedBookings: bookings.length,
+    sent: results.filter(result => result?.sent).length,
+    skipped: results.filter(result => result?.skipped).length,
+    results,
+  };
+}
+
+async function handleDiscountValidate(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    const code = normalizeDiscountCode(body.code || "");
+    const discount = activeDiscountForCode(code);
+    if (!discount) {
+      sendJson(res, 400, { ok: false, error: "That promo code is not active or has expired." });
+      return;
+    }
+    sendJson(res, 200, {
+      ok: true,
+      code: discount.code,
+      percent: discount.percent,
+      expiresAt: discount.expiresAt,
+      message: `${discount.code} applied for ${discount.percent}% off.`,
+    });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleDiscountEmail(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    const email = String(body.email || "").trim();
+    const discount = activeDiscountForCode(body.code || "");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      sendJson(res, 400, { ok: false, error: "Enter a valid email address." });
+      return;
+    }
+    if (!discount) {
+      sendJson(res, 400, { ok: false, error: "That promo code is not active or has expired." });
+      return;
+    }
+    if (!emailConfigured()) {
+      sendJson(res, 503, { ok: false, error: "Promo email is not configured yet. Save or screenshot the code for now." });
+      return;
+    }
+    const expiresText = discount.expiresAt ? ` It expires on ${discount.expiresAt}.` : "";
+    await sendEmail(
+      email,
+      `Lovely Locs promo code: ${discount.code}`,
+      `Your Lovely Locs promo code is ${discount.code} for ${discount.percent}% off.${expiresText} Use it in the cart before booking. Codes must be active and unexpired when you submit your appointment request.`
+    );
+    sendJson(res, 200, { ok: true, message: "Promo code email was sent." });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
 }
 
 async function handleBooking(req, res) {
@@ -708,11 +1377,16 @@ async function handleBooking(req, res) {
     if (pricedBooking.deposit === 0 && isAdminTestBooking(pricedBooking.cart)) {
       const notificationResults = await notifyNoChargeTestBooking(pendingBooking);
       appendBookingRecord({ ...pendingBooking, notificationResults });
+      reserveBookingCredit(pendingBooking);
       sendJson(res, 200, {
         ok: true,
         id,
         status: pendingBooking.status,
         noCharge: true,
+        subtotal: pendingBooking.subtotal,
+        discountCode: pendingBooking.discountCode,
+        discountPercent: pendingBooking.discountPercent,
+        discountAmount: pendingBooking.discountAmount,
         total: pendingBooking.total,
         deposit: pendingBooking.deposit,
         message: "Free admin test booking saved. No deposit was requested. Confirmation messages were attempted with the connected providers.",
@@ -728,6 +1402,8 @@ async function handleBooking(req, res) {
     };
     const notificationResults = await notifyManualPaymentPending(savedBooking, req);
     appendBookingRecord({ ...savedBooking, notificationResults });
+    recordReferralPending(savedBooking);
+    reserveBookingCredit(savedBooking);
 
     sendJson(res, 200, {
       ok: true,
@@ -735,6 +1411,10 @@ async function handleBooking(req, res) {
       status: savedBooking.status,
       payOptionsUrl: `${publicSiteUrl(req)}/?booking=${encodeURIComponent(id)}&deposit=${encodeURIComponent(savedBooking.deposit)}#payment-options`,
       paymentOptions: savedBooking.paymentOptions,
+      subtotal: savedBooking.subtotal,
+      discountCode: savedBooking.discountCode,
+      discountPercent: savedBooking.discountPercent,
+      discountAmount: savedBooking.discountAmount,
       total: savedBooking.total,
       deposit: savedBooking.deposit,
       message: "Appointment request saved. Pay options are ready; Lovely Locs will send the official confirmation after the deposit receipt is verified in Gmail.",
@@ -763,6 +1443,8 @@ async function handleManualPaymentConfirm(req, res) {
     }
 
     const notificationResults = await notifyManualDepositPaid(booking, method);
+    const referralReward = approveReferralReward(booking);
+    const redeemedCredit = redeemBookingCredit(booking);
     appendBookingRecord({
       type: "manual.deposit.confirmed",
       bookingId,
@@ -770,6 +1452,8 @@ async function handleManualPaymentConfirm(req, res) {
       status: "deposit_paid",
       manualPayment: { method },
       notificationResults,
+      referralReward,
+      redeemedCredit,
     });
 
     sendHtml(res, 200, `<h1>Deposit confirmed</h1><p>Lovely Locs confirmation messages were attempted for booking ${bookingId}.</p>`);
@@ -794,6 +1478,8 @@ async function handleStripeWebhook(req, res) {
       const bookingId = session.metadata?.bookingId;
       const booking = findBookingById(bookingId);
       const notificationResults = booking ? await notifyDepositPaid(booking, session) : [];
+      const referralReward = booking ? approveReferralReward(booking) : null;
+      const redeemedCredit = booking ? redeemBookingCredit(booking) : null;
       appendBookingRecord({
         type: "stripe.checkout.session.completed",
         bookingId,
@@ -807,6 +1493,8 @@ async function handleStripeWebhook(req, res) {
           currency: session.currency || "usd",
         },
         notificationResults,
+        referralReward,
+        redeemedCredit,
       });
     }
 
@@ -814,6 +1502,146 @@ async function handleStripeWebhook(req, res) {
   } catch (error) {
     sendJson(res, 400, { ok: false, error: error.message });
   }
+}
+
+function clientSettingsFor(client, req) {
+  const records = readBookingRecords();
+  const latest = latestClientBooking(client, records);
+  const profile = latest?.client || {
+    fullName: String(client.fullName || "").trim(),
+    email: String(client.email || "").trim(),
+    phone: String(client.phone || "").trim(),
+  };
+  const key = clientIdentityKey(profile);
+  const referralCode = normalizeReferralCode(profile.referralCode || referralCodeForClient(profile));
+  const siteUrl = publicSiteUrl(req);
+  const shareUrl = `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
+  const pendingReferrals = records.filter(record => record.type === "referral.reward.pending" && record.referrerKey === key);
+  const approvedReferrals = records.filter(record => record.type === "referral.reward.approved" && record.clientKey === key);
+  const credits = records.filter(record => (
+    ["referral.reward.approved", "birthday.reward.approved"].includes(record.type)
+    && record.clientKey === key
+  )).map(record => {
+    const reserved = records.some(item => item.type === "discount.credit.reserved" && item.creditId === record.creditId);
+    const redeemed = records.some(item => item.type === "discount.credit.redeemed" && item.creditId === record.creditId);
+    return {
+      type: record.type === "birthday.reward.approved" ? "birthday" : "referral",
+      status: redeemed ? "redeemed" : reserved ? "reserved" : "available",
+      creditId: record.creditId,
+      discountCode: record.discountCode,
+      amountOff: record.amountOff,
+      createdAt: record.approvedAt,
+    };
+  });
+  return {
+    ok: true,
+    clientFound: Boolean(latest),
+    client: {
+      fullName: profile.fullName || "",
+      email: profile.email || "",
+      phone: profile.phone || "",
+      birthday: profile.birthday || "",
+      preferredContact: profile.preferredContact || "text_email",
+      smsOptIn: Boolean(profile.smsOptIn),
+      marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
+      referralOptIn: Boolean(profile.referralOptIn),
+      specialRequests: profile.specialRequests || "",
+    },
+    referralCode,
+    shareUrl,
+    referrals: {
+      pending: pendingReferrals.map(record => ({
+        referredClientName: record.referredClientName || "Pending client",
+        referredBookingId: record.referredBookingId,
+        amountOff: record.amountOff,
+        createdAt: record.createdAt,
+        status: "pending_deposit",
+      })),
+      approved: approvedReferrals.map(record => ({
+        referredBookingId: record.referredBookingId,
+        amountOff: record.amountOff,
+        approvedAt: record.approvedAt,
+        status: "approved",
+      })),
+    },
+    credits,
+    auth: {
+      gmailConfigured: Boolean(process.env.GOOGLE_CLIENT_ID),
+    },
+  };
+}
+
+async function handleClientSettings(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    const client = sanitizeClient({
+      fullName: body.fullName || "",
+      email: body.email || "",
+      phone: body.phone || "",
+      date: "2099-01-01",
+      time: "18:30",
+    });
+    if (!client.email || !client.phone) {
+      sendJson(res, 400, { ok: false, error: "Enter the email and phone number used for booking." });
+      return;
+    }
+    sendJson(res, 200, clientSettingsFor(client, req));
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleAutomationRun(req, res) {
+  try {
+    const siteUrl = publicSiteUrl(req);
+    const url = new URL(req.url || "/", siteUrl);
+    let body = {};
+    if (req.method === "POST") {
+      const raw = await readBody(req);
+      body = raw ? JSON.parse(raw) : {};
+    }
+    const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const token = body.token || url.searchParams.get("token") || bearer;
+    if (!process.env.AUTOMATION_RUN_TOKEN && !process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN) {
+      sendJson(res, 503, { ok: false, error: "AUTOMATION_RUN_TOKEN is not configured." });
+      return;
+    }
+    if (!automationTokenIsValid(token)) {
+      sendJson(res, 403, { ok: false, error: "Automation token is missing or invalid." });
+      return;
+    }
+    const type = String(body.type || url.searchParams.get("type") || "daily").trim().toLowerCase();
+    const validTypes = new Set(["all", "daily", "monthly", "referral-campaign", "deposit", "appointment", "review", "referral", "birthday"]);
+    if (!validTypes.has(type)) {
+      sendJson(res, 400, { ok: false, error: "Unknown automation type." });
+      return;
+    }
+    sendJson(res, 200, await runAutomations({ type }));
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+function automationProviderStatus() {
+  return {
+    tokenConfigured: Boolean(process.env.AUTOMATION_RUN_TOKEN || process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN),
+    emailConfigured: emailConfigured(),
+    smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+    dailyTypes: ["deposit", "appointment", "review", "referral", "birthday"],
+    monthlyTypes: ["referral-campaign"],
+  };
+}
+
+function startAutomationLoop() {
+  if (process.env.AUTOMATION_AUTO_RUN !== "true") return;
+  const runDaily = () => runAutomations({ type: "daily" }).catch(error => {
+    console.error(`Lovely Locs automation run failed: ${error.message}`);
+  });
+  const firstRun = setTimeout(runDaily, 60 * 1000);
+  const interval = setInterval(runDaily, 12 * 60 * 60 * 1000);
+  if (firstRun.unref) firstRun.unref();
+  if (interval.unref) interval.unref();
 }
 
 const server = http.createServer((req, res) => {
@@ -828,7 +1656,13 @@ const server = http.createServer((req, res) => {
       emailConfigured: emailConfigured(),
       ownerEmail,
       smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+      automation: automationProviderStatus(),
     });
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/automation-status") {
+    sendJson(res, 200, { ok: true, ...automationProviderStatus() });
     return;
   }
 
@@ -844,11 +1678,21 @@ const server = http.createServer((req, res) => {
         sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
         return;
       }
-      const settings = saveSiteSettings({ logo: body.logo || {} });
+      const settings = saveSiteSettings({ logo: body.logo, discount: body.discount });
       sendJson(res, 200, { ok: true, settings });
     }).catch(error => {
       sendJson(res, 400, { ok: false, error: error.message });
     });
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/discount/validate") {
+    handleDiscountValidate(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/discount/email") {
+    handleDiscountEmail(req, res);
     return;
   }
 
@@ -869,8 +1713,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/client-settings") {
+    handleClientSettings(req, res);
+    return;
+  }
+
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/stripe/webhook") {
     handleStripeWebhook(req, res);
+    return;
+  }
+
+  if (["GET", "POST"].includes(req.method) && (req.url || "").split("?")[0] === "/api/automations/run") {
+    handleAutomationRun(req, res);
     return;
   }
 
@@ -905,4 +1759,5 @@ const server = http.createServer((req, res) => {
 server.listen(port, host, () => {
   const shownHost = host === "0.0.0.0" ? "127.0.0.1" : host;
   console.log(`Lovely Locs site running at http://${shownHost}:${port}/`);
+  startAutomationLoop();
 });

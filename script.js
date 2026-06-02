@@ -1425,6 +1425,24 @@ function adminPage() {
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
         </div>
         <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Manual Deposits</p>
+          <h2>Confirm a Client Deposit</h2>
+          <p>If the owner Gmail does not arrive, use this form after you verify the matching Venmo or Apple Pay receipt. The booking ID is in the client's pay-options link after <strong>booking=</strong>.</p>
+          <form class="brand-settings-form" id="manualDepositConfirmForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Booking ID<input name="booking" placeholder="LL-1780438950711"></label>
+            <label>Payment Method
+              <select name="method">
+                <option value="venmo">Venmo</option>
+                <option value="apple-pay">Apple Pay</option>
+                <option value="manual">Manual</option>
+              </select>
+            </label>
+            <p class="form-error" id="manualDepositConfirmStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-confirm-manual-deposit>Confirm Deposit &amp; Send Client Confirmation</button>
+          </form>
+        </div>
+        <div class="policy-box brand-settings-box">
           <p class="eyebrow">Owner Branding</p>
           <h2>Logo size and centering</h2>
           <p>Use your private manual deposit token to save logo adjustments. Changes apply to the live site after saving, but may reset after a Render restart until we add permanent database storage.</p>
@@ -2029,6 +2047,7 @@ function bindDynamic() {
   });
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
+  document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
   document.querySelectorAll("[data-email-promo]").forEach(button => button.addEventListener("click", emailPromoCode));
@@ -2296,6 +2315,31 @@ async function saveDiscountSettings() {
     saveDiscountSettingsLocal(result.settings.discount);
     if (!result.settings.discount.enabled) saveAppliedDiscount(null);
     if (status) status.textContent = "Discount code saved for the live site.";
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+async function confirmManualDeposit() {
+  const form = document.getElementById("manualDepositConfirmForm");
+  const status = document.getElementById("manualDepositConfirmStatus");
+  if (!form) return;
+  const data = new FormData(form);
+  const booking = String(data.get("booking") || "").trim();
+  const token = String(data.get("token") || "").trim();
+  const method = String(data.get("method") || "manual").trim();
+  if (!booking || !token) {
+    if (status) status.textContent = "Enter the booking ID and admin token.";
+    return;
+  }
+  if (status) status.textContent = "Confirming deposit...";
+  try {
+    const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}`;
+    const response = await fetch(url);
+    const text = await response.text();
+    const cleanText = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!response.ok) throw new Error(cleanText || "Deposit confirmation failed.");
+    if (status) status.textContent = "Deposit confirmed. Client confirmation messages were attempted.";
   } catch (error) {
     if (status) status.textContent = error.message;
   }

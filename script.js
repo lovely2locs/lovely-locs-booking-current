@@ -30,6 +30,10 @@ const manualPaymentFallbackOptions = [
   }
 ];
 
+const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
+const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
+const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
+
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
   { id: "emergency-fee", duration: "3h", featured: false, price: 45, name: "Emergency Fee", description: "Additional fee for emergency bookings. Applies to same-day, within 24 hours, and major holiday appointments.", category: "add-ons" },
@@ -261,7 +265,7 @@ const bookingPrepItems = [
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
   { title: "Choose product preferences", copy: "Maintenance clients can note Oil and Water, Foam, or Gel so the finish matches their scalp and style goals." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
-  { title: "Wait for final confirmation", copy: "The official confirmation is sent after Lovely Locs verifies your deposit receipt and appointment availability." }
+  { title: "Wait for final confirmation", copy: "The official confirmation is sent after Lovely Locs verifies your deposit receipt. Emergency proposals may need an extra owner follow-up." }
 ];
 
 const visualVersions = [
@@ -276,10 +280,10 @@ const visualVersions = [
 ];
 
 const policies = {
-  deposit: "A non-refundable deposit is required before an appointment request can be reviewed for final confirmation. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo or Apple Pay details after submitting.",
+  deposit: "A non-refundable deposit is required to hold the selected appointment time. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo or Apple Pay details after submitting.",
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
-  emergency_fee: "Clients must add the Emergency Fee ($45) if booking within 24 hours, on Sundays, or on holidays and key dates outside of regular availability. Visit our policies to know when this applies to your appointment.",
+  emergency_fee: "A $45 Emergency Fee is added when a client selects a brown emergency proposal slot outside regular business hours, on Sundays, or on holidays/key dates.",
   payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt in Gmail."
 };
 
@@ -289,7 +293,7 @@ const faq = [
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
   { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
-  { question: "What about emergency or holiday appointments?", answer: "A $45 Emergency Fee applies for same-day bookings, Sunday bookings, and major holidays. Your appointment is subject to being declined if not pre-cleared." }
+  { question: "What about emergency or holiday appointments?", answer: "Brown emergency proposal slots are outside regular business hours, Sundays, or holiday/key dates. The $45 Emergency Fee is added before the deposit is calculated." }
 ];
 
 const hours = [
@@ -331,6 +335,7 @@ let pendingPartingService = null;
 let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
+let bookingSlotState = { date: "", time: "", type: "", reason: "" };
 let advisoryMessage = "";
 let baseProductMessage = "";
 let partingMessage = "";
@@ -987,7 +992,7 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>Appointment Requests</h2>
-          <p>Submitting a request does not guarantee an appointment. Your appointment is pending until Lovely Locs reviews the request, confirms availability, and receives the required deposit or payment when applicable.</p>
+          <p>Submitting a request reserves the selected open time after the required deposit is verified. Emergency proposal slots may require an owner follow-up because they fall outside regular business hours, on Sundays, or on holiday/key dates.</p>
         </div>
         <div class="policy-box">
           <h2>Deposits, Payments &amp; Cancellations</h2>
@@ -1128,7 +1133,7 @@ function paymentOptionsPage() {
         </div>
         <div class="payment-proof-box">
           <strong>Confirmation timing</strong>
-          <p>This page is not the final appointment confirmation. Your confirmation message is sent only after Lovely Locs confirms the deposit receipt in Gmail and reviews availability.</p>
+          <p>This page is not the final appointment confirmation. Your confirmation message is sent only after Lovely Locs confirms the deposit receipt in Gmail. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>
         </div>
       </div>
     </section>
@@ -1141,14 +1146,14 @@ function paymentSuccessPage() {
   return `
     <section class="hero route-page" id="payment-success-page">
       <h1>Deposit Received</h1>
-      <p class="subtitle">Thank you. Your deposit was received and your appointment request is pending final availability confirmation.</p>
+      <p class="subtitle">Thank you. Your deposit was received and your selected appointment time is held.</p>
     </section>
     <section class="section">
       <div class="narrow policy-stack">
         <div class="policy-box">
           <p class="eyebrow">Next Step</p>
-          <h2>Lovely Locs will review your request.</h2>
-          <p>Your appointment is not fully confirmed until Lovely Locs verifies availability and sends final confirmation. Keep your payment receipt for your records.</p>
+          <h2>Lovely Locs will hold your selected time.</h2>
+          <p>Your appointment is held after Lovely Locs verifies your deposit and sends final confirmation. Emergency proposals may receive a follow-up if the selected time needs owner approval. Keep your payment receipt for your records.</p>
         </div>
         ${contactCard()}
       </div>
@@ -1252,6 +1257,155 @@ function cartMarkup() {
   `;
 }
 
+function timeLabel(value) {
+  const [hourText, minuteText] = String(value || "").split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return "";
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function isHolidayDate(date) {
+  return holidayDates.has(date);
+}
+
+function dayOfWeek(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
+}
+
+function localAvailability(date, bookedTimes = []) {
+  const booked = new Set(bookedTimes);
+  const holiday = isHolidayDate(date);
+  const isSunday = dayOfWeek(date) === 0;
+  const regularSlots = holiday || isSunday ? [] : regularAppointmentTimes.map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "standard",
+    status: booked.has(time) ? "booked" : "open",
+    note: "Open appointment time."
+  }));
+  const emergencySlots = emergencyProposalTimes.map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "emergency",
+    status: booked.has(time) ? "booked" : "open",
+    note: holiday ? "Holiday emergency proposal. $45 emergency fee applies." : isSunday ? "Sunday emergency proposal. $45 emergency fee applies." : "Outside business hours. $45 emergency fee applies."
+  }));
+  return { date, slots: [...regularSlots, ...emergencySlots] };
+}
+
+function slotPickerMarkup() {
+  return `
+    <div class="full time-slot-field">
+      <label class="slot-label">Preferred Time</label>
+      <input id="bookingTime" name="time" type="hidden" required>
+      <input id="bookingEmergencySlot" name="emergencySlot" type="hidden">
+      <div class="time-slot-legend">
+        <span class="legend-open">Open</span>
+        <span class="legend-emergency">Emergency proposal</span>
+        <span class="legend-booked">Booked</span>
+      </div>
+      <div class="time-slot-grid" id="timeSlotGrid">
+        <p class="time-slot-placeholder">Choose a date to see open appointment times.</p>
+      </div>
+      <p class="time-slot-note" id="timeSlotNote">Regular appointment times are shown with a purple outline. Emergency proposals are brown and include the $45 emergency fee.</p>
+    </div>
+  `;
+}
+
+function emergencyFeeItem() {
+  const fee = services.find(item => item.id === "emergency-fee");
+  return fee ? { ...fee, type: "service", autoEmergencyFee: true } : null;
+}
+
+function setEmergencyFeeForSlot(enabled) {
+  const hasAutoFee = cart.some(item => item.id === "emergency-fee" && item.autoEmergencyFee);
+  if (enabled && !cart.some(item => item.id === "emergency-fee")) {
+    const fee = emergencyFeeItem();
+    if (fee) cart.push(fee);
+  }
+  if (!enabled && hasAutoFee) {
+    cart = cart.filter(item => !(item.id === "emergency-fee" && item.autoEmergencyFee));
+  }
+  saveCart();
+  updateBookingSummaryTotals();
+}
+
+function updateBookingSummaryTotals() {
+  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const deposit = bookingDeposit(total, cart);
+  const totalNode = document.getElementById("bookingTotalText");
+  const depositNode = document.getElementById("bookingDepositText");
+  const addOnsNode = document.getElementById("bookingAddOnsText");
+  if (totalNode) totalNode.textContent = `Estimated Total: ${money(total)}`;
+  if (depositNode) depositNode.textContent = `Deposit Required to Hold Slot: ${money(deposit)}`;
+  if (addOnsNode) {
+    const addOns = cart.filter(item => item.type !== "service" || item.id === "emergency-fee");
+    addOnsNode.textContent = addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : "";
+  }
+}
+
+function renderTimeSlots(availability) {
+  const grid = document.getElementById("timeSlotGrid");
+  const note = document.getElementById("timeSlotNote");
+  const timeInput = document.getElementById("bookingTime");
+  const emergencyInput = document.getElementById("bookingEmergencySlot");
+  if (!grid) return;
+  grid.innerHTML = availability.slots.map(slot => `
+    <button type="button" class="time-slot ${slot.type} ${slot.status}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" ${slot.status === "booked" ? "disabled" : ""}>
+      <strong>${slot.label}</strong>
+      <span>${slot.status === "booked" ? "Booked" : slot.type === "emergency" ? "Emergency +$45" : "Open"}</span>
+    </button>
+  `).join("");
+  if (timeInput) timeInput.value = "";
+  if (emergencyInput) emergencyInput.value = "";
+  bookingSlotState = { date: availability.date, time: "", type: "", reason: "" };
+  setEmergencyFeeForSlot(false);
+  if (note) note.textContent = availability.holiday ? "Holiday/key dates are emergency proposals and include the $45 emergency fee." : "Choose a purple regular slot or a brown emergency proposal.";
+  bindTimeSlotButtons();
+}
+
+async function loadAvailabilityForDate(date) {
+  if (!date) return;
+  const grid = document.getElementById("timeSlotGrid");
+  if (grid) grid.innerHTML = `<p class="time-slot-placeholder">Loading open times...</p>`;
+  try {
+    const response = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Availability could not be loaded.");
+    renderTimeSlots(result);
+  } catch {
+    renderTimeSlots(localAvailability(date));
+  }
+}
+
+function bindTimeSlotButtons() {
+  document.querySelectorAll("[data-time-slot]").forEach(button => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("[data-time-slot]").forEach(item => item.classList.remove("selected"));
+      button.classList.add("selected");
+      const time = button.dataset.timeSlot;
+      const type = button.dataset.slotType;
+      const note = button.dataset.slotNote || "";
+      const timeInput = document.getElementById("bookingTime");
+      const emergencyInput = document.getElementById("bookingEmergencySlot");
+      const noteNode = document.getElementById("timeSlotNote");
+      if (timeInput) timeInput.value = time;
+      if (emergencyInput) emergencyInput.value = type === "emergency" ? "true" : "";
+      bookingSlotState = { ...bookingSlotState, time, type, reason: note };
+      setEmergencyFeeForSlot(type === "emergency");
+      if (noteNode) {
+        noteNode.textContent = type === "emergency"
+          ? `${note} This adds the Emergency Fee to your total before the deposit is calculated.`
+          : "This is a regular Lovely Locs evening appointment time.";
+      }
+    });
+  });
+}
+
 function bookingModal() {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
@@ -1281,16 +1435,17 @@ function bookingModal() {
           ${selectedServices.length ? `<p>Estimated Service Time: ${selectedServices.map(item => item.duration).join(" + ")}</p>` : ""}
           ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
-          ${addOns.length ? `<p>Add-ons / products: ${addOns.map(item => item.name).join(", ")}</p>` : ""}
-          <p>Estimated Total: ${money(total)}</p>
-          <p>Deposit Required to Hold Slot: ${money(deposit)}</p>
+          <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
+          <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
+          <p id="bookingDepositText">Deposit Required to Hold Slot: ${money(deposit)}</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name"></label>
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com"></label>
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567"></label>
-          <label>Preferred Date<input name="date" required type="date"></label>
+          <label>Preferred Date<input id="bookingDate" name="date" required type="date"></label>
+          ${slotPickerMarkup()}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
             <label><input name="preferredContact" type="radio" value="text_email" checked> Text + Email</label>
@@ -1308,7 +1463,7 @@ function bookingModal() {
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
-            : `<p>Deposits are non-refundable. Same-day, Sunday, and holiday bookings may require the $45 emergency fee. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail and confirms availability.</p>`}
+            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>Purple time slots are regular open appointment times. Brown time slots are emergency proposals outside business hours, on Sundays, or on holiday/key dates and include the $45 emergency fee.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
@@ -1542,6 +1697,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-view-services]").forEach(button => button.addEventListener("click", goToServices));
   document.querySelectorAll("[data-close-booking]").forEach(button => button.addEventListener("click", closeBooking));
   document.querySelectorAll("[data-submit-booking]").forEach(button => button.addEventListener("click", submitBooking));
+  document.getElementById("bookingDate")?.addEventListener("change", event => loadAvailabilityForDate(event.target.value));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
   document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
@@ -1693,6 +1849,8 @@ function bookingSummaryFromForm(form) {
     `Email: ${client.email}`,
     `Phone: ${client.phone}`,
     `Preferred date: ${client.date}`,
+    `Preferred time: ${timeLabel(client.time)}`,
+    `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
     `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
     "",
     "Services:",
@@ -1721,6 +1879,8 @@ function bookingPayloadFromForm(form) {
       email: data.get("email") || "",
       phone: data.get("phone") || "",
       date: data.get("date") || "",
+      time: data.get("time") || "",
+      emergencySlot: Boolean(data.get("emergencySlot")),
       preferredContact: data.get("preferredContact") || "text_email",
       smsOptIn: Boolean(data.get("smsOptIn")),
       specialRequests: data.get("specialRequests") || ""
@@ -1762,6 +1922,11 @@ async function submitBooking() {
   }
   if (policyAcknowledgement && !policyAcknowledgement.checked) {
     if (error) error.textContent = "Please confirm that you have read the Lovely Locs policies before submitting your appointment request.";
+    return;
+  }
+  const timeInput = document.getElementById("bookingTime");
+  if (timeInput && !timeInput.value) {
+    if (error) error.textContent = "Please choose an open appointment time before submitting your request.";
     return;
   }
   if (error) error.textContent = "";

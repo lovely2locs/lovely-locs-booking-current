@@ -30,9 +30,21 @@ loadEnvFile();
 const port = Number(process.env.PORT || 4175);
 const host = process.env.HOST || "0.0.0.0";
 const bookingsFile = path.join(root, "bookings.jsonl");
+const settingsFile = path.join(root, "site-settings.json");
 const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lovely2locs@gmail.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
 let stripeClient = null;
+
+const defaultSiteSettings = {
+  logo: {
+    navSize: 40,
+    heroSize: 88,
+    heroAlign: "left",
+    fit: "cover",
+    x: 50,
+    y: 50,
+  },
+};
 
 const serviceCatalog = [
   { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons" },
@@ -260,6 +272,54 @@ function sendHtml(res, status, html) {
     "Cache-Control": "no-store",
   });
   res.end(html);
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(Math.max(number, min), max);
+}
+
+function sanitizeLogoSettings(logo = {}) {
+  const align = ["left", "center", "right"].includes(logo.heroAlign) ? logo.heroAlign : defaultSiteSettings.logo.heroAlign;
+  const fit = ["cover", "contain"].includes(logo.fit) ? logo.fit : defaultSiteSettings.logo.fit;
+  return {
+    navSize: clampNumber(logo.navSize, 28, 72, defaultSiteSettings.logo.navSize),
+    heroSize: clampNumber(logo.heroSize, 56, 180, defaultSiteSettings.logo.heroSize),
+    heroAlign: align,
+    fit,
+    x: clampNumber(logo.x, 0, 100, defaultSiteSettings.logo.x),
+    y: clampNumber(logo.y, 0, 100, defaultSiteSettings.logo.y),
+  };
+}
+
+function readSiteSettings() {
+  if (!fs.existsSync(settingsFile)) return defaultSiteSettings;
+  try {
+    const saved = JSON.parse(fs.readFileSync(settingsFile, "utf8"));
+    return {
+      ...defaultSiteSettings,
+      ...saved,
+      logo: sanitizeLogoSettings(saved.logo || {}),
+    };
+  } catch {
+    return defaultSiteSettings;
+  }
+}
+
+function saveSiteSettings(settings) {
+  const clean = {
+    ...defaultSiteSettings,
+    ...settings,
+    logo: sanitizeLogoSettings(settings.logo || {}),
+  };
+  fs.writeFileSync(settingsFile, JSON.stringify(clean, null, 2), "utf8");
+  return clean;
+}
+
+function tokenIsValid(token) {
+  const expectedToken = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
+  return Boolean(expectedToken && token === expectedToken);
 }
 
 function findBookingById(id) {
@@ -689,8 +749,7 @@ async function handleManualPaymentConfirm(req, res) {
     const siteUrl = publicSiteUrl(req);
     const url = new URL(req.url || "/", siteUrl);
     const token = url.searchParams.get("token") || "";
-    const expectedToken = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
-    if (!expectedToken || token !== expectedToken) {
+    if (!tokenIsValid(token)) {
       sendHtml(res, 403, "<h1>Manual deposit confirmation unavailable</h1><p>The owner confirmation token is missing or invalid.</p>");
       return;
     }
@@ -769,6 +828,26 @@ const server = http.createServer((req, res) => {
       emailConfigured: emailConfigured(),
       ownerEmail,
       smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+    });
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/site-settings") {
+    sendJson(res, 200, { ok: true, settings: readSiteSettings() });
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/site-settings") {
+    readBody(req).then(raw => {
+      const body = JSON.parse(raw || "{}");
+      if (!tokenIsValid(body.token || "")) {
+        sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
+        return;
+      }
+      const settings = saveSiteSettings({ logo: body.logo || {} });
+      sendJson(res, 200, { ok: true, settings });
+    }).catch(error => {
+      sendJson(res, 400, { ok: false, error: error.message });
     });
     return;
   }

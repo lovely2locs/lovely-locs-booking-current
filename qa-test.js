@@ -207,6 +207,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("Admin Test Booking"), "admin test page missing");
   assert(html.includes("Free Admin Test Booking"), "free test service missing");
   assert(html.includes("No deposit"), "no-charge deposit note missing");
+  assert(html.includes("Logo size and centering"), "admin logo settings section missing");
+  assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
@@ -496,6 +498,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/availability"), "availability endpoint missing");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
+  assert(server.includes("/api/site-settings"), "site settings endpoint missing");
+  assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");

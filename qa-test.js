@@ -89,11 +89,24 @@ const context = {
   },
   localStorage: {
     getItem(key) { return localStore.get(key) || null; },
-    setItem(key, value) { localStore.set(key, value); }
+    setItem(key, value) { localStore.set(key, value); },
+    removeItem(key) { localStore.delete(key); }
   },
   console,
   fetch: async (url, options) => {
     context.lastFetch = { url, options };
+    if (url === "/api/discount/validate") {
+      return {
+        ok: true,
+        json: async () => ({ ok: true, code: "LOVELY10", percent: 10, expiresAt: "2026-12-31", message: "LOVELY10 applied for 10% off." })
+      };
+    }
+    if (url === "/api/discount/email") {
+      return {
+        ok: true,
+        json: async () => ({ ok: true, message: "Promo code email was sent." })
+      };
+    }
     return {
       ok: true,
       json: async () => ({
@@ -122,9 +135,13 @@ context.FormData = class {
       ["phone", "(555) 123-4567"],
       ["date", "2026-06-01"],
       ["time", "18:30"],
+      ["birthday", "1998-07-31"],
+      ["referredByCode", "LLABC123"],
       ["emergencySlot", ""],
       ["preferredContact", "text_email"],
       ["smsOptIn", "on"],
+      ["marketingEmailOptIn", "on"],
+      ["referralOptIn", "on"],
       ["specialRequests", "Test booking notes"],
       ["policyAcknowledgement", "on"]
     ]);
@@ -209,6 +226,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("No deposit"), "no-charge deposit note missing");
   assert(html.includes("Logo size and centering"), "admin logo settings section missing");
   assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
+  assert(html.includes("Discount Code Settings"), "admin discount settings section missing");
+  assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
@@ -258,7 +277,7 @@ test("privacy and terms routes render SMS safeguards", () => {
   context.render(context.currentRoute());
   html = appHtml();
   assert(html.includes("Terms &amp; Conditions"), "terms page missing");
-  assert(html.includes("Rewards, Discounts &amp; Free Product Offers"), "offer safeguards missing");
+  assert(html.includes("Referral Rewards"), "referral reward safeguards missing");
   assert(html.includes("not guaranteed for every client"), "non-guarantee terms missing");
 });
 
@@ -284,6 +303,22 @@ test("adding a service updates cart and booking modal", () => {
   assert(html.includes("Services: QA Service"), "booking modal did not use selected service");
   assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
   assert(html.includes("Finalize Cart &amp; Enter Details"), "final cart CTA missing");
+  assert(html.includes("Promo Code"), "cart promo field missing");
+  assert(html.includes("data-email-promo"), "promo email control missing");
+});
+
+test("promo code can be applied and included in booking payload", async () => {
+  context.window.location.hash = "";
+  context.clearCart();
+  context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
+  elements.promoCodeInput = new FakeElement("promoCodeInput");
+  elements.promoCodeInput.value = "lovely10";
+  await context.applyPromoCode();
+  assert(localStore.get("lovelyLocsAppliedDiscount").includes("LOVELY10"), "applied discount should be stored");
+  const payload = context.bookingPayloadFromForm(elements.bookingForm);
+  assert(payload.discountCode === "LOVELY10", "booking payload should include applied promo code");
+  assert(payload.total === 90, "booking payload should show discounted client preview total");
+  context.saveAppliedDiscount(null);
 });
 
 test("service selection opens cart before client details", () => {
@@ -384,11 +419,16 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="email" required'), "email not required");
   assert(html.includes('name="phone" required'), "phone not required");
   assert(html.includes('name="date" required'), "date not required");
+  assert(html.includes('name="birthday" type="date"'), "annual birthday credit field missing");
+  assert(html.includes('name="referredByCode"'), "referral code field missing");
   assert(html.includes('id="bookingTime" name="time"'), "preferred time slot input missing");
   assert(html.includes("time-slot-grid"), "time slot picker missing");
   assert(html.includes("Emergency proposal"), "emergency slot legend missing");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
   assert(html.includes('name="smsOptIn"'), "optional SMS opt-in checkbox missing");
+  assert(html.includes('name="marketingEmailOptIn"'), "monthly referral campaign opt-in missing");
+  assert(html.includes('name="referralOptIn"'), "referral reminder opt-in missing");
+  assert(html.includes("Good People Know Good People"), "referral campaign headline missing");
   assert(html.includes('value="text"'), "text contact option missing");
   assert(html.includes('value="email"'), "email contact option missing");
   assert(html.includes('Text + Email'), "text plus email contact option missing");
@@ -397,6 +437,41 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
   assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
+});
+
+test("client settings route shows referral tracking surface", () => {
+  context.window.location.hash = "#client-settings";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes("Referral code and reward status"), "client settings heading missing");
+  assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
+  assert(html.includes("Continue with Gmail"), "Gmail sign-in placeholder missing");
+  assert(html.includes("pending referrals"), "client settings pending referral copy missing");
+});
+
+test("saved client profile pre-fills booking basics", () => {
+  context.saveClientProfile({
+    fullName: "Saved Client",
+    email: "saved@example.com",
+    phone: "(336) 555-1212",
+    birthday: "1998-07-31",
+    preferredContact: "email",
+    smsOptIn: true,
+    marketingEmailOptIn: true,
+    referralOptIn: true,
+    specialRequests: "Saved notes"
+  });
+  context.window.location.hash = "";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes('value="Saved Client"'), "saved full name did not prefill");
+  assert(html.includes('value="saved@example.com"'), "saved email did not prefill");
+  assert(html.includes('value="(336) 555-1212"'), "saved phone did not prefill");
+  assert(html.includes('value="1998-07-31"'), "saved birthday did not prefill");
+  assert(html.includes('value="email" checked'), "saved preferred contact did not preselect");
+  assert(html.includes('name="smsOptIn" type="checkbox" checked'), "saved SMS opt-in did not precheck");
+  assert(html.includes("Saved notes"), "saved notes did not prefill");
+  context.clearClientProfile();
 });
 
 test("anchor route maps to home for section navigation", () => {
@@ -462,6 +537,10 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes('"time":"18:30"'), "booking backend payload should include selected time");
   assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
   assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
+  assert(context.lastFetch.options.body.includes("marketingEmailOptIn"), "booking backend payload should include monthly referral campaign opt-in status");
+  assert(context.lastFetch.options.body.includes("referralOptIn"), "booking backend payload should include referral reminder opt-in status");
+  assert(context.lastFetch.options.body.includes("1998-07-31"), "booking backend payload should include annual birthday credit date");
+  assert(context.lastFetch.options.body.includes("LLABC123"), "booking backend payload should include referral code used by new client");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
   assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until deposit is confirmed");
@@ -500,11 +579,32 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
   assert(server.includes("/api/site-settings"), "site settings endpoint missing");
   assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
+  assert(server.includes("sanitizeDiscountSettings"), "discount settings sanitizer missing");
+  assert(server.includes("/api/discount/validate"), "discount validation endpoint missing");
+  assert(server.includes("/api/discount/email"), "discount email endpoint missing");
+  assert(server.includes("activeDiscountForCode"), "server discount validator missing");
+  assert(server.includes("discountAmountForTotal"), "trusted server discount calculation missing");
+  assert(server.includes("availableClientCredit"), "earned client credit helper missing");
+  assert(server.includes("chooseBookingDiscount"), "one-discount-per-booking chooser missing");
+  assert(server.includes("recordReferralPending"), "pending referral tracking missing");
+  assert(server.includes("approveReferralReward"), "approved referral reward tracking missing");
+  assert(server.includes("/api/client-settings"), "client settings endpoint missing");
+  assert(server.includes("GOOGLE_CLIENT_ID"), "Google sign-in configuration hook missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
   assert(server.includes("notifyNoChargeTestBooking"), "no-charge test booking notifier missing");
   assert(server.includes("no_charge_test"), "no-charge test status missing");
+  assert(server.includes("/api/automations/run"), "automation run endpoint missing");
+  assert(server.includes("deposit_reminder"), "deposit reminder automation missing");
+  assert(server.includes("appointment_reminder_3_day"), "3-day appointment reminder automation missing");
+  assert(server.includes("appointment_reminder_1_day"), "1-day appointment reminder automation missing");
+  assert(server.includes("review_request"), "review request automation missing");
+  assert(server.includes("monthly_referral_campaign"), "monthly referral campaign automation missing");
+  assert(!server.includes("birthday_offer"), "birthday offer automation should not be active");
+  assert(server.includes("birthday_credit"), "annual birthday credit automation missing");
+  assert(server.includes("referral_reminder"), "referral reminder automation missing");
+  assert(server.includes("automation.notification.sent"), "automation duplicate guard event missing");
 });
 
 test("referral share link copies the booking page", async () => {

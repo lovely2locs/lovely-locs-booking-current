@@ -41,6 +41,12 @@ const defaultLogoSettings = {
   x: 50,
   y: 50
 };
+const defaultDiscountSettings = {
+  code: "LOVELY10",
+  percent: 10,
+  enabled: false,
+  expiresAt: ""
+};
 
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
@@ -348,6 +354,96 @@ function saveLogoSettingsLocal(settings) {
   applyLogoSettings();
 }
 
+function normalizeDiscountCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+
+function loadDiscountSettings() {
+  try {
+    return { ...defaultDiscountSettings, ...JSON.parse(localStorage.getItem("lovelyLocsDiscountSettings") || "{}") };
+  } catch {
+    return { ...defaultDiscountSettings };
+  }
+}
+
+function saveDiscountSettingsLocal(settings) {
+  discountSettings = {
+    ...defaultDiscountSettings,
+    ...settings,
+    code: normalizeDiscountCode(settings?.code || defaultDiscountSettings.code),
+    percent: Number(settings?.percent ?? defaultDiscountSettings.percent),
+    enabled: Boolean(settings?.enabled),
+    expiresAt: settings?.expiresAt || ""
+  };
+  localStorage.setItem("lovelyLocsDiscountSettings", JSON.stringify(discountSettings));
+  if (typeof appliedDiscount !== "undefined" && appliedDiscount) {
+    const expires = discountSettings.expiresAt ? new Date(`${discountSettings.expiresAt}T23:59:59`).getTime() < Date.now() : false;
+    if (!discountSettings.enabled || expires || appliedDiscount.code !== discountSettings.code) {
+      saveAppliedDiscount(null);
+    }
+  }
+}
+
+function loadAppliedDiscount() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("lovelyLocsAppliedDiscount") || "null");
+    if (!saved?.code || !saved?.percent) return null;
+    return { code: normalizeDiscountCode(saved.code), percent: Number(saved.percent), expiresAt: saved.expiresAt || "" };
+  } catch {
+    return null;
+  }
+}
+
+function saveAppliedDiscount(discount) {
+  appliedDiscount = discount ? { code: normalizeDiscountCode(discount.code), percent: Number(discount.percent), expiresAt: discount.expiresAt || "" } : null;
+  if (appliedDiscount) localStorage.setItem("lovelyLocsAppliedDiscount", JSON.stringify(appliedDiscount));
+  else if (localStorage.removeItem) localStorage.removeItem("lovelyLocsAppliedDiscount");
+  else localStorage.setItem("lovelyLocsAppliedDiscount", "");
+}
+
+function escapeAttr(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function loadClientProfile() {
+  try {
+    const profile = JSON.parse(localStorage.getItem("lovelyLocsClientProfile") || "null");
+    return profile && typeof profile === "object" ? profile : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveClientProfile(profile = {}) {
+  const clean = {
+    fullName: profile.fullName || "",
+    email: profile.email || "",
+    phone: profile.phone || "",
+    birthday: profile.birthday || "",
+    preferredContact: profile.preferredContact || "text_email",
+    smsOptIn: Boolean(profile.smsOptIn),
+    marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
+    referralOptIn: Boolean(profile.referralOptIn),
+    referralCode: profile.referralCode || "",
+    specialRequests: profile.specialRequests || ""
+  };
+  localStorage.setItem("lovelyLocsClientProfile", JSON.stringify(clean));
+  savedClientProfile = clean;
+  return clean;
+}
+
+function clearClientProfile() {
+  if (localStorage.removeItem) localStorage.removeItem("lovelyLocsClientProfile");
+  else localStorage.setItem("lovelyLocsClientProfile", "");
+  savedClientProfile = null;
+  clientSettingsResult = null;
+  render(currentRoute());
+}
+
 function applyLogoSettings() {
   const settings = { ...defaultLogoSettings, ...logoSettings };
   if (!document.documentElement?.style?.setProperty) return;
@@ -365,6 +461,9 @@ async function fetchLogoSettings() {
     if (result.ok && result.settings?.logo) {
       saveLogoSettingsLocal(result.settings.logo);
     }
+    if (result.ok && result.settings?.discount) {
+      saveDiscountSettingsLocal(result.settings.discount);
+    }
   } catch {
     applyLogoSettings();
   }
@@ -381,10 +480,14 @@ let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
 let bookingSlotState = { date: "", time: "", type: "", reason: "" };
 let logoSettings = loadLogoSettings();
+let discountSettings = loadDiscountSettings();
+let appliedDiscount = loadAppliedDiscount();
+let savedClientProfile = loadClientProfile();
 let advisoryMessage = "";
 let baseProductMessage = "";
 let partingMessage = "";
 let bookingConfirmation = null;
+let clientSettingsResult = null;
 let lastRoute = null;
 
 const app = document.getElementById("app");
@@ -392,6 +495,24 @@ const drawer = document.getElementById("drawer");
 
 function money(value) {
   return `$${Number(value).toFixed(0)}`;
+}
+
+function cartSubtotal(items = cart) {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+
+function discountAmountForTotal(total, discount = appliedDiscount) {
+  if (!discount?.code || !Number(discount.percent)) return 0;
+  return Math.min(total, Math.max(0, Math.round(total * Number(discount.percent) / 100)));
+}
+
+function discountedCartTotal(items = cart, discount = appliedDiscount) {
+  const subtotal = cartSubtotal(items);
+  return Math.max(0, subtotal - discountAmountForTotal(subtotal, discount));
+}
+
+function discountExpiryText(discount = appliedDiscount) {
+  return discount?.expiresAt ? `Expires ${discount.expiresAt}` : "No expiration date shown";
 }
 
 function isAdminTestBooking(items = cart) {
@@ -625,8 +746,10 @@ function referralShareSection() {
       <div class="container referral-card">
         <div>
           <p class="eyebrow">Referral Rewards</p>
-          <h2>Share Lovely Locs with a friend.</h2>
-          <p>Send the booking page to someone starting or maintaining their locs. Ask them to add your name in their booking notes so referral bonuses are easy to track.</p>
+          <h2>Good People Know Good People</h2>
+          <p>Refer a friend. When they book, they receive the new client rate and you receive $15 off your next service.</p>
+          <p>This rewards loyalty without discounting the Lovely Locs brand.</p>
+          <p><a href="#client-settings" data-route="client-settings">Open client settings</a> to get your personal referral code and track pending rewards.</p>
         </div>
         <div class="referral-actions">
           <button class="share-icon-btn" data-share-booking aria-label="Share booking link" title="Share booking link">
@@ -634,6 +757,69 @@ function referralShareSection() {
           </button>
           <button class="outline-btn" data-copy-booking>Copy Link</button>
           <p id="shareStatus" class="share-status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function clientSettingsPage() {
+  const result = clientSettingsResult;
+  const profile = savedClientProfile || result?.client || {};
+  const creditRows = result?.credits?.length
+    ? result.credits.map(credit => `<li><strong>${credit.type === "birthday" ? "Birthday" : "Referral"} credit:</strong> ${money(credit.amountOff)} ${credit.status}</li>`).join("")
+    : "<li>No earned credits yet.</li>";
+  const pendingRows = result?.referrals?.pending?.length
+    ? result.referrals.pending.map(item => `<li>${item.referredClientName}: pending until their deposit is accepted.</li>`).join("")
+    : "<li>No pending referrals yet.</li>";
+  const approvedRows = result?.referrals?.approved?.length
+    ? result.referrals.approved.map(item => `<li>Referral approved for ${money(item.amountOff)} off.</li>`).join("")
+    : "<li>No approved referrals yet.</li>";
+
+  return `
+    <section class="page-hero" id="client-settings-page">
+      <div class="container">
+        <p class="eyebrow">Client Settings</p>
+        <h1>Referral code and reward status</h1>
+        <p class="subtitle">Use the same email and phone number from your booking to see your referral code, pending referrals, and earned birthday or referral credits.</p>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container admin-grid">
+        <div class="policy-box">
+          <h2>Look Up Your Settings</h2>
+          ${savedClientProfile ? `<p class="promo-status success">Saved profile: ${escapeAttr(savedClientProfile.email || savedClientProfile.phone)}</p>` : ""}
+          <form class="form-grid" id="clientSettingsForm">
+            <label>Booking Email<input name="email" type="email" required placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
+            <label>Booking Phone<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
+            <p class="form-error" id="clientSettingsStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-client-settings-login>View Settings</button>
+            ${savedClientProfile ? `<button class="outline-btn" type="button" data-clear-client-profile>Sign Out / Clear Saved Details</button>` : ""}
+          </form>
+        </div>
+        <div class="policy-box">
+          <h2>Easy Sign In</h2>
+          <button class="outline-btn" type="button" disabled>Continue with Gmail</button>
+          <p>Gmail sign-in can be connected after a Google Client ID is added. Until then, use booking email and phone.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Your Referral Code</h2>
+          ${result ? `
+            <p class="promo-status success">Code: <strong>${result.referralCode}</strong></p>
+            <p>${result.shareUrl}</p>
+            <button class="outline-btn" type="button" data-copy-client-referral>Copy Referral Link</button>
+          ` : `<p>Enter your booking email and phone to see your code.</p>`}
+        </div>
+        <div class="policy-box">
+          <h2>Referral Status</h2>
+          <strong>Pending</strong>
+          <ul>${pendingRows}</ul>
+          <strong>Approved</strong>
+          <ul>${approvedRows}</ul>
+        </div>
+        <div class="policy-box">
+          <h2>Credits</h2>
+          <ul>${creditRows}</ul>
         </div>
       </div>
     </section>
@@ -987,16 +1173,16 @@ function privacyPage() {
         </div>
         <div class="policy-box">
           <h2>Information We Collect</h2>
-          <p>Lovely Locs may collect your name, email address, phone number, preferred appointment date, selected services, product or parting preferences, special requests, referral notes, SMS opt-in status, and message history related to your appointment.</p>
+          <p>Lovely Locs may collect your name, email address, phone number, preferred appointment date, selected services, product or parting preferences, special requests, referral notes, opt-in status, and message history related to your appointment.</p>
         </div>
         <div class="policy-box">
           <h2>How We Use Information</h2>
-          <p>Your information is used to process appointment requests, confirm booking details, send service-related updates, answer questions, provide loc care follow-up messages, manage referrals, and share occasional opt-in offers or chances for bonuses, discounts, or product promotions.</p>
-          <p>Promotional opportunities are not guaranteed and may vary based on availability, eligibility, timing, and active promotions.</p>
+          <p>Your information is used to process appointment requests, confirm booking details, send service-related updates, answer questions, provide loc care follow-up messages, manage referrals, and share opt-in referral campaign messages.</p>
+          <p>Referral rewards are not guaranteed and may vary based on availability, eligibility, timing, and active campaign rules.</p>
         </div>
         <div class="policy-box">
           <h2>SMS Privacy &amp; Consent</h2>
-          <p>By choosing to receive texts from Lovely Locs, you consent to receive appointment updates, booking reminders, follow-up messages, care tips, and occasional promotional or referral-related messages from Lovely Locs. Message frequency may vary. Message and data rates may apply.</p>
+          <p>By choosing to receive texts from Lovely Locs, you consent to receive appointment updates, booking reminders, follow-up messages, care tips, and occasional referral-related messages from Lovely Locs. Message frequency may vary. Message and data rates may apply.</p>
           <p><strong>Lovely Locs does not sell, rent, or share SMS opt-in data, phone numbers, or text messaging consent with third parties for their own marketing or promotional purposes.</strong></p>
         </div>
         <div class="policy-box">
@@ -1051,12 +1237,12 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>SMS Terms</h2>
-          <p>By opting in to Lovely Locs SMS messages, you agree to receive appointment updates, booking confirmations, reminders, follow-up messages, loc care tips, and occasional promotional or referral-related messages. Message frequency may vary. Message and data rates may apply.</p>
+          <p>By opting in to Lovely Locs SMS messages, you agree to receive appointment updates, booking confirmations, reminders, follow-up messages, loc care tips, and occasional referral-related messages. Message frequency may vary. Message and data rates may apply.</p>
           <p>Reply STOP to opt out. Reply HELP for help. Opting out of promotional messages may limit our ability to send some text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
         </div>
         <div class="policy-box">
-          <h2>Rewards, Discounts &amp; Free Product Offers</h2>
-          <p>Referral bonuses, discounts, rewards, and free product offers are occasional opportunities only. They are not guaranteed for every client, service, booking, referral, or opt-in. Offers may vary based on availability, eligibility, timing, promotion rules, and Lovely Locs discretion.</p>
+          <h2>Referral Rewards</h2>
+          <p>Referral rewards are occasional opportunities only. They are not guaranteed for every client, service, booking, referral, or opt-in. Referral rules may vary based on availability, eligibility, timing, campaign rules, and Lovely Locs discretion.</p>
         </div>
         <div class="policy-box">
           <h2>Studio Policy</h2>
@@ -1084,8 +1270,8 @@ function smsOptInPage() {
         <div class="policy-box sms-optin-proof">
           <p class="eyebrow">Consent Form</p>
           <h2>Lovely Locs Text Message Opt-In</h2>
-          <p>Complete this form if you would like to receive text messages from Lovely Locs. Texts may include appointment updates, booking reminders, service follow-ups, loc care tips, referral updates, and occasional chances for discounts, rewards, or free product offers.</p>
-          <p>Offers are not guaranteed and may vary by availability, eligibility, timing, and active promotion rules.</p>
+          <p>Complete this form if you would like to receive text messages from Lovely Locs. Texts may include appointment updates, booking reminders, service follow-ups, loc care tips, and referral updates.</p>
+          <p>Referral rewards are not guaranteed and may vary by availability, eligibility, timing, and active campaign rules.</p>
           <form class="sms-optin-form">
             <label>Full Name<input name="smsOptInName" placeholder="Your name"></label>
             <label>Mobile Number<input name="smsOptInPhone" placeholder="(555) 123-4567"></label>
@@ -1209,6 +1395,7 @@ function paymentSuccessPage() {
 function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
   const settings = { ...defaultLogoSettings, ...logoSettings };
+  const discount = { ...defaultDiscountSettings, ...discountSettings };
   return `
     <section class="hero route-page" id="admin-page">
       <h1>Admin Test Booking</h1>
@@ -1265,6 +1452,20 @@ function adminPage() {
             <button class="primary-btn" type="button" data-save-logo-settings>Save Logo Settings</button>
           </form>
         </div>
+        <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Owner Promotions</p>
+          <h2>Discount Code Settings</h2>
+          <p>Use your private manual deposit token to save one active sale promo code. Clients can use the sale code on more than one separate booking before the deadline, but the server only applies one discount per booking.</p>
+          <form class="brand-settings-form" id="discountSettingsForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Promo Code Spelling<input name="code" value="${discount.code}" maxlength="24" placeholder="LOVELY10"></label>
+            <label>Discount Percent<input name="percent" type="number" min="0" max="100" value="${discount.percent}"></label>
+            <label>Expiration Date<input name="expiresAt" type="date" value="${discount.expiresAt || ""}"></label>
+            <label class="full toggle-line"><input name="enabled" type="checkbox" ${discount.enabled ? "checked" : ""}> Promo code is active</label>
+            <p class="form-error" id="discountSettingsStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-save-discount-settings>Save Discount Code</button>
+          </form>
+        </div>
       </div>
     </section>
     ${cartMarkup()}
@@ -1307,7 +1508,10 @@ function versionsPage() {
 
 function cartMarkup() {
   const count = cart.length;
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = cartSubtotal();
+  const discountAmount = discountAmountForTotal(subtotal);
+  const total = discountedCartTotal();
+  const promoValue = appliedDiscount?.code || "";
   return `
     <button class="cart-button" id="cartButton">Cart ${count ? `(${count})` : ""}</button>
     <div class="cart" id="cart">
@@ -1325,7 +1529,27 @@ function cartMarkup() {
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
         </div>
-        ${cart.length ? `<div class="cart-total"><div class="service-top"><strong>Total</strong><strong>${money(total)}</strong></div><button class="primary-btn" data-open-booking>Finalize Cart &amp; Enter Details</button></div>` : ""}
+        ${cart.length ? `
+          <div class="promo-box">
+            <label>Promo Code<input id="promoCodeInput" value="${promoValue}" placeholder="Enter promo code"></label>
+            <div class="promo-actions">
+              <button type="button" data-apply-promo>Apply</button>
+              ${appliedDiscount ? `<button type="button" data-clear-promo>Clear</button>` : ""}
+            </div>
+            ${appliedDiscount ? `<p class="promo-status success">${appliedDiscount.code} applied: ${appliedDiscount.percent}% off. ${discountExpiryText(appliedDiscount)}.</p>` : `<p class="promo-status" id="promoStatus">Enter an active Lovely Locs promo code before booking.</p>`}
+            <div class="promo-email-row">
+              <label>Email Code For Later<input id="promoEmailInput" type="email" placeholder="you@example.com"></label>
+              <button type="button" data-email-promo>Email Code</button>
+            </div>
+            <p class="promo-status" id="promoEmailStatus" aria-live="polite"></p>
+          </div>
+          <div class="cart-total">
+            <div class="service-top"><strong>Subtotal</strong><strong>${money(subtotal)}</strong></div>
+            ${discountAmount ? `<div class="service-top discount-total"><strong>Promo Discount</strong><strong>-${money(discountAmount)}</strong></div>` : ""}
+            <div class="service-top"><strong>Total</strong><strong>${money(total)}</strong></div>
+            <button class="primary-btn" data-open-booking>Finalize Cart &amp; Enter Details</button>
+          </div>
+        ` : ""}
       </aside>
     </div>
   `;
@@ -1409,12 +1633,16 @@ function setEmergencyFeeForSlot(enabled) {
 }
 
 function updateBookingSummaryTotals() {
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = cartSubtotal();
+  const discountAmount = discountAmountForTotal(subtotal);
+  const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   const totalNode = document.getElementById("bookingTotalText");
   const depositNode = document.getElementById("bookingDepositText");
   const addOnsNode = document.getElementById("bookingAddOnsText");
+  const discountNode = document.getElementById("bookingDiscountText");
   if (totalNode) totalNode.textContent = `Estimated Total: ${money(total)}`;
+  if (discountNode) discountNode.textContent = discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : "";
   if (depositNode) depositNode.textContent = `Deposit Required to Hold Slot: ${money(deposit)}`;
   if (addOnsNode) {
     const addOns = cart.filter(item => item.type !== "service" || item.id === "emergency-fee");
@@ -1483,7 +1711,10 @@ function bindTimeSlotButtons() {
 function bookingModal() {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const profile = savedClientProfile || {};
+  const subtotal = cartSubtotal();
+  const discountAmount = discountAmountForTotal(subtotal);
+  const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   const adminTest = isAdminTestBooking(cart);
   const confirmationMarkup = bookingConfirmation ? `
@@ -1510,25 +1741,31 @@ function bookingModal() {
           ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
           <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
+          ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
+          <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : ""}</p>
           <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
           <p id="bookingDepositText">Deposit Required to Hold Slot: ${money(deposit)}</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
         <form class="form-grid" id="bookingForm">
-          <label>Full Name<input name="fullName" required placeholder="Your name"></label>
-          <label>Email Address<input name="email" required type="email" placeholder="you@example.com"></label>
-          <label>Phone Number<input name="phone" required placeholder="(555) 123-4567"></label>
+          <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
+          <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
+          <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Preferred Date<input id="bookingDate" name="date" required type="date"></label>
+          <label>Birthday Credit Date<input name="birthday" type="date" value="${escapeAttr(profile.birthday)}"></label>
+          <label>Referral Code<input name="referredByCode" value="${referredByCodeFromUrl()}" placeholder="Friend's code"></label>
           ${slotPickerMarkup()}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
-            <label><input name="preferredContact" type="radio" value="text_email" checked> Text + Email</label>
-            <label><input name="preferredContact" type="radio" value="text"> Text</label>
-            <label><input name="preferredContact" type="radio" value="email"> Email</label>
+            <label><input name="preferredContact" type="radio" value="text_email" ${!profile.preferredContact || profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email</label>
+            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}> Text</label>
+            <label><input name="preferredContact" type="radio" value="email" ${profile.preferredContact === "email" ? "checked" : ""}> Email</label>
             <p>Lovely Locs will still send both confirmation types when text and email providers are connected.</p>
           </fieldset>
-          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox"><span>I agree to receive Lovely Locs text messages for appointment updates, reminders, follow-ups, loc care tips, and occasional chances for referral bonuses, discounts, or free product offers. Offers are not guaranteed. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
-          <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes..."></textarea></label>
+          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive Lovely Locs text messages for appointment updates, reminders, follow-ups, loc care tips, and occasional referral updates. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
+          <label class="full policy-ack"><input name="marketingEmailOptIn" type="checkbox" ${profile.marketingEmailOptIn ? "checked" : ""}><span>I agree to receive the Lovely Locs monthly referral campaign by email. I can unsubscribe by replying to any email.</span></label>
+          <label class="full policy-ack"><input name="referralOptIn" type="checkbox" ${profile.referralOptIn ? "checked" : ""}><span>I agree to receive referral reminders and referral reward updates from Lovely Locs.</span></label>
+          <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
           <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a> before submitting this appointment request.</span></label>
         </form>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
@@ -1557,6 +1794,7 @@ function render(route = currentRoute()) {
   else if (route === "terms") app.innerHTML = termsPage();
   else if (route === "payment-options") app.innerHTML = paymentOptionsPage();
   else if (route === "payment-success") app.innerHTML = paymentSuccessPage();
+  else if (route === "client-settings") app.innerHTML = clientSettingsPage();
   else if (route === "admin") app.innerHTML = adminPage();
   else if (route === "versions") app.innerHTML = versionsPage();
   else app.innerHTML = homePage();
@@ -1577,7 +1815,7 @@ function scrollRouteToTop(route) {
 
 function currentRoute() {
   const hash = window.location.hash.replace("#", "").split("?")[0];
-  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "versions"].includes(hash) ? hash : "home";
+  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "client-settings", "admin", "versions"].includes(hash) ? hash : "home";
   if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
@@ -1790,6 +2028,10 @@ function bindDynamic() {
     });
   });
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
+  document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
+  document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
+  document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
+  document.querySelectorAll("[data-email-promo]").forEach(button => button.addEventListener("click", emailPromoCode));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
   document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
@@ -1824,6 +2066,10 @@ function bindDynamic() {
       if (currentRoute() === "versions") render("versions");
     });
   });
+
+  document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
+  document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
+  document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
 
   if (pendingAnchor) {
     const target = document.getElementById(pendingAnchor);
@@ -1860,6 +2106,17 @@ function bookingShareUrl() {
   return `${origin}/#services`;
 }
 
+function referredByCodeFromUrl() {
+  try {
+    const code = new URLSearchParams(window.location.search || "").get("ref") || localStorage.getItem("lovelyLocsReferredByCode") || "";
+    const clean = normalizeDiscountCode(code).replace(/[^A-Z0-9]/g, "");
+    if (clean) localStorage.setItem("lovelyLocsReferredByCode", clean);
+    return clean;
+  } catch {
+    return "";
+  }
+}
+
 function shareMessage() {
   return {
     title: "Book Lovely Locs",
@@ -1871,6 +2128,44 @@ function shareMessage() {
 function setShareStatus(message) {
   const status = document.getElementById("shareStatus");
   if (status) status.textContent = message;
+}
+
+async function lookupClientSettings() {
+  const form = document.getElementById("clientSettingsForm");
+  const status = document.getElementById("clientSettingsStatus");
+  if (!form) return;
+  if (!form.reportValidity()) {
+    if (status) status.textContent = "Enter the email and phone number used for booking.";
+    return;
+  }
+  const data = new FormData(form);
+  if (status) status.textContent = "Loading client settings...";
+  try {
+    const response = await fetch("/api/client-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: data.get("email") || "",
+        phone: data.get("phone") || ""
+      })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Client settings could not be loaded.");
+    clientSettingsResult = result;
+    saveClientProfile({
+      ...(result.client || {}),
+      referralCode: result.referralCode || result.client?.referralCode || ""
+    });
+    render("client-settings");
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+async function copyClientReferralLink() {
+  const link = clientSettingsResult?.shareUrl || "";
+  if (!link) return;
+  await navigator.clipboard?.writeText(link);
 }
 
 async function copyBookingLink() {
@@ -1970,6 +2265,104 @@ async function saveLogoSettings() {
   }
 }
 
+function discountSettingsFromForm() {
+  const form = document.getElementById("discountSettingsForm");
+  const data = new FormData(form);
+  return {
+    code: normalizeDiscountCode(data.get("code")),
+    percent: Number(data.get("percent")),
+    expiresAt: data.get("expiresAt") || "",
+    enabled: Boolean(data.get("enabled"))
+  };
+}
+
+async function saveDiscountSettings() {
+  const form = document.getElementById("discountSettingsForm");
+  const status = document.getElementById("discountSettingsStatus");
+  if (!form) return;
+  const data = new FormData(form);
+  const token = data.get("token") || "";
+  const settings = discountSettingsFromForm();
+  saveDiscountSettingsLocal(settings);
+  if (status) status.textContent = "Saving discount code...";
+  try {
+    const response = await fetch("/api/site-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, discount: settings })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Discount code could not be saved.");
+    saveDiscountSettingsLocal(result.settings.discount);
+    if (!result.settings.discount.enabled) saveAppliedDiscount(null);
+    if (status) status.textContent = "Discount code saved for the live site.";
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+function setPromoStatus(message, kind = "") {
+  const status = document.getElementById("promoStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("success", kind === "success");
+  status.classList.toggle("error", kind === "error");
+}
+
+async function applyPromoCode() {
+  const input = document.getElementById("promoCodeInput");
+  const code = normalizeDiscountCode(input?.value || "");
+  if (!code) {
+    setPromoStatus("Enter a promo code first.", "error");
+    return;
+  }
+  setPromoStatus("Checking promo code...");
+  try {
+    const response = await fetch("/api/discount/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Promo code could not be applied.");
+    saveAppliedDiscount({ code: result.code, percent: result.percent, expiresAt: result.expiresAt || "" });
+    render(currentRoute());
+    openCart();
+  } catch (error) {
+    saveAppliedDiscount(null);
+    setPromoStatus(error.message, "error");
+  }
+}
+
+function clearPromoCode() {
+  saveAppliedDiscount(null);
+  render(currentRoute());
+  openCart();
+}
+
+async function emailPromoCode() {
+  const status = document.getElementById("promoEmailStatus");
+  const email = document.getElementById("promoEmailInput")?.value || "";
+  const code = normalizeDiscountCode(appliedDiscount?.code || document.getElementById("promoCodeInput")?.value || "");
+  if (!email || !code) {
+    if (status) status.textContent = "Add an email and an active promo code first.";
+    return;
+  }
+  if (status) status.textContent = "Sending promo code...";
+  try {
+    const response = await fetch("/api/discount/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Promo code could not be emailed.");
+    if (status) status.textContent = result.message || "Promo code email was queued.";
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
 function bookingSummaryFromForm(form) {
   const booking = bookingPayloadFromForm(form);
   const { client, selectedServices, addOns, total, deposit } = booking;
@@ -1991,13 +2384,18 @@ function bookingSummaryFromForm(form) {
     `Phone: ${client.phone}`,
     `Preferred date: ${client.date}`,
     `Preferred time: ${timeLabel(client.time)}`,
+    client.birthday ? `Birthday credit date: ${client.birthday}` : "",
     `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
     `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
+    `Monthly referral campaign opt-in: ${client.marketingEmailOptIn ? "Yes" : "No"}`,
+    `Referral reminder opt-in: ${client.referralOptIn ? "Yes" : "No"}`,
+    client.referredByCode ? `Referred by code: ${client.referredByCode}` : "",
     "",
     "Services:",
     serviceLines.length ? serviceLines.join("\n") : "- No service selected",
     addOnLines.length ? `\nAdd-ons / products:\n${addOnLines.join("\n")}` : "",
     "",
+    appliedDiscount ? `Promo code: ${appliedDiscount.code} (${appliedDiscount.percent}% off)` : "",
     `Estimated total: ${money(total)}`,
     `Deposit required: ${money(deposit)}`,
     "",
@@ -2012,7 +2410,7 @@ function bookingPayloadFromForm(form) {
   const data = new FormData(form);
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   return {
     client: {
@@ -2021,9 +2419,13 @@ function bookingPayloadFromForm(form) {
       phone: data.get("phone") || "",
       date: data.get("date") || "",
       time: data.get("time") || "",
+      birthday: data.get("birthday") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),
       preferredContact: data.get("preferredContact") || "text_email",
       smsOptIn: Boolean(data.get("smsOptIn")),
+      marketingEmailOptIn: Boolean(data.get("marketingEmailOptIn")),
+      referralOptIn: Boolean(data.get("referralOptIn")),
+      referredByCode: normalizeDiscountCode(data.get("referredByCode") || "").replace(/[^A-Z0-9]/g, ""),
       specialRequests: data.get("specialRequests") || ""
     },
     cart,
@@ -2031,6 +2433,7 @@ function bookingPayloadFromForm(form) {
     addOns,
     total,
     deposit,
+    discountCode: appliedDiscount?.code || "",
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement"))
   };
 }
@@ -2077,13 +2480,15 @@ async function submitBooking() {
     submitButton.textContent = isAdminTestBooking(cart) ? "Saving Test Booking..." : "Opening Pay Options...";
   }
   try {
+    const bookingPayload = bookingPayloadFromForm(form);
     const response = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bookingPayloadFromForm(form))
+      body: JSON.stringify(bookingPayload)
     });
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
+    saveClientProfile(bookingPayload.client);
     if (result.noCharge) {
       bookingConfirmation = {
         message: result.message || "Free admin test booking saved. No deposit was requested."

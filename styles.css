@@ -1239,13 +1239,24 @@ button { cursor: pointer; }
   grid-column: 1 / -1;
 }
 
-.brand-settings-form input[type="password"] {
+.brand-settings-form input[type="password"],
+.brand-settings-form input[type="text"],
+.brand-settings-form input[type="number"],
+.brand-settings-form input[type="date"],
+.brand-settings-form input:not([type]) {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--white);
   color: var(--text);
   min-height: 44px;
   padding: 10px 12px;
+}
+
+.toggle-line {
+  align-items: center;
+  display: flex !important;
+  flex-direction: row;
+  gap: 10px !important;
 }
 
 .brand-settings-form input[type="range"] {
@@ -2052,6 +2063,62 @@ button { cursor: pointer; }
   padding-top: 16px;
   display: grid;
   gap: 16px;
+}
+
+.promo-box {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.promo-box label {
+  color: var(--brown);
+  display: grid;
+  gap: 7px;
+  font-weight: 800;
+}
+
+.promo-box input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--text);
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.promo-actions,
+.promo-email-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.promo-actions button,
+.promo-email-row button {
+  border: 1px solid rgba(122, 82, 142, 0.28);
+  border-radius: 10px;
+  background: rgba(122, 82, 142, 0.08);
+  color: var(--plum);
+  font-weight: 850;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.promo-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.promo-status.success,
+.discount-total {
+  color: var(--plum);
+}
+
+.promo-status.error {
+  color: var(--brown);
 }
 
 .modal {

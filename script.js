@@ -33,6 +33,14 @@ const manualPaymentFallbackOptions = [
 const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
+const defaultLogoSettings = {
+  navSize: 40,
+  heroSize: 88,
+  heroAlign: "left",
+  fit: "cover",
+  x: 50,
+  y: 50
+};
 
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
@@ -326,6 +334,42 @@ function saveCart() {
   localStorage.setItem("lovelyLocsCart", JSON.stringify(cart));
 }
 
+function loadLogoSettings() {
+  try {
+    return { ...defaultLogoSettings, ...JSON.parse(localStorage.getItem("lovelyLocsLogoSettings") || "{}") };
+  } catch {
+    return { ...defaultLogoSettings };
+  }
+}
+
+function saveLogoSettingsLocal(settings) {
+  logoSettings = { ...defaultLogoSettings, ...settings };
+  localStorage.setItem("lovelyLocsLogoSettings", JSON.stringify(logoSettings));
+  applyLogoSettings();
+}
+
+function applyLogoSettings() {
+  const settings = { ...defaultLogoSettings, ...logoSettings };
+  if (!document.documentElement?.style?.setProperty) return;
+  document.documentElement.style.setProperty("--nav-logo-size", `${settings.navSize}px`);
+  document.documentElement.style.setProperty("--hero-logo-size", `${settings.heroSize}px`);
+  document.documentElement.style.setProperty("--logo-fit", settings.fit);
+  document.documentElement.style.setProperty("--logo-position", `${settings.x}% ${settings.y}%`);
+  document.documentElement.style.setProperty("--hero-logo-margin-inline", settings.heroAlign === "center" ? "auto" : settings.heroAlign === "right" ? "auto 0" : "0 auto");
+}
+
+async function fetchLogoSettings() {
+  try {
+    const response = await fetch("/api/site-settings");
+    const result = await response.json();
+    if (result.ok && result.settings?.logo) {
+      saveLogoSettingsLocal(result.settings.logo);
+    }
+  } catch {
+    applyLogoSettings();
+  }
+}
+
 let cart = loadCart();
 let selectedService = cart.find(item => item.type === "service") || null;
 let pendingAnchor = null;
@@ -336,6 +380,7 @@ let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
 let bookingSlotState = { date: "", time: "", type: "", reason: "" };
+let logoSettings = loadLogoSettings();
 let advisoryMessage = "";
 let baseProductMessage = "";
 let partingMessage = "";
@@ -1163,6 +1208,7 @@ function paymentSuccessPage() {
 
 function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
+  const settings = { ...defaultLogoSettings, ...logoSettings };
   return `
     <section class="hero route-page" id="admin-page">
       <h1>Admin Test Booking</h1>
@@ -1190,6 +1236,34 @@ function adminPage() {
         <div class="policy-box">
           <h2>How to use it</h2>
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
+        </div>
+        <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Owner Branding</p>
+          <h2>Logo size and centering</h2>
+          <p>Use your private manual deposit token to save logo adjustments. Changes apply to the live site after saving, but may reset after a Render restart until we add permanent database storage.</p>
+          <div class="brand-preview">
+            <div class="hero-logo admin-logo-preview"><img data-admin-logo-preview src="${logoUrl}" alt="Lovely Locs Logo preview"></div>
+          </div>
+          <form class="brand-settings-form" id="brandSettingsForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Top Nav Logo Size <input name="navSize" type="range" min="28" max="72" value="${settings.navSize}"><span data-logo-value="navSize">${settings.navSize}px</span></label>
+            <label>Hero Logo Size <input name="heroSize" type="range" min="56" max="180" value="${settings.heroSize}"><span data-logo-value="heroSize">${settings.heroSize}px</span></label>
+            <label>Logo Left/Right Crop <input name="x" type="range" min="0" max="100" value="${settings.x}"><span data-logo-value="x">${settings.x}%</span></label>
+            <label>Logo Up/Down Crop <input name="y" type="range" min="0" max="100" value="${settings.y}"><span data-logo-value="y">${settings.y}%</span></label>
+            <div class="full brand-segment">
+              <span>Hero alignment</span>
+              <button type="button" class="${settings.heroAlign === "left" ? "active" : ""}" data-logo-align="left">Left</button>
+              <button type="button" class="${settings.heroAlign === "center" ? "active" : ""}" data-logo-align="center">Center</button>
+              <button type="button" class="${settings.heroAlign === "right" ? "active" : ""}" data-logo-align="right">Right</button>
+            </div>
+            <div class="full brand-segment">
+              <span>Image fit</span>
+              <button type="button" class="${settings.fit === "cover" ? "active" : ""}" data-logo-fit="cover">Fill circle</button>
+              <button type="button" class="${settings.fit === "contain" ? "active" : ""}" data-logo-fit="contain">Show full logo</button>
+            </div>
+            <p class="form-error" id="brandSettingsStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-save-logo-settings>Save Logo Settings</button>
+          </form>
         </div>
       </div>
     </section>
@@ -1698,6 +1772,24 @@ function bindDynamic() {
   document.querySelectorAll("[data-close-booking]").forEach(button => button.addEventListener("click", closeBooking));
   document.querySelectorAll("[data-submit-booking]").forEach(button => button.addEventListener("click", submitBooking));
   document.getElementById("bookingDate")?.addEventListener("change", event => loadAvailabilityForDate(event.target.value));
+  document.querySelectorAll("#brandSettingsForm input[type='range']").forEach(input => input.addEventListener("input", previewLogoSettings));
+  document.querySelectorAll("[data-logo-align]").forEach(button => {
+    button.addEventListener("click", () => {
+      logoSettings.heroAlign = button.dataset.logoAlign;
+      document.querySelectorAll("[data-logo-align]").forEach(item => item.classList.remove("active"));
+      button.classList.add("active");
+      previewLogoSettings();
+    });
+  });
+  document.querySelectorAll("[data-logo-fit]").forEach(button => {
+    button.addEventListener("click", () => {
+      logoSettings.fit = button.dataset.logoFit;
+      document.querySelectorAll("[data-logo-fit]").forEach(item => item.classList.remove("active"));
+      button.classList.add("active");
+      previewLogoSettings();
+    });
+  });
+  document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
   document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
@@ -1826,6 +1918,55 @@ async function copySmsOptInLink() {
     setShareStatus("SMS opt-in link copied.");
   } catch {
     setShareStatus(`Copy this SMS opt-in link: ${url}`);
+  }
+}
+
+function logoSettingsFromForm() {
+  const form = document.getElementById("brandSettingsForm");
+  const data = new FormData(form);
+  return {
+    navSize: Number(data.get("navSize")),
+    heroSize: Number(data.get("heroSize")),
+    heroAlign: logoSettings.heroAlign,
+    fit: logoSettings.fit,
+    x: Number(data.get("x")),
+    y: Number(data.get("y"))
+  };
+}
+
+function updateLogoControlLabels(settings) {
+  for (const [key, suffix] of [["navSize", "px"], ["heroSize", "px"], ["x", "%"], ["y", "%"]]) {
+    const node = document.querySelector(`[data-logo-value="${key}"]`);
+    if (node) node.textContent = `${settings[key]}${suffix}`;
+  }
+}
+
+function previewLogoSettings() {
+  const settings = logoSettingsFromForm();
+  saveLogoSettingsLocal(settings);
+  updateLogoControlLabels(settings);
+}
+
+async function saveLogoSettings() {
+  const form = document.getElementById("brandSettingsForm");
+  const status = document.getElementById("brandSettingsStatus");
+  if (!form) return;
+  const token = new FormData(form).get("token") || "";
+  const settings = logoSettingsFromForm();
+  saveLogoSettingsLocal(settings);
+  if (status) status.textContent = "Saving logo settings...";
+  try {
+    const response = await fetch("/api/site-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, logo: settings })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "Logo settings could not be saved.");
+    saveLogoSettingsLocal(result.settings.logo);
+    if (status) status.textContent = "Logo settings saved for the live site.";
+  } catch (error) {
+    if (status) status.textContent = error.message;
   }
 }
 
@@ -2017,6 +2158,8 @@ document.getElementById("themeToggle").addEventListener("click", () => {
 });
 
 if (localStorage.getItem("darkMode") === "true") document.documentElement.classList.add("dark");
+applyLogoSettings();
+fetchLogoSettings();
 function applyVisualVersion(versionId) {
   visualVersions.forEach(version => document.documentElement.classList.remove(`visual-${version.id}`));
   document.documentElement.classList.add(`visual-${versionId}`);

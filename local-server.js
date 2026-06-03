@@ -231,15 +231,24 @@ async function sendEmail(to, subject, text) {
     return { provider: "resend", skipped: true, reason: "RESEND_API_KEY and CONFIRMATION_FROM_EMAIL are not set" };
   }
 
-  const result = await postJson("https://api.resend.com/emails", {
-    from: process.env.CONFIRMATION_FROM_EMAIL,
+  const sendFrom = async from => postJson("https://api.resend.com/emails", {
+    from,
     to,
     subject,
     text,
   }, {
     Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
   });
-  return { provider: "resend", skipped: false, id: result.id || "" };
+  try {
+    const result = await sendFrom(process.env.CONFIRMATION_FROM_EMAIL);
+    return { provider: "resend", skipped: false, id: result.id || "" };
+  } catch (error) {
+    const ownerDestination = String(to || "").trim().toLowerCase() === String(ownerEmail || "").trim().toLowerCase();
+    const unverifiedSender = /domain is not verified/i.test(error.message || "");
+    if (!ownerDestination || !unverifiedSender) throw error;
+    const result = await sendFrom("Lovely Locs <onboarding@resend.dev>");
+    return { provider: "resend", skipped: false, fallbackFrom: "onboarding@resend.dev", id: result.id || "" };
+  }
 }
 
 async function sendSms(to, body) {

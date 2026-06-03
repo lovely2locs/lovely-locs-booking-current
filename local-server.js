@@ -392,8 +392,9 @@ function bookingPaymentOptionsUrl(booking) {
 }
 
 function automationTokenIsValid(token) {
-  const expected = process.env.AUTOMATION_RUN_TOKEN || process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
-  return Boolean(expected && token === expected);
+  return [process.env.AUTOMATION_RUN_TOKEN, process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN].some(expected => (
+    Boolean(expected && token === expected)
+  ));
 }
 
 function automationAlreadySent(records, automationType, recipientKey, cycleKey = "") {
@@ -591,8 +592,7 @@ function saveSiteSettings(settings = {}) {
 }
 
 function tokenIsValid(token) {
-  const expectedToken = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || "";
-  return Boolean(expectedToken && token === expectedToken);
+  return automationTokenIsValid(token);
 }
 
 function discountIsExpired(discount) {
@@ -870,7 +870,7 @@ function paymentOptionsText(booking) {
 }
 
 function manualConfirmUrl(req, booking, method = "manual") {
-  const token = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN;
+  const token = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN;
   if (!token) return "";
   const url = new URL("/api/manual-payment/confirm", publicSiteUrl(req));
   url.searchParams.set("booking", booking.id);

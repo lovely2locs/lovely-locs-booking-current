@@ -2,8 +2,8 @@ const logoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/publ
 
 const categories = [
   { id: "loc-maintenance", label: "Loc Maintenance", icon: "Retwist" },
-  { id: "starter-locs", label: "Starter Locs", icon: "Start" },
-  { id: "instant-crochet", label: "Instant / Crochet", icon: "Crochet" },
+  { id: "starter-locs", label: "Starter Locs", icon: "" },
+  { id: "instant-crochet", label: "Instant Locs / Crochet", icon: "" },
   { id: "add-ons", label: "Add-Ons & More", icon: "Add-On" }
 ];
 
@@ -208,6 +208,41 @@ const productCarePrinciples = [
   "Patch test anything new before making it part of your routine."
 ];
 
+const stockShortlist = [
+  {
+    name: "Locsanity Rosewater & Peppermint Spray",
+    role: "Best first shelf item",
+    quality: "Light daily moisture, familiar to loc clients, and easy to explain after retwist appointments.",
+    proof: "Walmart and Shop App listings show purchaser-review activity, while community feedback is mixed enough to keep this as a client-choice item rather than a blanket recommendation.",
+    margin: "Strong add-on potential because sprays are easy to bundle, easy to sample, and low-risk to keep in small quantities.",
+    action: "Stock soon"
+  },
+  {
+    name: "Made For Locs Aloe Moisturizing Hair Spray",
+    role: "Gentler hydration option",
+    quality: "Aloe-based moisture support for clients who want a lighter routine between appointments.",
+    proof: "CVS and Made For Locs review pages show loc-client feedback around daily use, hydration, and improved feel.",
+    margin: "Good retail potential as a second spray option for sensitive or peppermint-avoidant clients.",
+    action: "Stock soon"
+  },
+  {
+    name: "Dr Locs Imani Locking Spray",
+    role: "Professional retwist support",
+    quality: "A lighter hold option that fits your current booking flow because clients already choose Oil and Water, Foam, or Gel.",
+    proof: "Shop App and Dr Locs buyer reviews mention hold, scent, sensitive-scalp use, and loctician use.",
+    margin: "Worth testing in limited quantity because professional hold products can sell after maintenance services.",
+    action: "Test small"
+  },
+  {
+    name: "Loc Sprinkles, cuffs, and custom charms",
+    role: "Highest margin accessory lane",
+    quality: "Visual add-ons are not hair-health dependent, so quality control is easier: shine, durability, comfort, and color variety matter most.",
+    proof: "Your booking menu already supports sprinkles and custom color preferences, so this is the most natural shelf expansion.",
+    margin: "Best profit-margin potential because accessories can be bought in bulk and sold as appointment add-ons.",
+    action: "Prioritize"
+  }
+];
+
 const testimonials = [
   {
     name: "Starter loc client",
@@ -229,7 +264,7 @@ const testimonials = [
 const serviceGuide = [
   {
     id: "new-locs",
-    label: "I am starting locs",
+    label: "Starter Locs",
     recommendation: "Start with a Consultation if you are unsure about size, parting, or method. If you are ready, choose Children's Starter Locs, Medium Adult Starter Locs, or Small Adult Starter Locs based on your desired size.",
     serviceIds: ["consultation", "child-starter-coils", "medium-adult-starter", "small-adult-starter"]
   },
@@ -241,7 +276,7 @@ const serviceGuide = [
   },
   {
     id: "instant",
-    label: "I want instant/crochet work",
+    label: "Instant Locs / Crochet",
     recommendation: "Choose Adult Instant Locs or Children's Instant Loc. These services use crochet needle work and need a longer appointment window.",
     serviceIds: ["adult-instant", "child-instant", "children-instant-starter"]
   },
@@ -258,9 +293,9 @@ const serviceQuizQuestions = [
     id: "stage",
     label: "Hair stage",
     options: [
-      { value: "starter", label: "Starting locs", guide: "new-locs" },
+      { value: "starter", label: "Starter locs", guide: "new-locs" },
       { value: "maintenance", label: "Maintaining locs", guide: "maintenance" },
-      { value: "instant", label: "Instant/crochet", guide: "instant" }
+      { value: "instant", label: "Instant locs / crochet", guide: "instant" }
     ]
   },
   {
@@ -1090,6 +1125,27 @@ function productsPage() {
         </div>
         <div class="product-filter-row" aria-label="Product shelf filters">
           ${["All", ...productShelfGroups.map(group => group.name)].map(filter => `<button class="${activeProductShelf === filter ? "active" : ""}" data-product-filter="${filter}">${filter}</button>`).join("")}
+        </div>
+        <div class="stock-shortlist">
+          <div class="split-heading">
+            <div>
+              <p class="eyebrow">Worth Stocking Soon</p>
+              <h2 class="section-title left">Quality first, margin second.</h2>
+            </div>
+            <p>These are the product lanes I would consider adding to Lovely Locs first because they fit real client needs, have outside review signals, and can sell naturally after an appointment without making the brand feel discount-heavy.</p>
+          </div>
+          <div class="stock-grid">
+            ${stockShortlist.map(item => `
+              <article class="card stock-card">
+                <span>${item.action}</span>
+                <h3>${item.name}</h3>
+                <p class="stock-role">${item.role}</p>
+                <div><strong>Quality reason</strong><p>${item.quality}</p></div>
+                <div><strong>Review signal</strong><p>${item.proof}</p></div>
+                <div><strong>Profit potential</strong><p>${item.margin}</p></div>
+              </article>
+            `).join("")}
+          </div>
         </div>
         <div class="product-shelf-stack">
           ${visibleGroups.map(group => `
@@ -2407,9 +2463,10 @@ function notificationResultsHtml(results = []) {
   return results.map(result => {
     const label = escapeAttr(result.channel || "notification");
     if (result.failed) {
+      const deliveryLabel = result.channel === "clientEmail" ? "clientEmail: not delivered automatically" : `${label}: failed`;
       const fallback = result.fallback ? `<br><span>${escapeAttr(result.fallback)}</span>` : "";
       const draft = result.gmailDraftUrl ? `<br><a href="${escapeAttr(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open Gmail draft for client confirmation</a>` : "";
-      return `<span>${label}: failed - ${escapeAttr(result.error || "Unknown error")}${fallback}${draft}</span>`;
+      return `<span>${deliveryLabel} - ${escapeAttr(result.error || "Unknown error")}${fallback}${draft}</span>`;
     }
     if (result.skipped) return `<span>${label}: skipped - ${escapeAttr(result.reason || "Provider not ready")}</span>`;
     const parts = [`${label}: accepted by ${escapeAttr(result.provider || "provider")}`];

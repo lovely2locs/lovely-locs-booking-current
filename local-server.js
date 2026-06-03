@@ -34,6 +34,7 @@ const bookingsFile = path.join(root, "bookings.jsonl");
 const settingsFile = path.join(root, "site-settings.json");
 const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lovely2locs@gmail.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
+const emailLogoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
 const dayMs = 24 * 60 * 60 * 1000;
 const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
 const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
@@ -178,6 +179,141 @@ function bookingText(booking) {
   ].join("\n");
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function emailDetailRows(rows = []) {
+  return rows
+    .filter(row => row?.value !== undefined && row?.value !== null && String(row.value).trim() !== "")
+    .map(row => `
+      <tr>
+        <td style="padding:10px 0;color:#7a6257;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(row.label)}</td>
+        <td style="padding:10px 0;color:#3b2821;font-size:15px;text-align:right;font-weight:700;">${escapeHtml(row.value)}</td>
+      </tr>
+    `).join("");
+}
+
+function serviceSummaryHtml(booking) {
+  const items = (booking.selectedServices?.length ? booking.selectedServices : booking.cart || []);
+  if (!items.length) return "";
+  return items.map(item => {
+    const details = [
+      item.duration ? `Time: ${item.duration}` : "",
+      item.baseProduct ? `Base product: ${item.baseProduct}` : "",
+      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
+    ].filter(Boolean).join(" • ");
+    return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
+  }).join("");
+}
+
+function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], services = "", note = "", ctaUrl = "", ctaLabel = "" }) {
+  return `
+  <div style="margin:0;padding:0;background:#f8f0ea;font-family:Arial,Helvetica,sans-serif;color:#3b2821;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f0ea;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fffaf7;border:1px solid #ead8cf;border-radius:18px;overflow:hidden;">
+            <tr>
+              <td style="background:#3b2821;padding:24px;text-align:center;">
+                <img src="${emailLogoUrl}" alt="Lovely Locs" width="92" height="92" style="display:block;margin:0 auto 12px;border-radius:999px;object-fit:cover;border:3px solid #f3d9ce;">
+                <p style="margin:0;color:#f3d9ce;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;">${escapeHtml(eyebrow)}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:30px 28px 12px;">
+                <h1 style="margin:0 0 12px;color:#3b2821;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;font-weight:400;">${escapeHtml(title)}</h1>
+                <p style="margin:0;color:#6c544b;font-size:16px;line-height:1.65;">${escapeHtml(intro)}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:10px 28px 24px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #ead8cf;border-bottom:1px solid #ead8cf;">
+                  ${emailDetailRows(rows)}
+                </table>
+                ${services ? `<div style="margin-top:22px;"><p style="margin:0 0 10px;color:#7a6257;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">Service Details</p><ul style="padding-left:20px;margin:0;">${services}</ul></div>` : ""}
+                ${note ? `<div style="margin-top:22px;background:#f1e3dc;border-radius:14px;padding:16px;color:#5d453c;font-size:15px;line-height:1.55;">${escapeHtml(note)}</div>` : ""}
+                ${ctaUrl && ctaLabel ? `<p style="margin:26px 0 0;"><a href="${escapeHtml(ctaUrl)}" style="background:#7b4f5f;color:#ffffff;text-decoration:none;border-radius:999px;display:inline-block;padding:13px 18px;font-weight:800;">${escapeHtml(ctaLabel)}</a></p>` : ""}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 28px;background:#fff3ee;color:#7a6257;font-size:13px;line-height:1.5;text-align:center;">
+                Lovely Locs • Private in-home studio • Address shared after confirmation
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+}
+
+function confirmationEmail(booking, { test = false } = {}) {
+  const title = test ? "Your Lovely Locs test booking came through" : "Your loc time is confirmed";
+  const intro = test
+    ? "This was a no-charge owner test, but the email style matches what clients will see after a confirmed deposit."
+    : "Take a breath, your appointment request is no longer floating around. Your deposit has been received, and your Lovely Locs time is saved.";
+  const rows = [
+    { label: "Client", value: booking.client?.fullName },
+    { label: "Date", value: booking.client?.date },
+    { label: "Time", value: timeLabel(booking.client?.time) },
+    { label: "Booking ID", value: booking.id },
+    { label: "Deposit", value: `$${booking.deposit || 0}` },
+    { label: "Estimated Total", value: `$${booking.total || 0}` },
+  ];
+  return {
+    text: [
+      title,
+      "",
+      intro,
+      "",
+      `Booking ID: ${booking.id}`,
+      `Date: ${booking.client?.date || ""}`,
+      `Time: ${timeLabel(booking.client?.time)}`,
+      `Deposit: $${booking.deposit || 0}`,
+      "",
+      "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
+      "",
+      bookingText(booking),
+    ].join("\n"),
+    html: brandEmailHtml({
+      eyebrow: test ? "Owner Test" : "Appointment Confirmed",
+      title,
+      intro,
+      rows,
+      services: serviceSummaryHtml(booking),
+      note: "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
+    }),
+  };
+}
+
+function ownerBookingEmail(booking, { title, intro, ctaUrl = "", ctaLabel = "" }) {
+  const rows = [
+    { label: "Client", value: booking.client?.fullName },
+    { label: "Client Email", value: booking.client?.email },
+    { label: "Phone", value: booking.client?.phone },
+    { label: "Date", value: booking.client?.date },
+    { label: "Time", value: timeLabel(booking.client?.time) },
+    { label: "Booking ID", value: booking.id },
+    { label: "Deposit", value: `$${booking.deposit || 0}` },
+    { label: "Estimated Total", value: `$${booking.total || 0}` },
+  ];
+  return brandEmailHtml({
+    eyebrow: "Owner Update",
+    title,
+    intro,
+    rows,
+    services: serviceSummaryHtml(booking),
+    note: booking.client?.specialRequests ? `Client notes: ${booking.client.specialRequests}` : "No special client notes were added.",
+    ctaUrl,
+    ctaLabel,
+  });
+}
+
 function timeLabel(value) {
   const [hourText, minuteText] = String(value || "").split(":");
   const hour = Number(hourText);
@@ -265,7 +401,7 @@ function smsBlockedReason() {
   return "";
 }
 
-async function sendEmail(to, subject, text) {
+async function sendEmail(to, subject, text, options = {}) {
   if (!emailConfigured()) {
     return { provider: "resend", skipped: true, reason: "RESEND_API_KEY and CONFIRMATION_FROM_EMAIL are not set" };
   }
@@ -275,6 +411,7 @@ async function sendEmail(to, subject, text) {
     to,
     subject,
     text,
+    html: options.html || undefined,
   }, {
     Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
   });
@@ -1127,11 +1264,16 @@ async function notifyDepositPaid(booking, session) {
   });
   const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
   const ownerText = `Stripe deposit paid for ${booking.client.fullName}: $${booking.deposit}. Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`;
+  const clientEmail = confirmationEmail(booking);
+  const ownerHtml = ownerBookingEmail(booking, {
+    title: "Deposit confirmed",
+    intro: "Stripe marked this deposit paid. The client confirmation email has been queued through the connected email provider.",
+  });
   const results = [];
 
   for (const task of [
-    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs appointment confirmed", `${clientText}\n\n${details}`)],
-    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit paid: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
+    ["clientEmail", () => sendEmail(booking.client.email, "Your Lovely Locs appointment is confirmed", clientEmail.text, { html: clientEmail.html })],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit paid: ${booking.client.fullName}`, `${ownerText}\n\n${details}`, { html: ownerHtml })],
     booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
   ].filter(Boolean)) {
@@ -1161,10 +1303,16 @@ async function notifyManualPaymentPending(booking, req) {
     "",
     details,
   ].join("\n");
+  const ownerHtml = ownerBookingEmail(booking, {
+    title: "A deposit is waiting for your eyes",
+    intro: "A client chose manual payment. Once you see the matching Venmo or Apple Pay receipt, use the approve button to send their confirmation.",
+    ctaUrl: confirmLink,
+    ctaLabel: "Confirm Deposit",
+  });
   const results = [];
 
   for (const task of [
-    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText)],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText, { html: ownerHtml })],
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. ${booking.client.date} ${timeLabel(booking.client.time)}. Confirm link: ${confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN."}`)],
   ]) {
     try {
@@ -1189,11 +1337,16 @@ async function notifyManualDepositPaid(booking, method) {
   });
   const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
   const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}.`;
+  const clientEmail = confirmationEmail(booking);
+  const ownerHtml = ownerBookingEmail(booking, {
+    title: "Deposit confirmed",
+    intro: `The ${method} deposit has been marked paid. The client confirmation email has been queued through the connected email provider.`,
+  });
   const results = [];
 
   for (const task of [
-    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs appointment confirmed", `${clientText}\n\n${details}`)],
-    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs manual deposit confirmed: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
+    ["clientEmail", () => sendEmail(booking.client.email, "Your Lovely Locs appointment is confirmed", clientEmail.text, { html: clientEmail.html })],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs manual deposit confirmed: ${booking.client.fullName}`, `${ownerText}\n\n${details}`, { html: ownerHtml })],
     booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
   ].filter(Boolean)) {
@@ -1211,11 +1364,16 @@ async function notifyNoChargeTestBooking(booking) {
   const details = bookingText(booking);
   const clientText = `Lovely Locs test booking received for ${booking.client.date}. This was a no-charge admin test, so no deposit was requested.`;
   const ownerText = `No-charge admin test booking submitted for ${booking.client.fullName}. Preferred date: ${booking.client.date}.`;
+  const clientEmail = confirmationEmail(booking, { test: true });
+  const ownerHtml = ownerBookingEmail(booking, {
+    title: "Test booking came through",
+    intro: "This no-charge test booking confirms the form and notification path are connected.",
+  });
   const results = [];
 
   for (const task of [
-    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs test booking received", `${clientText}\n\n${details}`)],
-    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs test booking: ${booking.client.fullName}`, `${ownerText}\n\n${details}`)],
+    ["clientEmail", () => sendEmail(booking.client.email, "Lovely Locs test booking received", clientEmail.text, { html: clientEmail.html })],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs test booking: ${booking.client.fullName}`, `${ownerText}\n\n${details}`, { html: ownerHtml })],
     booking.client.smsOptIn ? ["clientSms", () => sendSms(normalizePhone(booking.client.phone), clientText)] : null,
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), ownerText)],
   ].filter(Boolean)) {

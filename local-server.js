@@ -37,6 +37,7 @@ const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
 const emailLogoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
 const dayMs = 24 * 60 * 60 * 1000;
 const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
+const referredNewClientCreditAmount = Number(process.env.REFERRED_NEW_CLIENT_CREDIT_AMOUNT || 15);
 const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
 let stripeClient = null;
 
@@ -139,6 +140,9 @@ function readBody(req) {
 }
 
 function bookingText(booking) {
+  const discountLabel = booking.discountPercent
+    ? `${booking.discountPercent}% off`
+    : `$${booking.discountAmount || 0} off`;
   const serviceLines = (booking.cart || []).map(item => {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
@@ -168,7 +172,7 @@ function bookingText(booking) {
     serviceLines.length ? serviceLines.join("\n") : "- No cart items included",
     "",
     booking.subtotal && booking.discountAmount ? `Subtotal before promo: $${booking.subtotal}` : "",
-    booking.discountAmount ? `Promo code: ${booking.discountCode || ""} (${booking.discountPercent || 0}% off, -$${booking.discountAmount})` : "",
+    booking.discountAmount ? `Promo code: ${booking.discountCode || ""} (${discountLabel}, -$${booking.discountAmount})` : "",
     `Estimated total: $${booking.total || 0}`,
     `Deposit required: $${booking.deposit || 0}`,
     "",
@@ -952,9 +956,26 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   };
 }
 
-function chooseBookingDiscount(subtotal, saleDiscount, clientCredit) {
+function referredNewClientDiscount(client, total, records = readBookingRecords()) {
+  const code = normalizeReferralCode(client?.referredByCode);
+  if (!code) return null;
+  const referrer = findReferrerByCode(code, records);
+  if (!referrer || sameClient(referrer.client, client)) return null;
+  if (latestClientBooking(client, records)) return null;
+  const amountOff = Math.min(total, Math.max(0, Math.round(referredNewClientCreditAmount)));
+  if (!amountOff) return null;
+  return {
+    type: "referral_new_client",
+    code: `NEW-${code}`,
+    amountOff,
+    source: "referral_new_client_rate",
+  };
+}
+
+function chooseBookingDiscount(subtotal, saleDiscount, clientCredit, referredClientDiscount) {
   const saleAmount = discountAmountForTotal(subtotal, saleDiscount);
   const creditAmount = clientCredit ? discountAmountForTotal(subtotal, clientCredit) : 0;
+  const referredClientAmount = referredClientDiscount ? discountAmountForTotal(subtotal, referredClientDiscount) : 0;
   if (clientCredit && creditAmount > saleAmount) {
     return {
       code: clientCredit.code,
@@ -973,6 +994,15 @@ function chooseBookingDiscount(subtotal, saleDiscount, clientCredit) {
       amountOff: saleAmount,
       expiresAt: saleDiscount.expiresAt || "",
       source: "sale_code",
+    };
+  }
+  if (referredClientDiscount && referredClientAmount > 0) {
+    return {
+      code: referredClientDiscount.code,
+      type: referredClientDiscount.type,
+      percent: 0,
+      amountOff: referredClientAmount,
+      source: referredClientDiscount.source,
     };
   }
   return null;
@@ -1269,7 +1299,8 @@ function priceBooking(booking) {
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
   const saleDiscount = activeDiscountForCode(booking.discountCode);
   const clientCredit = availableClientCredit(client, subtotal);
-  const discount = isAdminTestBooking(cart) ? null : chooseBookingDiscount(subtotal, saleDiscount, clientCredit);
+  const referredClientDiscount = referredNewClientDiscount(client, subtotal);
+  const discount = isAdminTestBooking(cart) ? null : chooseBookingDiscount(subtotal, saleDiscount, clientCredit, referredClientDiscount);
   const discountAmount = isAdminTestBooking(cart) ? 0 : discountAmountForTotal(subtotal, discount);
   const total = Math.max(0, subtotal - discountAmount);
   const deposit = isAdminTestBooking(cart) ? 0 : Math.max(Math.round(total * 0.3), 30);

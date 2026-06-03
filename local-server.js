@@ -211,12 +211,27 @@ function emailConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.CONFIRMATION_FROM_EMAIL);
 }
 
+function isUsTollFreeNumber(phone) {
+  const digits = String(phone || "").replace(/[^0-9]/g, "");
+  const normalized = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  return normalized.length === 10 && /^(800|833|844|855|866|877|888)/.test(normalized);
+}
+
+function smsBlockedReason() {
+  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } = process.env;
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) return "";
+  if (isUsTollFreeNumber(TWILIO_FROM_NUMBER) && process.env.TWILIO_TOLLFREE_VERIFIED !== "true") {
+    return "SMS is paused because the Twilio sender is a U.S. toll-free number and TWILIO_TOLLFREE_VERIFIED is not true. Verify the toll-free number in Twilio first to avoid paid undelivered messages.";
+  }
+  return "";
+}
+
 async function sendEmail(to, subject, text) {
   if (!emailConfigured()) {
     return { provider: "resend", skipped: true, reason: "RESEND_API_KEY and CONFIRMATION_FROM_EMAIL are not set" };
   }
 
-  await postJson("https://api.resend.com/emails", {
+  const result = await postJson("https://api.resend.com/emails", {
     from: process.env.CONFIRMATION_FROM_EMAIL,
     to,
     subject,
@@ -224,13 +239,17 @@ async function sendEmail(to, subject, text) {
   }, {
     Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
   });
-  return { provider: "resend", skipped: false };
+  return { provider: "resend", skipped: false, id: result.id || "" };
 }
 
 async function sendSms(to, body) {
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } = process.env;
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
     return { provider: "twilio", skipped: true, reason: "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER are not set" };
+  }
+  const blockedReason = smsBlockedReason();
+  if (blockedReason) {
+    return { provider: "twilio", skipped: true, reason: blockedReason };
   }
 
   const params = new URLSearchParams({
@@ -250,7 +269,17 @@ async function sendSms(to, body) {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${text}`.trim());
   }
-  return { provider: "twilio", skipped: false };
+  const result = await response.json().catch(() => ({}));
+  return {
+    provider: "twilio",
+    skipped: false,
+    sid: result.sid || "",
+    status: result.status || "",
+    to: result.to || to,
+    from: result.from || TWILIO_FROM_NUMBER,
+    errorCode: result.error_code || null,
+    errorMessage: result.error_message || null,
+  };
 }
 
 function normalizePhone(phone) {
@@ -1425,11 +1454,17 @@ async function handleBooking(req, res) {
 }
 
 async function handleManualPaymentConfirm(req, res) {
+  let wantsJson = false;
   try {
     const siteUrl = publicSiteUrl(req);
     const url = new URL(req.url || "/", siteUrl);
     const token = url.searchParams.get("token") || "";
+    wantsJson = url.searchParams.get("format") === "json";
     if (!tokenIsValid(token)) {
+      if (wantsJson) {
+        sendJson(res, 403, { ok: false, error: "The owner confirmation token is missing or invalid." });
+        return;
+      }
       sendHtml(res, 403, "<h1>Manual deposit confirmation unavailable</h1><p>The owner confirmation token is missing or invalid.</p>");
       return;
     }
@@ -1438,6 +1473,10 @@ async function handleManualPaymentConfirm(req, res) {
     const method = url.searchParams.get("method") || "manual";
     const booking = findBookingById(bookingId);
     if (!booking) {
+      if (wantsJson) {
+        sendJson(res, 404, { ok: false, error: "No matching Lovely Locs booking was found for this confirmation link." });
+        return;
+      }
       sendHtml(res, 404, "<h1>Booking not found</h1><p>No matching Lovely Locs booking was found for this confirmation link.</p>");
       return;
     }
@@ -1456,8 +1495,16 @@ async function handleManualPaymentConfirm(req, res) {
       redeemedCredit,
     });
 
+    if (wantsJson) {
+      sendJson(res, 200, { ok: true, bookingId, notificationResults, referralReward, redeemedCredit });
+      return;
+    }
     sendHtml(res, 200, `<h1>Deposit confirmed</h1><p>Lovely Locs confirmation messages were attempted for booking ${bookingId}.</p>`);
   } catch (error) {
+    if (wantsJson) {
+      sendJson(res, 400, { ok: false, error: error.message });
+      return;
+    }
     sendHtml(res, 400, `<h1>Confirmation failed</h1><p>${error.message}</p>`);
   }
 }
@@ -1592,6 +1639,35 @@ async function handleClientSettings(req, res) {
   }
 }
 
+async function handleNotificationTest(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    if (!tokenIsValid(body.token || "")) {
+      sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
+      return;
+    }
+    const channel = String(body.channel || "all").trim().toLowerCase();
+    const email = String(body.email || ownerEmail).trim();
+    const phone = normalizePhone(body.phone || ownerPhone);
+    const tasks = [];
+    const stamp = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+    if (channel === "all" || channel === "email") {
+      tasks.push(["ownerEmail", () => sendEmail(email, "Lovely Locs notification test", `Lovely Locs test email sent at ${stamp}. If you see this, email notifications are working.`)]);
+    }
+    if (channel === "all" || channel === "sms") {
+      tasks.push(["ownerSms", () => sendSms(phone, `Lovely Locs test text sent at ${stamp}.`)]);
+    }
+    if (!tasks.length) {
+      sendJson(res, 400, { ok: false, error: "Choose email, SMS, or both." });
+      return;
+    }
+    sendJson(res, 200, { ok: true, results: await runNotificationTasks(tasks) });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
 async function handleAutomationRun(req, res) {
   try {
     const siteUrl = publicSiteUrl(req);
@@ -1624,10 +1700,14 @@ async function handleAutomationRun(req, res) {
 }
 
 function automationProviderStatus() {
+  const configuredForSms = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
+  const blockedReason = smsBlockedReason();
   return {
     tokenConfigured: Boolean(process.env.AUTOMATION_RUN_TOKEN || process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN),
     emailConfigured: emailConfigured(),
-    smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+    smsConfigured: configuredForSms,
+    smsReady: configuredForSms && !blockedReason,
+    smsBlockedReason: blockedReason,
     dailyTypes: ["deposit", "appointment", "review", "referral", "birthday"],
     monthlyTypes: ["referral-campaign"],
   };
@@ -1651,11 +1731,15 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/notification-status") {
+    const configuredForSms = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
+    const blockedReason = smsBlockedReason();
     sendJson(res, 200, {
       ok: true,
       emailConfigured: emailConfigured(),
       ownerEmail,
-      smsConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
+      smsConfigured: configuredForSms,
+      smsReady: configuredForSms && !blockedReason,
+      smsBlockedReason: blockedReason,
       automation: automationProviderStatus(),
     });
     return;
@@ -1715,6 +1799,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/client-settings") {
     handleClientSettings(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/notifications/test") {
+    handleNotificationTest(req, res);
     return;
   }
 

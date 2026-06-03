@@ -767,7 +767,10 @@ function clientSettingsPage() {
   const result = clientSettingsResult;
   const profile = savedClientProfile || result?.client || {};
   const creditRows = result?.credits?.length
-    ? result.credits.map(credit => `<li><strong>${credit.type === "birthday" ? "Birthday" : "Referral"} credit:</strong> ${money(credit.amountOff)} ${credit.status}</li>`).join("")
+    ? result.credits.map(credit => {
+      const dates = credit.type === "birthday" && credit.validFrom && credit.expiresAt ? ` (${credit.validFrom} - ${credit.expiresAt})` : "";
+      return `<li><strong>${credit.type === "birthday" ? "Birthday" : "Referral"} credit:</strong> ${money(credit.amountOff)} ${credit.status}${dates}</li>`;
+    }).join("")
     : "<li>No earned credits yet.</li>";
   const pendingRows = result?.referrals?.pending?.length
     ? result.referrals.pending.map(item => `<li>${item.referredClientName}: pending until their deposit is accepted.</li>`).join("")
@@ -1789,7 +1792,7 @@ function bookingModal() {
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Preferred Date<input id="bookingDate" name="date" required type="date"></label>
-          <label>Birthday Credit Date<input name="birthday" type="date" value="${escapeAttr(profile.birthday)}"></label>
+          <label>Birthday<input name="birthday" type="date" value="${escapeAttr(profile.birthday)}"><span class="field-note">Birthday rewards are emailed automatically 2 weeks before this date and expire 1 month after it.</span></label>
           <label>Referral Code<input name="referredByCode" value="${referredByCodeFromUrl()}" placeholder="Friend's code"></label>
           ${slotPickerMarkup()}
           <fieldset class="full contact-preference">
@@ -1797,7 +1800,7 @@ function bookingModal() {
             <label><input name="preferredContact" type="radio" value="text_email" ${!profile.preferredContact || profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email</label>
             <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}> Text</label>
             <label><input name="preferredContact" type="radio" value="email" ${profile.preferredContact === "email" ? "checked" : ""}> Email</label>
-            <p>Lovely Locs will still send both confirmation types when text and email providers are connected.</p>
+            <p>Choose how you want client-facing confirmations delivered. SMS only sends if the client checks the text-message consent box.</p>
           </fieldset>
           <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive Lovely Locs text messages for appointment updates, reminders, follow-ups, loc care tips, and occasional referral updates. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full policy-ack"><input name="marketingEmailOptIn" type="checkbox" ${profile.marketingEmailOptIn ? "checked" : ""}><span>I agree to receive the Lovely Locs monthly referral campaign by email. I can unsubscribe by replying to any email.</span></label>

@@ -140,8 +140,6 @@ context.FormData = class {
       ["emergencySlot", ""],
       ["preferredContact", "text_email"],
       ["smsOptIn", "on"],
-      ["marketingEmailOptIn", "on"],
-      ["referralOptIn", "on"],
       ["specialRequests", "Test booking notes"],
       ["policyAcknowledgement", "on"]
     ]);
@@ -295,6 +293,8 @@ test("privacy and terms routes render SMS safeguards", () => {
   assert(html.includes("Terms &amp; Conditions"), "terms page missing");
   assert(html.includes("Referral Rewards"), "referral reward safeguards missing");
   assert(html.includes("not guaranteed for every client"), "non-guarantee terms missing");
+  assert(html.includes("Lovely Locs does not provide medical care"), "service-scope terms missing");
+  assert(html.includes("quality work cannot be rushed"), "unrushed timing terms missing");
 });
 
 test("sms opt-in route renders consent proof form", () => {
@@ -442,9 +442,10 @@ test("booking form has required client fields", () => {
   assert(html.includes("time-slot-grid"), "time slot picker missing");
   assert(html.includes("Emergency proposal"), "emergency slot legend missing");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
-  assert(html.includes('name="smsOptIn"'), "optional SMS opt-in checkbox missing");
-  assert(html.includes('name="marketingEmailOptIn"'), "monthly referral campaign opt-in missing");
-  assert(html.includes('name="referralOptIn"'), "referral reminder opt-in missing");
+  assert(html.includes('name="smsOptIn"'), "optional communications opt-in checkbox missing");
+  assert(html.includes("Optional: send me Lovely Locs texts and emails"), "condensed communications consent copy missing");
+  assert(!html.includes('name="marketingEmailOptIn"'), "old monthly referral campaign checkbox should be merged into communications consent");
+  assert(!html.includes('name="referralOptIn"'), "old referral reminder checkbox should be merged into communications consent");
   assert(html.includes("Good People Know Good People"), "referral campaign headline missing");
   assert(html.includes('value="text"'), "text contact option missing");
   assert(html.includes('value="email"'), "email contact option missing");
@@ -452,6 +453,8 @@ test("booking form has required client fields", () => {
   assert(!html.includes('name="address"'), "address field should not be shown for studio-only bookings");
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
+  assert(html.includes("outside the listed loc/natural-hair scope"), "service scope acknowledgement missing");
+  assert((html.match(/type="checkbox"/g) || []).length === 2, "checkout should use exactly two checkboxes");
   assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });

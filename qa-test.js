@@ -185,6 +185,7 @@ test("home renders core client sections", () => {
 
 test("site shell exposes client login and owner admin access", () => {
   const html = fs.readFileSync("index.html", "utf8");
+  assert(html.includes('href="#products" data-route="products">Products'), "products link missing from site shell");
   assert(html.includes('href="#client-settings" data-route="client-settings">Client Login'), "client login link missing from site shell");
   assert(html.includes('href="#admin" data-route="admin">Owner Admin'), "owner admin link missing from site shell");
 });
@@ -206,6 +207,8 @@ test("products route renders products and cart", () => {
   const html = appHtml();
   assert(html.includes("Products"), "products page missing");
   assert(html.includes("Recommended Hair Products"), "recommended hair products section missing");
+  assert(html.includes("Worth Stocking Soon"), "stocking shortlist missing");
+  assert(html.includes("Quality first, margin second."), "stocking strategy headline missing");
   assert(html.includes("Loc Jewels &amp; Accessories"), "accessories section missing");
   assert(html.includes("Review source"), "review source links missing");
   assert(html.includes("data-product-filter"), "product filter controls missing");
@@ -641,6 +644,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
   assert(script.includes("Open Gmail draft for client confirmation"), "admin Gmail draft fallback link missing");
+  assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");

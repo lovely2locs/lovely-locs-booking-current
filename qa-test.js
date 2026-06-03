@@ -197,6 +197,7 @@ test("policies route renders FAQ and policies", () => {
   assert(html.includes("Policies &amp; FAQ"), "policy hero missing");
   assert(html.includes("Lovely Locs Booking Standards"), "booking standards missing");
   assert(html.includes("Prices, add-ons, advisory changes"), "clear pricing policy copy missing");
+  assert(html.includes("quality loc work cannot be rushed"), "unrushed quality work policy missing");
   assert(html.includes("Frequently Asked Questions"), "FAQ missing");
   assert(html.includes("Are deposits refundable?"), "deposit FAQ missing");
 });

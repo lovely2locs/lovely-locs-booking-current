@@ -2182,6 +2182,15 @@ input, textarea {
 }
 textarea { min-height: 92px; resize: vertical; }
 
+.field-note {
+  color: var(--muted);
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
 .contact-preference {
   border: 1px solid var(--border);
   border-radius: 14px;

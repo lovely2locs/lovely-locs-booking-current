@@ -1271,6 +1271,46 @@ button { cursor: pointer; }
   font-size: 0.86rem;
 }
 
+.readiness-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.readiness-line {
+  border: 1px solid var(--border);
+  border-left: 5px solid #b42318;
+  border-radius: 8px;
+  background: var(--white);
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.readiness-line.ready {
+  border-left-color: #267a46;
+}
+
+.readiness-line strong {
+  color: var(--brown);
+}
+
+.readiness-line span {
+  color: var(--plum);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.readiness-line.ready span {
+  color: #267a46;
+}
+
+.readiness-line p {
+  color: var(--muted);
+  margin: 0;
+}
+
 .brand-segment {
   align-items: center;
   display: flex;

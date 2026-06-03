@@ -586,6 +586,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("manualPaymentOptions"), "manual payment options helper missing");
   assert(server.includes("notifyManualPaymentPending"), "manual pending owner notification missing");
   assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
+  assert(server.includes("brandEmailHtml"), "branded email HTML template missing");
+  assert(server.includes("emailLogoUrl"), "email logo asset missing");
+  assert(server.includes("Your loc time is confirmed"), "relaxed confirmation email copy missing");
+  assert(server.includes("Take a breath"), "warm confirmation email intro missing");
+  assert(server.includes("html: options.html"), "Resend HTML email payload missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");

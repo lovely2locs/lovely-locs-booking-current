@@ -1428,6 +1428,15 @@ function adminPage() {
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
         </div>
         <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Launch Readiness</p>
+          <h2>Notification Status</h2>
+          <p>Check this before launch. Owner test email can work while client confirmation email still needs a verified sending domain.</p>
+          <div class="readiness-list" id="adminNotificationStatus">
+            <p>Loading notification status...</p>
+          </div>
+          <button class="outline-btn" type="button" data-refresh-notification-status>Refresh Status</button>
+        </div>
+        <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
           <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner Gmail or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
@@ -2071,6 +2080,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
+  document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
   document.querySelectorAll("[data-email-promo]").forEach(button => button.addEventListener("click", emailPromoCode));
@@ -2112,6 +2122,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
   document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
+  if (currentRoute() === "admin") loadAdminNotificationStatus();
 
   if (pendingAnchor) {
     const target = document.getElementById(pendingAnchor);
@@ -2406,6 +2417,29 @@ async function sendNotificationTest() {
     if (status) status.textContent = notificationResultsText(result.results);
   } catch (error) {
     if (status) status.textContent = error.message;
+  }
+}
+
+function readinessLine(label, ready, detail) {
+  return `<div class="readiness-line ${ready ? "ready" : "blocked"}"><strong>${label}</strong><span>${ready ? "Ready" : "Needs attention"}</span><p>${escapeAttr(detail || "")}</p></div>`;
+}
+
+async function loadAdminNotificationStatus() {
+  const target = document.getElementById("adminNotificationStatus");
+  if (!target) return;
+  target.innerHTML = "<p>Loading notification status...</p>";
+  try {
+    const response = await fetch("/api/notification-status");
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Notification status could not load.");
+    target.innerHTML = [
+      readinessLine("Owner Email", Boolean(result.emailConfigured), result.emailConfigured ? `Owner email target: ${result.ownerEmail}` : result.emailReadinessReason),
+      readinessLine("Client Confirmation Email", Boolean(result.emailReadyForClients), result.emailReadinessReason),
+      readinessLine("SMS", Boolean(result.smsReady), result.smsBlockedReason || (result.smsConfigured ? "SMS provider is configured." : "Twilio env vars are not configured.")),
+      readinessLine("Admin Token", Boolean(result.automation?.tokenConfigured), result.automation?.tokenConfigured ? "Admin actions and automations have a token configured." : "Set AUTOMATION_RUN_TOKEN or MANUAL_DEPOSIT_CONFIRM_TOKEN.")
+    ].join("");
+  } catch (error) {
+    target.innerHTML = `<p class="form-error">${escapeAttr(error.message)}</p>`;
   }
 }
 

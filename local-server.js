@@ -314,6 +314,16 @@ function ownerBookingEmail(booking, { title, intro, ctaUrl = "", ctaLabel = "" }
   });
 }
 
+function gmailComposeUrl(to, subject, body) {
+  const url = new URL("https://mail.google.com/mail/");
+  url.searchParams.set("view", "cm");
+  url.searchParams.set("fs", "1");
+  url.searchParams.set("to", to || "");
+  url.searchParams.set("su", subject || "");
+  url.searchParams.set("body", body || "");
+  return url.toString();
+}
+
 function timeLabel(value) {
   const [hourText, minuteText] = String(value || "").split(":");
   const hour = Number(hourText);
@@ -1355,6 +1365,16 @@ async function notifyManualDepositPaid(booking, method) {
     } catch (error) {
       results.push({ channel: task[0], failed: true, error: error.message });
     }
+  }
+
+  const clientEmailResult = results.find(result => result.channel === "clientEmail");
+  if (clientEmailResult?.failed) {
+    clientEmailResult.gmailDraftUrl = gmailComposeUrl(
+      booking.client.email,
+      "Your Lovely Locs appointment is confirmed",
+      clientEmail.text
+    );
+    clientEmailResult.fallback = "Client email was blocked by the provider. Open the Gmail draft link to send the confirmation from the owner Gmail.";
   }
 
   return results;

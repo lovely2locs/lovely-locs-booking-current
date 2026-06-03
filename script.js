@@ -1072,7 +1072,8 @@ function policiesPage() {
     ["Private", "Appointments are held at the Lovely Locs home studio by appointment only. The exact address is shared after booking is confirmed."],
     ["Clear", "Prices, add-ons, advisory changes, and deposit expectations are shown before checkout."],
     ["Guided", "Service questions help match your hair history to the correct appointment so time is not underbooked."],
-    ["Prepared", "Client notes, product preferences, and parting preferences are reviewed before confirmation."]
+    ["Prepared", "Client notes, product preferences, and parting preferences are reviewed before confirmation."],
+    ["Unrushed", "Please do not schedule anything directly after your appointment. Lovely Locs gives each service the time it needs because quality loc work cannot be rushed."]
   ];
   return `
     <section class="hero route-page" id="policies-page">

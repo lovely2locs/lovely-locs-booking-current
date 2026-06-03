@@ -1430,7 +1430,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
-          <p>If the owner Gmail does not arrive, use this form after you verify the matching Venmo or Apple Pay receipt. The booking ID is in the client's pay-options link after <strong>booking=</strong>.</p>
+          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner Gmail or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
           <form class="brand-settings-form" id="manualDepositConfirmForm">
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
             <label>Booking ID<input name="booking" placeholder="LL-1780438950711"></label>

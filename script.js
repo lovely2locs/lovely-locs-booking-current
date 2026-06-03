@@ -1443,6 +1443,25 @@ function adminPage() {
           </form>
         </div>
         <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Notification Test</p>
+          <h2>Send Notification Test</h2>
+          <p>Use this before testing bookings. The app will show the real email or SMS provider result. SMS is skipped if the Twilio toll-free sender is not verified, so it will not keep spending credits on blocked texts.</p>
+          <form class="brand-settings-form" id="notificationTestForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Email<input name="email" type="email" value="lovely2locs@gmail.com"></label>
+            <label>Phone<input name="phone" type="tel" value="3364711098"></label>
+            <label>Channel
+              <select name="channel">
+                <option value="email">Email only</option>
+                <option value="sms">SMS only</option>
+                <option value="all">Email + SMS</option>
+              </select>
+            </label>
+            <p class="form-error" id="notificationTestStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-send-notification-test>Send Test</button>
+          </form>
+        </div>
+        <div class="policy-box brand-settings-box">
           <p class="eyebrow">Owner Branding</p>
           <h2>Logo size and centering</h2>
           <p>Use your private manual deposit token to save logo adjustments. Changes apply to the live site after saving, but may reset after a Render restart until we add permanent database storage.</p>
@@ -2048,6 +2067,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
+  document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
   document.querySelectorAll("[data-email-promo]").forEach(button => button.addEventListener("click", emailPromoCode));
@@ -2334,12 +2354,53 @@ async function confirmManualDeposit() {
   }
   if (status) status.textContent = "Confirming deposit...";
   try {
-    const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}`;
+    const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}&format=json`;
     const response = await fetch(url);
-    const text = await response.text();
-    const cleanText = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    if (!response.ok) throw new Error(cleanText || "Deposit confirmation failed.");
-    if (status) status.textContent = "Deposit confirmed. Client confirmation messages were attempted.";
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Deposit confirmation failed.");
+    if (status) status.textContent = `Deposit confirmed.\n${notificationResultsText(result.notificationResults)}`;
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+function notificationResultsText(results = []) {
+  if (!results.length) return "No notification tasks were returned.";
+  return results.map(result => {
+    const label = result.channel || "notification";
+    if (result.failed) return `${label}: failed - ${result.error || "Unknown error"}`;
+    if (result.skipped) return `${label}: skipped - ${result.reason || "Provider not ready"}`;
+    const parts = [`${label}: accepted by ${result.provider || "provider"}`];
+    if (result.id) parts.push(`email id ${result.id}`);
+    if (result.sid) parts.push(`sms sid ${result.sid}`);
+    if (result.status) parts.push(`status ${result.status}`);
+    return parts.join(" - ");
+  }).join("\n");
+}
+
+async function sendNotificationTest() {
+  const form = document.getElementById("notificationTestForm");
+  const status = document.getElementById("notificationTestStatus");
+  if (!form) return;
+  const data = new FormData(form);
+  const token = String(data.get("token") || "").trim();
+  const email = String(data.get("email") || "").trim();
+  const phone = String(data.get("phone") || "").trim();
+  const channel = String(data.get("channel") || "email").trim();
+  if (!token) {
+    if (status) status.textContent = "Enter the admin token first.";
+    return;
+  }
+  if (status) status.textContent = "Sending notification test...";
+  try {
+    const response = await fetch("/api/notifications/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, email, phone, channel })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Notification test failed.");
+    if (status) status.textContent = notificationResultsText(result.results);
   } catch (error) {
     if (status) status.textContent = error.message;
   }

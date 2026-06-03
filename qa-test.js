@@ -591,6 +591,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("Your loc time is confirmed"), "relaxed confirmation email copy missing");
   assert(server.includes("Take a breath"), "warm confirmation email intro missing");
   assert(server.includes("html: options.html"), "Resend HTML email payload missing");
+  assert(server.includes("gmailComposeUrl"), "Gmail compose fallback missing");
+  assert(server.includes("gmailDraftUrl"), "client confirmation Gmail draft link missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
@@ -637,6 +639,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   const script = fs.readFileSync("script.js", "utf8");
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
+  assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
+  assert(script.includes("Open Gmail draft for client confirmation"), "admin Gmail draft fallback link missing");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");

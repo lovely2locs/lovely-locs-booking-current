@@ -528,6 +528,37 @@ function birthdayMonthDay(value) {
   return match ? `${match[1]}-${match[2]}` : "";
 }
 
+function birthdayWindowForYear(value, year) {
+  const monthDay = birthdayMonthDay(value);
+  const [month, day] = monthDay.split("-").map(Number);
+  if (!month || !day) return null;
+  const birthdayDate = new Date(year, month - 1, day, 12, 0, 0);
+  if (birthdayDate.getMonth() !== month - 1 || birthdayDate.getDate() !== day) return null;
+  const validFrom = new Date(birthdayDate);
+  validFrom.setDate(validFrom.getDate() - 14);
+  const expiresAt = new Date(birthdayDate);
+  expiresAt.setMonth(expiresAt.getMonth() + 1);
+  return {
+    cycleYear: String(year),
+    birthdayDate: dateKey(birthdayDate),
+    validFrom: dateKey(validFrom),
+    expiresAt: dateKey(expiresAt),
+  };
+}
+
+function activeBirthdayWindow(value, now = new Date()) {
+  const today = dateKey(now);
+  for (const year of [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]) {
+    const window = birthdayWindowForYear(value, year);
+    if (window && today >= window.validFrom && today <= window.expiresAt) return window;
+  }
+  return null;
+}
+
+function creditIsExpired(record, now = new Date()) {
+  return Boolean(record.expiresAt && dateKey(now) > record.expiresAt);
+}
+
 function sameClient(left = {}, right = {}) {
   return Boolean(clientIdentityKey(left) && clientIdentityKey(left) === clientIdentityKey(right));
 }
@@ -632,6 +663,7 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
     && record.clientKey === key
     && record.creditId
     && !creditIsUnavailable(records, record.creditId)
+    && !creditIsExpired(record)
   ));
   if (!credits.length) return null;
   const best = credits.reduce((winner, credit) => (
@@ -1225,13 +1257,12 @@ async function runBirthdayCreditAutomation(booking, records, now) {
   if (!booking.client?.marketingEmailOptIn || !booking.client?.birthday) return null;
   const key = clientIdentityKey(booking.client);
   if (!key) return null;
-  const todayMonthDay = dateKey(now).slice(5);
-  if (birthdayMonthDay(booking.client.birthday) !== todayMonthDay) return null;
-  const year = String(now.getFullYear());
-  const creditId = `birthday:${year}:${key}`;
+  const window = activeBirthdayWindow(booking.client.birthday, now);
+  if (!window) return null;
+  const creditId = `birthday:${window.cycleYear}:${key}`;
   const currentRecords = readBookingRecords();
   if (currentRecords.some(record => record.type === "birthday.reward.approved" && record.creditId === creditId)) return null;
-  const code = `BDAY-${year}-${referralCodeForClient(booking.client)}`;
+  const code = `BDAY-${window.cycleYear}-${referralCodeForClient(booking.client)}`;
   const event = {
     type: "birthday.reward.approved",
     clientKey: key,
@@ -1239,16 +1270,20 @@ async function runBirthdayCreditAutomation(booking, records, now) {
     creditId,
     discountCode: code,
     amountOff: birthdayCreditAmount,
-    cycleKey: year,
+    cycleKey: window.cycleYear,
+    birthdayDate: window.birthdayDate,
+    validFrom: window.validFrom,
+    expiresAt: window.expiresAt,
     approvedAt: new Date().toISOString(),
   };
   appendBookingRecord(event);
   const text = [
     `Happy birthday, ${clientFirstName(booking)}!`,
     `Lovely Locs added a $${birthdayCreditAmount} birthday credit to your client settings for this year.`,
+    `Your birthday credit is available from ${window.validFrom} through ${window.expiresAt}.`,
     "Birthday credits are annual and can apply to one future booking while available.",
   ].join("\n");
-  return sendClientAutomation(booking, "birthday_credit", year, "Your annual Lovely Locs birthday credit", text, text, { emailOnly: true });
+  return sendClientAutomation(booking, "birthday_credit", window.cycleYear, "Your annual Lovely Locs birthday credit", text, text, { emailOnly: true });
 }
 
 async function runMonthlyReferralCampaignAutomation(bookings, records, now) {
@@ -1571,13 +1606,16 @@ function clientSettingsFor(client, req) {
   )).map(record => {
     const reserved = records.some(item => item.type === "discount.credit.reserved" && item.creditId === record.creditId);
     const redeemed = records.some(item => item.type === "discount.credit.redeemed" && item.creditId === record.creditId);
+    const expired = creditIsExpired(record);
     return {
       type: record.type === "birthday.reward.approved" ? "birthday" : "referral",
-      status: redeemed ? "redeemed" : reserved ? "reserved" : "available",
+      status: redeemed ? "redeemed" : reserved ? "reserved" : expired ? "expired" : "available",
       creditId: record.creditId,
       discountCode: record.discountCode,
       amountOff: record.amountOff,
       createdAt: record.approvedAt,
+      validFrom: record.validFrom || "",
+      expiresAt: record.expiresAt || "",
     };
   });
   return {

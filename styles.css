@@ -20,6 +20,8 @@
   --hero-logo-margin-inline: 0 auto;
   --logo-fit: cover;
   --logo-position: 50% 50%;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 }
 
 .visual-v1 {
@@ -96,13 +98,42 @@ body {
   margin: 0;
   background: var(--cream);
   color: var(--text);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 a { color: inherit; text-decoration: none; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+
+h1, h2, h3,
+.brand span,
+.drawer-head span,
+.section-title,
+.service-top h4,
+.featured-card h3,
+.prep-card h3,
+.referral-card h2,
+.process-card h3,
+.guide-copy h2,
+.portfolio-tile h3,
+.version-intro h2,
+.hour-card h4,
+.product-card h3,
+.product-card h4,
+.product-shelf-intro h2,
+.recommended-product-card h4,
+.policy-box h2,
+.contact-card h2,
+.payment-summary-panel h2,
+.payment-option-card h3,
+.modal-head h2,
+.advisory-box h3,
+.footer h3 {
+  font-family: var(--font-display);
+}
 
 .announcement {
   background: linear-gradient(90deg, var(--dark-brown), var(--plum), var(--lilac-deep));
@@ -144,8 +175,9 @@ button { cursor: pointer; }
 
 .brand {
   color: var(--brown);
-  font-size: clamp(1.55rem, 3vw, 1.9rem);
-  font-weight: 800;
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 0.95;
   letter-spacing: 0;
 }
 
@@ -242,8 +274,8 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: space-between;
   color: var(--brown);
-  font-size: 1.25rem;
-  font-weight: 300;
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .drawer-head button {
@@ -268,9 +300,10 @@ button { cursor: pointer; }
 .drawer-label {
   margin: 24px 32px 8px;
   color: var(--taupe);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .top-gap { margin-top: 28px; }
 .drawer-login { margin-top: auto; border-top: 1px solid var(--border); border-radius: 0; padding-top: 18px; }
@@ -327,17 +360,17 @@ button { cursor: pointer; }
 .hero h1 {
   margin: 0 0 24px;
   max-width: 720px;
-  font-size: clamp(3.2rem, 8vw, 5.2rem);
-  font-weight: 900;
-  line-height: 0.95;
+  font-size: 5.15rem;
+  font-weight: 700;
+  line-height: 0.92;
   color: var(--dark-brown);
 }
 
 .hero .subtitle {
   max-width: 680px;
   color: var(--brown);
-  font-size: clamp(1.25rem, 3vw, 1.5rem);
-  font-weight: 700;
+  font-size: 1.38rem;
+  font-weight: 650;
   margin: 0 0 28px;
 }
 
@@ -373,16 +406,18 @@ button { cursor: pointer; }
 
 .main-proof span {
   color: var(--sage);
-  font-size: 0.76rem;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .main-proof strong {
   display: block;
   color: var(--dark-brown);
-  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
   line-height: 1.12;
   margin: 12px 0;
 }
@@ -450,8 +485,9 @@ button { cursor: pointer; }
 .section-title {
   text-align: center;
   color: var(--brown);
-  font-size: clamp(2rem, 4vw, 2.5rem);
-  font-weight: 300;
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
   margin: 0 0 12px;
 }
 
@@ -460,10 +496,10 @@ button { cursor: pointer; }
 .eyebrow {
   margin: 0 0 8px;
   color: var(--taupe);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .split-heading {
@@ -525,8 +561,8 @@ button { cursor: pointer; }
 }
 .group-title h3 {
   color: var(--brown);
-  font-weight: 300;
-  font-size: 1.55rem;
+  font-weight: 700;
+  font-size: 1.75rem;
   margin: 0;
 }
 .group-title span { font-size: 1.5rem; }
@@ -657,10 +693,10 @@ button { cursor: pointer; }
 
 .featured-card span {
   color: var(--taupe);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .featured-card h3 {
@@ -767,15 +803,15 @@ button { cursor: pointer; }
 
 .guide-result span {
   color: var(--taupe);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .guide-result p {
   color: var(--brown);
-  font-size: clamp(1.2rem, 3vw, 1.65rem);
+  font-size: 1.45rem;
   line-height: 1.35;
   margin: 14px 0 24px;
 }
@@ -876,7 +912,8 @@ button { cursor: pointer; }
 
 .referral-card h2 {
   color: var(--dark-brown);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: 3rem;
+  font-weight: 700;
   line-height: 1.04;
   margin: 0 0 12px;
 }
@@ -1021,9 +1058,9 @@ button { cursor: pointer; }
 
 .guide-copy h2 {
   margin: 0 0 16px;
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: 3rem;
   line-height: 1.04;
-  font-weight: 300;
+  font-weight: 700;
 }
 
 .guide-copy .primary-btn {
@@ -1078,10 +1115,10 @@ button { cursor: pointer; }
 
 .portfolio-tile span {
   color: rgba(250, 248, 245, 0.76);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .portfolio-tile h3 {
@@ -1142,8 +1179,8 @@ button { cursor: pointer; }
 
 .version-intro h2 {
   margin: 0 0 14px;
-  font-weight: 300;
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  font-size: 3rem;
 }
 
 .version-intro p,
@@ -1178,10 +1215,10 @@ button { cursor: pointer; }
 
 .version-card span {
   color: var(--taupe);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .version-card h3 {
@@ -1299,7 +1336,7 @@ button { cursor: pointer; }
   color: var(--plum);
   font-size: 0.82rem;
   font-weight: 900;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .readiness-line.ready span {
@@ -1386,8 +1423,8 @@ button { cursor: pointer; }
   margin-bottom: 42px;
 }
 .product-shelf-intro h2 {
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 300;
+  font-size: 3rem;
+  font-weight: 700;
   line-height: 1.04;
   margin: 0 0 14px;
 }
@@ -1538,7 +1575,7 @@ button { cursor: pointer; }
   font-weight: 900;
   letter-spacing: 0;
   padding: 6px 10px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .product-detail {
   border-top: 1px solid var(--border);
@@ -1599,7 +1636,7 @@ button { cursor: pointer; }
 
 .policy-stack { display: grid; gap: 28px; }
 .legal-stack { display: grid; gap: 18px; }
-.policy-box h2 { color: var(--brown); font-weight: 300; margin-top: 0; }
+.policy-box h2 { color: var(--brown); font-weight: 700; margin-top: 0; }
 .policy-box p { color: var(--muted); }
 .policy-box a {
   color: var(--plum);
@@ -1663,8 +1700,8 @@ button { cursor: pointer; }
 }
 .contact-card h2 {
   color: var(--dark-brown);
-  font-weight: 650;
-  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700;
+  font-size: 3.15rem;
   line-height: 1.04;
   margin: 0 0 16px;
   max-width: 720px;
@@ -1724,7 +1761,8 @@ button { cursor: pointer; }
 
 .payment-summary-panel h2 {
   color: var(--dark-brown);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: 3rem;
+  font-weight: 700;
   margin: 0 0 8px;
 }
 
@@ -1750,8 +1788,8 @@ button { cursor: pointer; }
   color: var(--plum);
   font-size: 0.82rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .payment-option-card h3 {
@@ -2189,9 +2227,9 @@ button { cursor: pointer; }
 }
 .modal-head h2 {
   color: var(--brown);
-  font-weight: 300;
+  font-weight: 700;
   margin: 0;
-  font-size: 1.65rem;
+  font-size: 1.85rem;
 }
 .progress {
   height: 8px;
@@ -2362,7 +2400,8 @@ textarea { min-height: 92px; resize: vertical; }
 
 .advisory-box h3 {
   color: var(--dark-brown);
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-size: 2.2rem;
+  font-weight: 700;
   margin: 6px 0 10px;
 }
 
@@ -2392,7 +2431,7 @@ textarea { min-height: 92px; resize: vertical; }
   text-align: center;
   padding: 48px 20px;
 }
-.footer h3 { font-size: 1.5rem; font-weight: 300; margin: 0 0 16px; }
+.footer h3 { font-size: 1.8rem; font-weight: 700; margin: 0 0 16px; }
 .footer p { color: #ead4b2; margin: 6px 0; }
 .footer .small { font-size: 0.9rem; }
 .footer .legal-links {
@@ -2411,6 +2450,7 @@ textarea { min-height: 92px; resize: vertical; }
 @media (max-width: 980px) {
   .hero-inner { grid-template-columns: 1fr; }
   .hero-copy { text-align: center; }
+  .hero h1 { font-size: 4.25rem; }
   .hero-logo { margin-inline: auto; }
   .hero .button-row { justify-content: center; }
   .services-layout { grid-template-columns: 1fr; }
@@ -2442,6 +2482,20 @@ textarea { min-height: 92px; resize: vertical; }
   .nav-link { display: none; }
   .text-button { padding: 8px 12px; }
   .hero { padding-top: 56px; }
+  .hero h1 { font-size: 3.15rem; }
+  .hero .subtitle { font-size: 1.18rem; }
+  .main-proof strong,
+  .section-title,
+  .referral-card h2,
+  .guide-copy h2,
+  .version-intro h2,
+  .product-shelf-intro h2,
+  .contact-card h2,
+  .payment-summary-panel h2 {
+    font-size: 2.18rem;
+  }
+  .advisory-box h3 { font-size: 1.8rem; }
+  .guide-result p { font-size: 1.25rem; }
   .service-grid, .hours-grid, .products-grid, .recommended-products-grid, .form-grid, .process-grid, .featured-grid, .portfolio-grid, .testimonial-grid, .payment-options-grid, .prep-grid, .time-slot-grid { grid-template-columns: 1fr; }
   .sms-optin-proof .sms-optin-form { grid-template-columns: 1fr; }
   .version-card { display: block; }

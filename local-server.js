@@ -243,11 +243,14 @@ async function sendEmail(to, subject, text) {
     const result = await sendFrom(process.env.CONFIRMATION_FROM_EMAIL);
     return { provider: "resend", skipped: false, id: result.id || "" };
   } catch (error) {
-    const ownerDestination = String(to || "").trim().toLowerCase() === String(ownerEmail || "").trim().toLowerCase();
     const unverifiedSender = /domain is not verified/i.test(error.message || "");
-    if (!ownerDestination || !unverifiedSender) throw error;
-    const result = await sendFrom("Lovely Locs <onboarding@resend.dev>");
-    return { provider: "resend", skipped: false, fallbackFrom: "onboarding@resend.dev", id: result.id || "" };
+    if (!unverifiedSender) throw error;
+    try {
+      const result = await sendFrom("Lovely Locs <onboarding@resend.dev>");
+      return { provider: "resend", skipped: false, fallbackFrom: "onboarding@resend.dev", id: result.id || "" };
+    } catch (fallbackError) {
+      throw new Error(`${error.message} Fallback sender onboarding@resend.dev also failed: ${fallbackError.message}`);
+    }
   }
 }
 

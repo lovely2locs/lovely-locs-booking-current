@@ -424,6 +424,7 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="phone" required'), "phone not required");
   assert(html.includes('name="date" required'), "date not required");
   assert(html.includes('name="birthday" type="date"'), "annual birthday credit field missing");
+  assert(html.includes("Birthday rewards are emailed automatically 2 weeks before this date"), "birthday reward window copy missing");
   assert(html.includes('name="referredByCode"'), "referral code field missing");
   assert(html.includes('id="bookingTime" name="time"'), "preferred time slot input missing");
   assert(html.includes("time-slot-grid"), "time slot picker missing");
@@ -613,6 +614,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("monthly_referral_campaign"), "monthly referral campaign automation missing");
   assert(!server.includes("birthday_offer"), "birthday offer automation should not be active");
   assert(server.includes("birthday_credit"), "annual birthday credit automation missing");
+  assert(server.includes("activeBirthdayWindow"), "birthday credit date window helper missing");
+  assert(server.includes("validFrom"), "birthday credit valid-from date missing");
+  assert(server.includes("expiresAt"), "birthday credit expiration date missing");
   assert(server.includes("referral_reminder"), "referral reminder automation missing");
   assert(server.includes("automation.notification.sent"), "automation duplicate guard event missing");
   const script = fs.readFileSync("script.js", "utf8");

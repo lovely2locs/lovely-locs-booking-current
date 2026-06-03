@@ -230,6 +230,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
   assert(html.includes("data-confirm-manual-deposit"), "manual deposit confirmation control missing");
+  assert(html.includes("Send Notification Test"), "admin notification test section missing");
+  assert(html.includes("data-send-notification-test"), "admin notification test control missing");
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
@@ -577,6 +579,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
+  assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
+  assert(server.includes("handleNotificationTest"), "notification test handler missing");
+  assert(server.includes("TWILIO_TOLLFREE_VERIFIED"), "Twilio toll-free verification guard missing");
+  assert(server.includes("smsBlockedReason"), "SMS blocked reason helper missing");
+  assert(server.includes("smsReady"), "SMS readiness status missing");
   assert(server.includes("/api/availability"), "availability endpoint missing");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
@@ -611,6 +618,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   const script = fs.readFileSync("script.js", "utf8");
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
+  assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
+  assert(script.includes("notificationResultsText"), "notification result display helper missing");
 });
 
 test("referral share link copies the booking page", async () => {

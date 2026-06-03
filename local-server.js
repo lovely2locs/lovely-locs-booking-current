@@ -668,6 +668,81 @@ function sendHtml(res, status, html) {
   res.end(html);
 }
 
+function notificationResultsMarkup(results = []) {
+  if (!results.length) return "<p>No notification tasks were returned.</p>";
+  return results.map(result => {
+    const label = escapeHtml(result.channel || "notification");
+    if (result.failed) {
+      const fallback = result.fallback ? `<p>${escapeHtml(result.fallback)}</p>` : "";
+      const draft = result.gmailDraftUrl
+        ? `<p><a class="secondary" href="${escapeHtml(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open Gmail draft for client confirmation</a></p>`
+        : "";
+      return `<li><strong>${label}</strong><span class="failed">Failed - ${escapeHtml(result.error || "Unknown error")}</span>${fallback}${draft}</li>`;
+    }
+    if (result.skipped) return `<li><strong>${label}</strong><span>Skipped - ${escapeHtml(result.reason || "Provider not ready")}</span></li>`;
+    const details = [
+      result.provider ? `accepted by ${result.provider}` : "accepted",
+      result.id ? `email id ${result.id}` : "",
+      result.sid ? `sms sid ${result.sid}` : "",
+      result.status ? `status ${result.status}` : "",
+    ].filter(Boolean).join(" - ");
+    return `<li><strong>${label}</strong><span>${escapeHtml(details)}</span></li>`;
+  }).join("");
+}
+
+function ownerConfirmPageHtml({ title, intro, bookingId = "", adminUrl = "", notificationResults = [] }) {
+  const results = notificationResultsMarkup(notificationResults);
+  const adminHref = adminUrl || "/#admin";
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)} | Lovely Locs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body{margin:0;background:#fffaf7;color:#241916;font-family:Manrope,"Segoe UI",Arial,sans-serif;line-height:1.55}
+      main{min-height:100vh;display:grid;place-items:center;padding:28px}
+      section{width:min(100%,680px);background:#fff;border:1px solid rgba(75,51,44,.14);border-radius:18px;box-shadow:0 18px 44px rgba(31,23,20,.1);overflow:hidden}
+      header{background:#231916;color:#fffaf7;padding:26px 28px}
+      header p{color:#ead4b2;font-weight:800;margin:0 0 8px}
+      h1{font-family:"Cormorant Garamond",Georgia,serif;font-size:44px;line-height:1;margin:0}
+      .content{padding:28px}
+      .booking{color:#7d5770;font-weight:800}
+      ul{display:grid;gap:12px;list-style:none;margin:22px 0;padding:0}
+      li{border:1px solid rgba(75,51,44,.14);border-radius:12px;padding:14px;background:#fffaf7}
+      li strong{display:block;color:#4b332c}
+      li span{display:block;color:#687a67;margin-top:4px}
+      .failed{color:#8a3d3d}
+      a.primary,a.secondary{display:inline-block;border-radius:10px;font-weight:800;margin:6px 8px 0 0;padding:12px 16px;text-decoration:none}
+      a.primary{background:#4b332c;color:#fffaf7}
+      a.secondary{border:1px solid #4b332c;color:#4b332c}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <header>
+          <p>Lovely Locs owner confirmation</p>
+          <h1>${escapeHtml(title)}</h1>
+        </header>
+        <div class="content">
+          <p>${escapeHtml(intro)}</p>
+          ${bookingId ? `<p class="booking">Booking ID: ${escapeHtml(bookingId)}</p>` : ""}
+          ${notificationResults.length ? `<ul>${results}</ul>` : ""}
+          <p>
+            <a class="primary" href="${escapeHtml(adminHref)}">Open Owner Admin Confirmation</a>
+            <a class="secondary" href="/#admin">Owner Admin</a>
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
 function clampNumber(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
@@ -1102,10 +1177,11 @@ function paymentOptionsText(booking) {
 function manualConfirmUrl(req, booking, method = "manual") {
   const token = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN;
   if (!token) return "";
-  const url = new URL("/api/manual-payment/confirm", publicSiteUrl(req));
+  const url = new URL("/", publicSiteUrl(req));
   url.searchParams.set("booking", booking.id);
   url.searchParams.set("method", method);
   url.searchParams.set("token", token);
+  url.hash = "admin-confirm-deposit";
   return url.toString();
 }
 
@@ -1723,25 +1799,36 @@ async function handleManualPaymentConfirm(req, res) {
     const siteUrl = publicSiteUrl(req);
     const url = new URL(req.url || "/", siteUrl);
     const token = url.searchParams.get("token") || "";
+    const bookingId = url.searchParams.get("booking") || "";
+    const method = url.searchParams.get("method") || "manual";
+    const adminUrl = `${siteUrl}/?booking=${encodeURIComponent(bookingId)}&method=${encodeURIComponent(method)}#admin-confirm-deposit`;
     wantsJson = url.searchParams.get("format") === "json";
     if (!tokenIsValid(token)) {
       if (wantsJson) {
         sendJson(res, 403, { ok: false, error: "The owner confirmation token is missing or invalid." });
         return;
       }
-      sendHtml(res, 403, "<h1>Manual deposit confirmation unavailable</h1><p>The owner confirmation token is missing or invalid.</p>");
+      sendHtml(res, 403, ownerConfirmPageHtml({
+        title: "Token needed before confirming",
+        intro: "This confirmation link is missing a valid owner token. Open the owner admin form, enter the booking ID and your manual deposit token, then confirm the deposit from there.",
+        bookingId,
+        adminUrl,
+      }));
       return;
     }
 
-    const bookingId = url.searchParams.get("booking") || "";
-    const method = url.searchParams.get("method") || "manual";
     const booking = findBookingById(bookingId);
     if (!booking) {
       if (wantsJson) {
         sendJson(res, 404, { ok: false, error: "No matching Lovely Locs booking was found for this confirmation link." });
         return;
       }
-      sendHtml(res, 404, "<h1>Booking not found</h1><p>No matching Lovely Locs booking was found for this confirmation link.</p>");
+      sendHtml(res, 404, ownerConfirmPageHtml({
+        title: "Booking not found",
+        intro: "No matching Lovely Locs booking was found for this confirmation link. Double-check the booking ID from the owner email or pay-options page.",
+        bookingId,
+        adminUrl,
+      }));
       return;
     }
 
@@ -1763,13 +1850,22 @@ async function handleManualPaymentConfirm(req, res) {
       sendJson(res, 200, { ok: true, bookingId, notificationResults, referralReward, redeemedCredit });
       return;
     }
-    sendHtml(res, 200, `<h1>Deposit confirmed</h1><p>Lovely Locs confirmation messages were attempted for booking ${bookingId}.</p>`);
+    sendHtml(res, 200, ownerConfirmPageHtml({
+      title: "Deposit confirmed",
+      intro: "Lovely Locs marked this deposit paid. Review the provider results below; if the client email was blocked, use the Gmail draft link shown here.",
+      bookingId,
+      adminUrl,
+      notificationResults,
+    }));
   } catch (error) {
     if (wantsJson) {
       sendJson(res, 400, { ok: false, error: error.message });
       return;
     }
-    sendHtml(res, 400, `<h1>Confirmation failed</h1><p>${error.message}</p>`);
+    sendHtml(res, 400, ownerConfirmPageHtml({
+      title: "Confirmation failed",
+      intro: error.message,
+    }));
   }
 }
 

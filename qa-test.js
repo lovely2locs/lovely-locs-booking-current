@@ -183,6 +183,12 @@ test("home renders core client sections", () => {
   assert(html.includes("data-copy-booking"), "copy booking button missing");
 });
 
+test("site shell exposes client login and owner admin access", () => {
+  const html = fs.readFileSync("index.html", "utf8");
+  assert(html.includes('href="#client-settings" data-route="client-settings">Client Login'), "client login link missing from site shell");
+  assert(html.includes('href="#admin" data-route="admin">Owner Admin'), "owner admin link missing from site shell");
+});
+
 test("policies route renders FAQ and policies", () => {
   context.window.location.hash = "#policies";
   context.render(context.currentRoute());
@@ -228,6 +234,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
   assert(html.includes("Discount Code Settings"), "admin discount settings section missing");
   assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
+  assert(html.includes("Notification Status"), "launch readiness notification status missing");
+  assert(html.includes("data-refresh-notification-status"), "notification status refresh control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
   assert(html.includes("data-confirm-manual-deposit"), "manual deposit confirmation control missing");
   assert(html.includes("Send Notification Test"), "admin notification test section missing");
@@ -554,7 +562,7 @@ test("booking submission sends booking to backend and shows confirmation", async
 test("admin no-charge booking submission does not require pay options URL", async () => {
   const previousFetch = context.fetch;
   context.fetch = async (url, options) => {
-    context.lastFetch = { url, options };
+    if (url === "/api/bookings") context.lastFetch = { url, options };
     return {
       ok: true,
       json: async () => ({ ok: true, id: "LL-TEST-FREE", noCharge: true, total: 0, deposit: 0, message: "Free admin test booking saved." })
@@ -588,6 +596,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/availability"), "availability endpoint missing");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
+  assert(server.includes("emailReadyForClients"), "client email readiness status missing");
+  assert(server.includes("emailReadinessReason"), "client email readiness reason missing");
   assert(server.includes("/api/site-settings"), "site settings endpoint missing");
   assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
   assert(server.includes("sanitizeDiscountSettings"), "discount settings sanitizer missing");
@@ -624,6 +634,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
+  assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");
 });
 
 test("referral share link copies the booking page", async () => {

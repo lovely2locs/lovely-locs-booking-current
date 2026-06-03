@@ -1395,14 +1395,34 @@ function paymentSuccessPage() {
   `;
 }
 
+function manualDepositConfirmParams() {
+  const params = new URLSearchParams(window.location.search || "");
+  const booking = String(params.get("booking") || "").trim();
+  const method = String(params.get("method") || "manual").trim();
+  const token = String(params.get("token") || "").trim();
+  const active = currentRoute() === "admin-confirm-deposit" || Boolean(booking || token);
+  return { active, booking, method, token };
+}
+
 function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
   const settings = { ...defaultLogoSettings, ...logoSettings };
   const discount = { ...defaultDiscountSettings, ...discountSettings };
+  const confirmParams = manualDepositConfirmParams();
+  const confirmNotice = confirmParams.active
+    ? `<p class="advisory-copy">Owner confirm link loaded. Review the matching Venmo or Apple Pay receipt, then press the confirmation button below. If the token field is blank, enter your owner confirmation token first.</p>`
+    : "";
+  const adminTitle = confirmParams.active ? "Owner Deposit Confirmation" : "Admin Test Booking";
+  const adminSubtitle = confirmParams.active
+    ? "Confirm a verified manual deposit, then send the client their official Lovely Locs confirmation."
+    : "Run a no-charge booking test without sending the client to the pay options page.";
+  const methodOptions = ["venmo", "apple-pay", "manual"].map(method => `
+                <option value="${method}" ${confirmParams.method === method ? "selected" : ""}>${method === "apple-pay" ? "Apple Pay" : method === "venmo" ? "Venmo" : "Manual"}</option>
+              `).join("");
   return `
     <section class="hero route-page" id="admin-page">
-      <h1>Admin Test Booking</h1>
-      <p class="subtitle">Run a no-charge booking test without sending the client to the pay options page.</p>
+      <h1>${adminTitle}</h1>
+      <p class="subtitle">${adminSubtitle}</p>
     </section>
     <section class="section">
       <div class="narrow policy-stack">
@@ -1427,7 +1447,7 @@ function adminPage() {
           <h2>How to use it</h2>
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
         </div>
-        <div class="policy-box brand-settings-box">
+        <div class="policy-box brand-settings-box" id="manual-deposit-confirm-panel">
           <p class="eyebrow">Launch Readiness</p>
           <h2>Notification Status</h2>
           <p>Check this before launch. Owner test email can work while client confirmation email still needs a verified sending domain.</p>
@@ -1440,14 +1460,13 @@ function adminPage() {
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
           <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner Gmail or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
+          ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">
-            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
-            <label>Booking ID<input name="booking" placeholder="LL-1780438950711"></label>
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password" value="${escapeAttr(confirmParams.token)}"></label>
+            <label>Booking ID<input name="booking" placeholder="LL-1780438950711" value="${escapeAttr(confirmParams.booking)}"></label>
             <label>Payment Method
               <select name="method">
-                <option value="venmo">Venmo</option>
-                <option value="apple-pay">Apple Pay</option>
-                <option value="manual">Manual</option>
+                ${methodOptions}
               </select>
             </label>
             <p class="form-error" id="manualDepositConfirmStatus" aria-live="polite"></p>
@@ -1844,7 +1863,7 @@ function render(route = currentRoute()) {
   else if (route === "payment-options") app.innerHTML = paymentOptionsPage();
   else if (route === "payment-success") app.innerHTML = paymentSuccessPage();
   else if (route === "client-settings") app.innerHTML = clientSettingsPage();
-  else if (route === "admin") app.innerHTML = adminPage();
+  else if (route === "admin" || route === "admin-confirm-deposit") app.innerHTML = adminPage();
   else if (route === "versions") app.innerHTML = versionsPage();
   else app.innerHTML = homePage();
   bindDynamic();
@@ -1864,8 +1883,8 @@ function scrollRouteToTop(route) {
 
 function currentRoute() {
   const hash = window.location.hash.replace("#", "").split("?")[0];
-  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "client-settings", "admin", "versions"].includes(hash) ? hash : "home";
-  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "versions", "home", ""].includes(hash)) {
+  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "client-settings", "admin", "admin-confirm-deposit", "versions"].includes(hash) ? hash : "home";
+  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "admin-confirm-deposit", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
   return route;
@@ -2122,7 +2141,12 @@ function bindDynamic() {
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
   document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
-  if (currentRoute() === "admin") loadAdminNotificationStatus();
+  if (currentRoute() === "admin" || currentRoute() === "admin-confirm-deposit") loadAdminNotificationStatus();
+  if (currentRoute() === "admin-confirm-deposit") {
+    setTimeout(() => {
+      document.getElementById("manual-deposit-confirm-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
 
   if (pendingAnchor) {
     const target = document.getElementById(pendingAnchor);

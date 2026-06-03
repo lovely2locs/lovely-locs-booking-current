@@ -1293,12 +1293,18 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>Client Accuracy &amp; Service Fit</h2>
-          <p>Clients are responsible for providing accurate hair history, timing, contact information, preferred dates, product preferences, and service notes. Lovely Locs may recommend a different service or price if the selected service does not match the condition, timing, or needs of the client's hair.</p>
+          <p>Clients are responsible for providing accurate hair history, timing, contact information, preferred dates, product preferences, and service notes. Please disclose scalp irritation, open areas, allergies, sensitivities, recent chemical services, product buildup, tension concerns, or anything that may affect whether a loc service is appropriate.</p>
+          <p>Lovely Locs provides listed natural-hair and loc grooming/styling services only. Lovely Locs does not provide medical care, scalp diagnosis, chemical services, cutting, coloring, relaxing, or any service outside the listed appointment scope unless it is separately confirmed and legally available. Lovely Locs may adjust, postpone, decline, or refer out a service if the selected booking does not match the condition, timing, safety, or needs of the client's hair/scalp.</p>
+        </div>
+        <div class="policy-box">
+          <h2>Timing, Results &amp; Client Readiness</h2>
+          <p>Service times are estimates. Clients should not schedule anything directly after the appointment because detailed loc work can take longer than expected and quality work cannot be rushed.</p>
+          <p>Results vary by hair history, density, length, product buildup, maintenance routine, scalp condition, and the service selected. Lovely Locs will use care and clear communication, but no style, parting, timing, longevity, repair, or transformation result is guaranteed.</p>
         </div>
         <div class="policy-box">
           <h2>SMS Terms</h2>
-          <p>By opting in to Lovely Locs SMS messages, you agree to receive appointment updates, booking confirmations, reminders, follow-up messages, loc care tips, and occasional referral-related messages. Message frequency may vary. Message and data rates may apply.</p>
-          <p>Reply STOP to opt out. Reply HELP for help. Opting out of promotional messages may limit our ability to send some text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
+          <p>By checking the optional communications consent box, you agree to receive Lovely Locs texts and emails for appointment updates, booking confirmations, reminders, follow-up messages, birthday offers, referral reward updates, loc care tips, and occasional campaign messages. Message frequency may vary. Message and data rates may apply.</p>
+          <p>Reply STOP to opt out of texts. Reply HELP for help. Opting out may limit text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
         </div>
         <div class="policy-box">
           <h2>Referral Rewards</h2>
@@ -1887,11 +1893,9 @@ function bookingModal() {
             <label><input name="preferredContact" type="radio" value="email" ${profile.preferredContact === "email" ? "checked" : ""}> Email</label>
             <p>Choose how you want client-facing confirmations delivered. SMS only sends if the client checks the text-message consent box.</p>
           </fieldset>
-          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive Lovely Locs text messages for appointment updates, reminders, follow-ups, loc care tips, and occasional referral updates. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
-          <label class="full policy-ack"><input name="marketingEmailOptIn" type="checkbox" ${profile.marketingEmailOptIn ? "checked" : ""}><span>I agree to receive the Lovely Locs monthly referral campaign by email. I can unsubscribe by replying to any email.</span></label>
-          <label class="full policy-ack"><input name="referralOptIn" type="checkbox" ${profile.referralOptIn ? "checked" : ""}><span>I agree to receive referral reminders and referral reward updates from Lovely Locs.</span></label>
+          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn || profile.marketingEmailOptIn || profile.referralOptIn ? "checked" : ""}><span>Optional: send me Lovely Locs texts and emails for appointment updates, reminders, follow-ups, birthday offers, referral reward updates, and occasional loc care or campaign messages. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out of texts or HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
-          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a> before submitting this appointment request.</span></label>
+          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
@@ -2629,8 +2633,7 @@ function bookingSummaryFromForm(form) {
     client.birthday ? `Birthday credit date: ${client.birthday}` : "",
     `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
     `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
-    `Monthly referral campaign opt-in: ${client.marketingEmailOptIn ? "Yes" : "No"}`,
-    `Referral reminder opt-in: ${client.referralOptIn ? "Yes" : "No"}`,
+    `Optional communications opt-in: ${client.smsOptIn ? "Yes" : "No"}`,
     client.referredByCode ? `Referred by code: ${client.referredByCode}` : "",
     "",
     "Services:",
@@ -2654,6 +2657,7 @@ function bookingPayloadFromForm(form) {
   const addOns = cart.filter(item => item.type !== "service");
   const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
+  const communicationsOptIn = Boolean(data.get("smsOptIn"));
   return {
     client: {
       fullName: data.get("fullName") || "",
@@ -2664,9 +2668,9 @@ function bookingPayloadFromForm(form) {
       birthday: data.get("birthday") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),
       preferredContact: data.get("preferredContact") || "text_email",
-      smsOptIn: Boolean(data.get("smsOptIn")),
-      marketingEmailOptIn: Boolean(data.get("marketingEmailOptIn")),
-      referralOptIn: Boolean(data.get("referralOptIn")),
+      smsOptIn: communicationsOptIn,
+      marketingEmailOptIn: communicationsOptIn,
+      referralOptIn: communicationsOptIn,
       referredByCode: normalizeDiscountCode(data.get("referredByCode") || "").replace(/[^A-Z0-9]/g, ""),
       specialRequests: data.get("specialRequests") || ""
     },

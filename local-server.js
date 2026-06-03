@@ -211,6 +211,45 @@ function emailConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.CONFIRMATION_FROM_EMAIL);
 }
 
+function configuredEmailAddress(value = "") {
+  const match = String(value).match(/<([^>]+)>/);
+  return (match ? match[1] : String(value)).trim().toLowerCase();
+}
+
+function emailReadiness() {
+  if (!emailConfigured()) {
+    return {
+      configured: false,
+      clientReady: false,
+      reason: "RESEND_API_KEY and CONFIRMATION_FROM_EMAIL are required before any email can send.",
+    };
+  }
+  const from = configuredEmailAddress(process.env.CONFIRMATION_FROM_EMAIL);
+  const domain = from.includes("@") ? from.split("@").pop() : "";
+  if (!domain || domain === "yourdomain.com") {
+    return {
+      configured: true,
+      clientReady: false,
+      from,
+      reason: "CONFIRMATION_FROM_EMAIL is still a placeholder. Use a verified domain sender such as bookings@yourdomain.com.",
+    };
+  }
+  if (["gmail.com", "googlemail.com", "resend.dev"].includes(domain)) {
+    return {
+      configured: true,
+      clientReady: false,
+      from,
+      reason: "Owner test email can work, but client emails require a verified custom domain in Resend. Gmail and resend.dev cannot send production client confirmations.",
+    };
+  }
+  return {
+    configured: true,
+    clientReady: true,
+    from,
+    reason: "Email sender uses a custom domain. Confirm the domain is verified in Resend before launch.",
+  };
+}
+
 function isUsTollFreeNumber(phone) {
   const digits = String(phone || "").replace(/[^0-9]/g, "");
   const normalized = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
@@ -1752,9 +1791,12 @@ async function handleAutomationRun(req, res) {
 function automationProviderStatus() {
   const configuredForSms = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
   const blockedReason = smsBlockedReason();
+  const email = emailReadiness();
   return {
     tokenConfigured: Boolean(process.env.AUTOMATION_RUN_TOKEN || process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN),
-    emailConfigured: emailConfigured(),
+    emailConfigured: email.configured,
+    emailReadyForClients: email.clientReady,
+    emailReadinessReason: email.reason,
     smsConfigured: configuredForSms,
     smsReady: configuredForSms && !blockedReason,
     smsBlockedReason: blockedReason,
@@ -1783,9 +1825,13 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/notification-status") {
     const configuredForSms = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
     const blockedReason = smsBlockedReason();
+    const email = emailReadiness();
     sendJson(res, 200, {
       ok: true,
-      emailConfigured: emailConfigured(),
+      emailConfigured: email.configured,
+      emailReadyForClients: email.clientReady,
+      emailReadinessReason: email.reason,
+      confirmationFromEmail: email.from || configuredEmailAddress(process.env.CONFIRMATION_FROM_EMAIL || ""),
       ownerEmail,
       smsConfigured: configuredForSms,
       smsReady: configuredForSms && !blockedReason,

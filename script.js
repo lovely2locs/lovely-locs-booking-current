@@ -2372,10 +2372,28 @@ async function confirmManualDeposit() {
     const response = await fetch(url);
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || "Deposit confirmation failed.");
-    if (status) status.textContent = `Deposit confirmed.\n${notificationResultsText(result.notificationResults)}`;
+    if (status) status.innerHTML = `Deposit confirmed.<br>${notificationResultsHtml(result.notificationResults)}`;
   } catch (error) {
     if (status) status.textContent = error.message;
   }
+}
+
+function notificationResultsHtml(results = []) {
+  if (!results.length) return "No notification tasks were returned.";
+  return results.map(result => {
+    const label = escapeAttr(result.channel || "notification");
+    if (result.failed) {
+      const fallback = result.fallback ? `<br><span>${escapeAttr(result.fallback)}</span>` : "";
+      const draft = result.gmailDraftUrl ? `<br><a href="${escapeAttr(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open Gmail draft for client confirmation</a>` : "";
+      return `<span>${label}: failed - ${escapeAttr(result.error || "Unknown error")}${fallback}${draft}</span>`;
+    }
+    if (result.skipped) return `<span>${label}: skipped - ${escapeAttr(result.reason || "Provider not ready")}</span>`;
+    const parts = [`${label}: accepted by ${escapeAttr(result.provider || "provider")}`];
+    if (result.id) parts.push(`email id ${escapeAttr(result.id)}`);
+    if (result.sid) parts.push(`sms sid ${escapeAttr(result.sid)}`);
+    if (result.status) parts.push(`status ${escapeAttr(result.status)}`);
+    return `<span>${parts.join(" - ")}</span>`;
+  }).join("<br>");
 }
 
 function notificationResultsText(results = []) {

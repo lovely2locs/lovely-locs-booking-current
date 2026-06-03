@@ -1241,8 +1241,11 @@ button { cursor: pointer; }
 
 .brand-settings-form input[type="password"],
 .brand-settings-form input[type="text"],
+.brand-settings-form input[type="email"],
+.brand-settings-form input[type="tel"],
 .brand-settings-form input[type="number"],
 .brand-settings-form input[type="date"],
+.brand-settings-form select,
 .brand-settings-form input:not([type]) {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2330,6 +2333,7 @@ textarea { min-height: 92px; resize: vertical; }
   color: #b42318;
   font-weight: 700;
   margin: 10px 0 0;
+  white-space: pre-line;
 }
 
 .footer {

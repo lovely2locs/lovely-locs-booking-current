@@ -484,6 +484,7 @@ test("client settings route shows referral tracking surface", () => {
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
   assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
+  assert(html.includes("data-switch-google-account"), "Google account switch control missing");
   assert(html.includes("pending referrals"), "client settings pending referral copy missing");
 });
 
@@ -755,6 +756,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("referral_reminder"), "referral reminder automation missing");
   assert(server.includes("automation.notification.sent"), "automation duplicate guard event missing");
   const script = fs.readFileSync("script.js", "utf8");
+  assert(script.includes("button_auto_select: false"), "FedCM button auto-selection should be disabled");
+  assert(script.includes("use_fedcm_for_button: false"), "FedCM button flow should stay off for explicit account choice");
+  assert(script.includes("function switchGoogleAccount"), "Google account switch handler missing");
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");

@@ -520,7 +520,6 @@ function clearClientProfile() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
-  clearBookingDraft();
   render(currentRoute());
 }
 
@@ -926,6 +925,7 @@ function clientSettingsPage() {
           <h2>Easy Sign In</h2>
           <div id="googleSignInButton" class="google-sign-in"></div>
           <p id="googleSignInStatus" class="form-error" aria-live="polite">Loading Google sign-in...</p>
+          <button class="outline-btn" type="button" data-switch-google-account>Use a Different Google Account</button>
           <p>Returning clients can sign in instantly. New clients will complete a short one-time profile before booking.</p>
         </div>
         ${savedClientProfile && cart.length ? `
@@ -2341,6 +2341,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
   document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
   document.querySelectorAll("[data-google-signup]").forEach(button => button.addEventListener("click", submitGoogleSignup));
+  document.querySelectorAll("[data-switch-google-account]").forEach(button => button.addEventListener("click", switchGoogleAccount));
   document.querySelectorAll("[data-resume-saved-cart]").forEach(button => button.addEventListener("click", () => {
     window.location.hash = "home";
     render("home");
@@ -2485,6 +2486,8 @@ async function initializeGoogleSignIn() {
       client_id: config.clientId,
       callback: handleGoogleCredential,
       auto_select: false,
+      button_auto_select: false,
+      use_fedcm_for_button: false,
       cancel_on_tap_outside: true
     });
     button.innerHTML = "";
@@ -2492,15 +2495,29 @@ async function initializeGoogleSignIn() {
       type: "standard",
       theme: "outline",
       size: "large",
-      text: "continue_with",
+      text: "signin_with",
       shape: "rectangular",
       logo_alignment: "left",
-      width: Math.min(360, Math.max(220, button.clientWidth || 320))
+      width: Math.min(360, Math.max(220, button.clientWidth || 320)),
+      click_listener: () => window.google.accounts.id.disableAutoSelect()
     });
     status.textContent = "";
   } catch (error) {
     status.textContent = error.message;
   }
+}
+
+function switchGoogleAccount() {
+  window.google?.accounts?.id?.disableAutoSelect();
+  if (localStorage.removeItem) localStorage.removeItem("lovelyLocsClientProfile");
+  else localStorage.setItem("lovelyLocsClientProfile", "");
+  savedClientProfile = null;
+  clientSettingsResult = null;
+  googleSignupCredential = "";
+  googleSignupState = null;
+  const status = document.getElementById("googleSignInStatus");
+  if (status) status.textContent = "Account selection reset. Click Sign in with Google and choose the account you want to use.";
+  initializeGoogleSignIn();
 }
 
 async function handleGoogleCredential(response) {

@@ -58,6 +58,8 @@ When a client uses client settings or submits a booking, the browser stores thei
 
 Google sign-in is enabled when `GOOGLE_CLIENT_ID` is configured. Returning clients open their saved settings. A verified Google user without a booking or profile receives a one-time signup form for name, phone, optional birthday, and optional loc-journey length. Completing or skipping the optional questions finishes onboarding so they are not asked during future bookings. The cart and unfinished booking draft remain stored on the device until the client removes or completes them.
 
+The Google button disables both classic and FedCM automatic account selection. Clients can use **Use a Different Google Account** to reset the local Lovely Locs identity, preserve their cart and unfinished booking draft, and reopen Google's account chooser.
+
 ## Scheduler URLs
 
 Use a scheduler such as Render Cron, UptimeRobot, Zapier, or Make to call these URLs:

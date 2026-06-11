@@ -218,7 +218,20 @@ function serviceSummaryHtml(booking) {
   }).join("");
 }
 
-function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], services = "", note = "", ctaUrl = "", ctaLabel = "" }) {
+function referralEmailCardHtml(referral = {}) {
+  referral = referral || {};
+  if (!referral.code || !referral.shareUrl) return "";
+  return `
+    <div style="margin-top:22px;background:linear-gradient(135deg,#f3e6f5,#fff1ea);border:1px solid #ddc2df;border-radius:16px;padding:20px;text-align:center;">
+      <p style="margin:0 0 7px;color:#7b4f5f;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;">Good People Know Good People</p>
+      <h2 style="margin:0 0 9px;color:#3b2821;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:400;">Share Lovely Locs</h2>
+      <p style="margin:0 0 12px;color:#6c544b;font-size:14px;line-height:1.5;">Send your personal code or link to someone who would love a Lovely Locs appointment.</p>
+      <div style="margin:0 auto 14px;background:#3b2821;color:#fffaf7;border-radius:12px;padding:13px 14px;font-size:18px;font-weight:800;letter-spacing:.04em;">${escapeHtml(referral.code)}</div>
+      <a href="${escapeHtml(referral.shareUrl)}" style="background:#7b4f5f;color:#ffffff;text-decoration:none;border-radius:999px;display:inline-block;padding:13px 18px;font-weight:800;">Share My Referral Link</a>
+    </div>`;
+}
+
+function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], services = "", referral = null, note = "", ctaUrl = "", ctaLabel = "" }) {
   return `
   <div style="margin:0;padding:0;background:#f8f0ea;font-family:Arial,Helvetica,sans-serif;color:#3b2821;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f0ea;padding:28px 12px;">
@@ -243,6 +256,7 @@ function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], serv
                   ${emailDetailRows(rows)}
                 </table>
                 ${services ? `<div style="margin-top:22px;"><p style="margin:0 0 10px;color:#7a6257;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">Service Details</p><ul style="padding-left:20px;margin:0;">${services}</ul></div>` : ""}
+                ${referralEmailCardHtml(referral)}
                 ${note ? `<div style="margin-top:22px;background:#f1e3dc;border-radius:14px;padding:16px;color:#5d453c;font-size:15px;line-height:1.55;">${escapeHtml(note)}</div>` : ""}
                 ${ctaUrl && ctaLabel ? `<p style="margin:26px 0 0;"><a href="${escapeHtml(ctaUrl)}" style="background:#7b4f5f;color:#ffffff;text-decoration:none;border-radius:999px;display:inline-block;padding:13px 18px;font-weight:800;">${escapeHtml(ctaLabel)}</a></p>` : ""}
               </td>
@@ -272,6 +286,9 @@ function confirmationEmail(booking, { test = false } = {}) {
     { label: "Deposit", value: `$${booking.deposit || 0}` },
     { label: "Estimated Total", value: `$${booking.total || 0}` },
   ];
+  const referralCode = normalizeReferralCode(booking.client?.referralCode || referralCodeForClient(booking.client));
+  const siteUrl = String(process.env.PUBLIC_SITE_URL || `http://127.0.0.1:${port}`).replace(/\/+$/, "");
+  const referralShareUrl = booking.referralShareUrl || `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
   return {
     text: [
       title,
@@ -283,6 +300,10 @@ function confirmationEmail(booking, { test = false } = {}) {
       `Time: ${timeLabel(booking.client?.time)}`,
       `Deposit: $${booking.deposit || 0}`,
       "",
+      "Your personal referral code:",
+      referralCode,
+      `Share link: ${referralShareUrl}`,
+      "",
       "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
       "",
       bookingText(booking),
@@ -293,6 +314,7 @@ function confirmationEmail(booking, { test = false } = {}) {
       intro,
       rows,
       services: serviceSummaryHtml(booking),
+      referral: { code: referralCode, shareUrl: referralShareUrl },
       note: "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
     }),
   };
@@ -1833,11 +1855,15 @@ async function handleBooking(req, res) {
     const booking = JSON.parse(raw || "{}");
     const pricedBooking = priceBooking(booking);
     const id = `LL-${Date.now()}`;
+    const referralCode = normalizeReferralCode(pricedBooking.client.referralCode || referralCodeForClient(pricedBooking.client));
+    const referralShareUrl = `${publicSiteUrl(req)}/?ref=${encodeURIComponent(referralCode)}#services`;
     const pendingBooking = {
       id,
       receivedAt: new Date().toISOString(),
       status: pricedBooking.deposit === 0 ? "no_charge_test" : "pending_payment",
       ...pricedBooking,
+      client: { ...pricedBooking.client, referralCode },
+      referralShareUrl,
     };
     if (pricedBooking.deposit === 0 && isAdminTestBooking(pricedBooking.cart)) {
       const notificationResults = await notifyNoChargeTestBooking(pendingBooking);
@@ -1854,6 +1880,8 @@ async function handleBooking(req, res) {
         discountAmount: pendingBooking.discountAmount,
         total: pendingBooking.total,
         deposit: pendingBooking.deposit,
+        referralCode,
+        referralShareUrl,
         message: "Free admin test booking saved. No deposit was requested. Confirmation messages were attempted with the connected providers.",
         notificationResults,
       });
@@ -1882,6 +1910,8 @@ async function handleBooking(req, res) {
       discountAmount: savedBooking.discountAmount,
       total: savedBooking.total,
       deposit: savedBooking.deposit,
+      referralCode,
+      referralShareUrl,
       message: "Appointment request saved. Pay options are ready; Lovely Locs will send the official confirmation after the deposit receipt is verified in Gmail.",
     });
   } catch (error) {
@@ -2007,6 +2037,49 @@ function handleAdminBookingLookup(req, res) {
       initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
       events,
     });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+function handleAdminRecentBookings(req, res) {
+  try {
+    const url = new URL(req.url || "/", publicSiteUrl(req));
+    const token = url.searchParams.get("token") || "";
+    if (!tokenIsValid(token)) {
+      sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
+      return;
+    }
+    const requestedLimit = Number(url.searchParams.get("limit") || 20);
+    const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 20, 1), 100);
+    const records = readBookingRecords();
+    const bookings = latestBookingRecords(records)
+      .sort((left, right) => String(right.receivedAt || "").localeCompare(String(left.receivedAt || "")))
+      .slice(0, limit)
+      .map(booking => ({
+        id: booking.id,
+        status: bookingStatus(booking, records),
+        receivedAt: booking.receivedAt || "",
+        client: {
+          fullName: booking.client?.fullName || "",
+          email: booking.client?.email || "",
+          phone: booking.client?.phone || "",
+        },
+        appointment: {
+          date: booking.client?.date || "",
+          time: booking.client?.time || "",
+        },
+        initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
+        events: records
+          .filter(record => bookingRecordId(record) === booking.id && record !== booking)
+          .map(record => ({
+            type: record.type || "",
+            status: record.status || "",
+            receivedAt: record.receivedAt || record.sentAt || record.approvedAt || "",
+            notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
+          })),
+      }));
+    sendJson(res, 200, { ok: true, bookings });
   } catch (error) {
     sendJson(res, 400, { ok: false, error: error.message });
   }
@@ -2564,6 +2637,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/admin/booking") {
     handleAdminBookingLookup(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/admin/bookings") {
+    handleAdminRecentBookings(req, res);
     return;
   }
 

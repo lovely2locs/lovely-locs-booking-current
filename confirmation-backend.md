@@ -44,7 +44,15 @@ TWILIO_FROM_NUMBER=
 
 Use E.164 format for the Twilio number, for example `+13364711098`.
 
-7. Optional: add Resend email credentials if you also want automatic emails.
+7. Add Resend email credentials for automatic client confirmations:
+
+```text
+RESEND_API_KEY=
+CONFIRMATION_FROM_EMAIL=Lovely Locs <lvlc.support@lovelylocsnc.com>
+RESEND_DOMAIN_VERIFIED=false
+```
+
+Set `RESEND_DOMAIN_VERIFIED=true` only after the Resend Domains dashboard shows `lovelylocsnc.com` as verified.
 8. Start the site with `OPEN_WEBSITE.bat` or run:
 
 ```powershell

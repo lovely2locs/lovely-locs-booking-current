@@ -2510,6 +2510,108 @@ textarea { min-height: 92px; resize: vertical; }
   margin: 16px 0 8px;
 }
 
+.personal-referral-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 15px;
+  margin: 22px 0;
+  padding: clamp(20px, 4vw, 28px);
+  border: 1px solid rgba(122, 82, 142, 0.28);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(214, 160, 169, 0.34), transparent 38%),
+    linear-gradient(135deg, rgba(233, 222, 242, 0.9), rgba(255, 243, 238, 0.96));
+  box-shadow: 0 16px 38px rgba(91, 57, 41, 0.1);
+}
+
+.personal-referral-card h3 {
+  margin: 3px 0 7px;
+  color: var(--dark-brown);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+}
+
+.personal-referral-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.personal-referral-code {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--dark-brown);
+  color: var(--cream);
+  font-size: clamp(1rem, 4vw, 1.35rem);
+  letter-spacing: 0.04em;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.personal-referral-code.muted {
+  background: rgba(91, 57, 41, 0.1);
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.personal-referral-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.personal-referral-actions button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(122, 82, 142, 0.32);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--plum);
+  font-weight: 850;
+}
+
+.personal-referral-actions button:last-child {
+  background: var(--plum);
+  color: white;
+}
+
+.personal-referral-status {
+  min-height: 20px;
+  color: var(--plum) !important;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.dark .personal-referral-card {
+  background:
+    radial-gradient(circle at top right, rgba(214, 160, 169, 0.18), transparent 38%),
+    linear-gradient(135deg, rgba(70, 48, 72, 0.96), rgba(43, 29, 37, 0.98));
+  border-color: rgba(233, 222, 242, 0.24);
+}
+
+.dark .personal-referral-card h3,
+.dark .personal-referral-card .eyebrow {
+  color: #f2d8eb;
+}
+
+.dark .personal-referral-card p {
+  color: rgba(255, 247, 241, 0.8);
+}
+
+.dark .personal-referral-actions button {
+  background: rgba(255, 250, 247, 0.1);
+  color: #f2d8eb;
+}
+
+.dark .personal-referral-actions button:last-child {
+  background: #b995c8;
+  color: #241916;
+}
+
 .advisory-panel {
   max-width: 620px;
 }
@@ -2597,6 +2699,12 @@ textarea { min-height: 92px; resize: vertical; }
   .payment-summary-panel { grid-template-columns: 1fr; }
   .client-guide { grid-template-columns: 1fr; }
   .product-consult-strip { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 620px) {
+  .personal-referral-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {

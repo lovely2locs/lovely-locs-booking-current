@@ -199,11 +199,12 @@ h1, h2, h3,
 }
 
 .theme-toggle {
-  width: auto;
-  min-width: 48px;
-  padding: 0 12px;
-  font-size: 0.78rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 1.12rem;
   font-weight: 700;
+  line-height: 1;
 }
 
 .icon-button {
@@ -2188,6 +2189,45 @@ h1, h2, h3,
   padding-top: 16px;
   display: grid;
   gap: 16px;
+}
+
+.cart-saved-details,
+.booking-save-note {
+  border: 1px solid rgba(122, 82, 142, 0.22);
+  border-radius: 12px;
+  background: rgba(233, 222, 242, 0.34);
+  padding: 13px 14px;
+}
+
+.cart-saved-details strong,
+.booking-save-note strong {
+  color: var(--brown);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.cart-saved-details p,
+.booking-save-note p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cart-saved-details button {
+  border: 0;
+  background: transparent;
+  color: var(--plum);
+  cursor: pointer;
+  font-weight: 850;
+  margin-top: 8px;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.booking-save-note {
+  margin: 18px 0;
 }
 
 .promo-box {

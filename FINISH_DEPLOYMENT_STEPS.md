@@ -61,12 +61,18 @@ Health Check Path: /healthz
 PUBLIC_SITE_URL=https://lovely-locs-booking.onrender.com
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-BOOKING_OWNER_EMAIL=lovely2locs@gmail.com
+BOOKING_OWNER_EMAIL=lvlc.support@lovelylocsnc.com
 BOOKING_OWNER_PHONE=3364711098
+RESEND_API_KEY=your_resend_api_key
+CONFIRMATION_FROM_EMAIL=Lovely Locs <lvlc.support@lovelylocsnc.com>
+RESEND_DOMAIN_VERIFIED=false
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_FROM_NUMBER=+18447522370
+TWILIO_TOLLFREE_VERIFIED=false
 ```
+
+Change `RESEND_DOMAIN_VERIFIED` to `true` only after Resend shows the domain as verified. Change `TWILIO_TOLLFREE_VERIFIED` to `true` only after Twilio approves the toll-free verification.
 
 6. Deploy.
 7. In Stripe, create a webhook endpoint:

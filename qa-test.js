@@ -118,7 +118,9 @@ const context = {
           { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
         ],
         total: 100,
-        deposit: 30
+        deposit: 30,
+        referralCode: "LOVELYLOCS/TESTCLIENT",
+        referralShareUrl: "http://127.0.0.1:4175/?ref=LOVELYLOCS%2FTESTCLIENT#services"
       })
     };
   },
@@ -257,6 +259,9 @@ test("payment options route renders manual deposit instructions", () => {
   localStore.set("lovelyLocsPendingPayment", JSON.stringify({
     id: "LL-TEST",
     deposit: 30,
+    fullName: "Test Client",
+    referralCode: "LOVELYLOCS/TESTCLIENT",
+    referralShareUrl: "http://127.0.0.1:4175/?ref=LOVELYLOCS%2FTESTCLIENT#services",
     paymentOptions: [
       { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
       { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
@@ -269,6 +274,10 @@ test("payment options route renders manual deposit instructions", () => {
   assert(!html.includes("Cash App"), "Cash App should be hidden until re-enabled");
   assert(html.includes("Apple Pay"), "Apple Pay option missing");
   assert(html.includes("verify the receipt"), "manual verification language missing");
+  assert(html.includes("LOVELYLOCS/TESTCLIENT"), "payment page should show the client's referral code");
+  assert(html.includes("data-copy-personal-referral-code"), "payment page referral code copy button missing");
+  assert(html.includes("data-copy-personal-referral-link"), "payment page referral link copy button missing");
+  assert(html.includes("data-share-personal-referral"), "payment page referral share button missing");
   context.window.location.search = "";
 });
 
@@ -352,6 +361,10 @@ test("referral codes use the LOVELYLOCS username format", () => {
   const payload = context.bookingPayloadFromForm(elements.bookingForm);
   assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");
   assert(context.normalizeReferralCode(" lovelylocs / Referral Owner ") === "LOVELYLOCS/REFERRALOWNER", "referral code normalizer should remove username spaces");
+  assert(context.referralCodeForName("Fatima Diallo") === "LOVELYLOCS/FATIMADIALLO", "client name should create the visible personal referral code");
+  const card = context.personalReferralCard({ fullName: "Fatima Diallo", preview: true });
+  assert(card.includes("LOVELYLOCS/FATIMADIALLO"), "personal referral preview should plug in the supplied client name");
+  assert(card.includes("Copy Code") && card.includes("Copy Link") && card.includes("Share"), "personal referral preview should offer one-click sharing controls");
 });
 
 test("service selection opens cart before client details", () => {
@@ -679,6 +692,7 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes("LOVELYLOCS/TESTCLIENT"), "booking backend payload should include referral code used by new client");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
+  assert(localStore.get("lovelyLocsPendingPayment").includes("LOVELYLOCS/TESTCLIENT"), "pending payment details should preserve the client's personal referral code");
   assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until deposit is confirmed");
   assert(!localStore.get("lovelyLocsBookingDraft"), "completed booking should clear the unfinished draft");
 });
@@ -713,6 +727,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("brandEmailHtml"), "branded email HTML template missing");
   assert(server.includes("emailLogoUrl"), "email logo asset missing");
   assert(server.includes("Your loc time is confirmed"), "relaxed confirmation email copy missing");
+  assert(server.includes("referralEmailCardHtml"), "confirmation email referral card missing");
+  assert(server.includes("Share My Referral Link"), "confirmation email referral share button missing");
+  assert(server.includes("Your personal referral code:"), "confirmation email referral code text missing");
   assert(server.includes("Take a breath"), "warm confirmation email intro missing");
   assert(server.includes("html: options.html"), "Resend HTML email payload missing");
   assert(server.includes("gmailComposeUrl"), "Gmail compose fallback missing");
@@ -720,6 +737,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("/api/admin/booking"), "protected owner booking lookup endpoint missing");
   assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
+  assert(server.includes("/api/admin/bookings"), "protected recent bookings endpoint missing");
+  assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
   assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");
   assert(server.includes("handleAdminConfirmationResend"), "confirmation resend handler missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");

@@ -9,7 +9,7 @@ const categories = [
 
 const business = {
   name: "Lovely Locs",
-  email: "lovely2locs@gmail.com",
+  email: "lvlc.support@lovelylocsnc.com",
   phone: "(336)-471-1098",
   area: "Piedmont Triad, North Carolina",
   studio: "Private in-home studio"
@@ -337,7 +337,7 @@ const policies = {
 };
 
 const faq = [
-  { question: "Do you repair locs?", answer: "Yes. Please contact us at lovely2locs@gmail.com to discuss your specific needs and schedule a consultation." },
+  { question: "Do you repair locs?", answer: "Yes. Please contact us at lvlc.support@lovelylocsnc.com to discuss your specific needs and schedule a consultation." },
   { question: "How long do services take?", answer: "Service durations vary from 1.5 to 6.5 hours depending on the type and complexity of service." },
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
@@ -373,6 +373,45 @@ function loadCart() {
 
 function saveCart() {
   localStorage.setItem("lovelyLocsCart", JSON.stringify(cart));
+}
+
+function loadBookingDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem("lovelyLocsBookingDraft") || "null");
+    return draft && typeof draft === "object" ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveBookingDraft(form) {
+  if (!form) return null;
+  const data = new FormData(form);
+  const draft = {
+    fullName: data.get("fullName") || "",
+    email: data.get("email") || "",
+    phone: data.get("phone") || "",
+    date: data.get("date") || "",
+    time: data.get("time") || "",
+    referredByCode: data.get("referredByCode") || "",
+    emergencySlot: Boolean(data.get("emergencySlot")),
+    preferredContact: data.get("preferredContact") || "text_email",
+    smsOptIn: Boolean(data.get("smsOptIn")),
+    specialRequests: data.get("specialRequests") || "",
+    policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
+    updatedAt: new Date().toISOString()
+  };
+  localStorage.setItem("lovelyLocsBookingDraft", JSON.stringify(draft));
+  bookingDraft = draft;
+  const status = document.getElementById("bookingDraftStatus");
+  if (status) status.textContent = "Saved on this device.";
+  return draft;
+}
+
+function clearBookingDraft() {
+  if (localStorage.removeItem) localStorage.removeItem("lovelyLocsBookingDraft");
+  else localStorage.setItem("lovelyLocsBookingDraft", "");
+  bookingDraft = null;
 }
 
 function loadLogoSettings() {
@@ -458,7 +497,6 @@ function saveClientProfile(profile = {}) {
     fullName: profile.fullName || "",
     email: profile.email || "",
     phone: profile.phone || "",
-    birthday: profile.birthday || "",
     preferredContact: profile.preferredContact || "text_email",
     smsOptIn: Boolean(profile.smsOptIn),
     marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
@@ -476,6 +514,7 @@ function clearClientProfile() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
+  clearBookingDraft();
   render(currentRoute());
 }
 
@@ -513,7 +552,13 @@ let pendingPartingService = null;
 let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
-let bookingSlotState = { date: "", time: "", type: "", reason: "" };
+let bookingDraft = loadBookingDraft();
+let bookingSlotState = {
+  date: bookingDraft?.date || "",
+  time: bookingDraft?.time || "",
+  type: bookingDraft?.emergencySlot ? "emergency" : "",
+  reason: ""
+};
 let logoSettings = loadLogoSettings();
 let discountSettings = loadDiscountSettings();
 let appliedDiscount = loadAppliedDiscount();
@@ -524,6 +569,8 @@ let partingMessage = "";
 let bookingConfirmation = null;
 let clientSettingsResult = null;
 let lastRoute = null;
+let googleAuthConfig = null;
+let googleAuthLoadAttempts = 0;
 
 const app = document.getElementById("app");
 const drawer = document.getElementById("drawer");
@@ -837,8 +884,9 @@ function clientSettingsPage() {
         </div>
         <div class="policy-box">
           <h2>Easy Sign In</h2>
-          <button class="outline-btn" type="button" disabled>Continue with Gmail</button>
-          <p>Gmail sign-in can be connected after a Google Client ID is added. Until then, use booking email and phone.</p>
+          <div id="googleSignInButton" class="google-sign-in"></div>
+          <p id="googleSignInStatus" class="form-error" aria-live="polite">Loading Google sign-in...</p>
+          <p>Use the Google account with the same email address as your Lovely Locs booking.</p>
         </div>
         <div class="policy-box">
           <h2>Your Referral Code</h2>
@@ -1237,12 +1285,12 @@ function privacyPage() {
         </div>
         <div class="policy-box">
           <h2>How We Use Information</h2>
-          <p>Your information is used to process appointment requests, confirm booking details, send service-related updates, answer questions, provide loc care follow-up messages, manage referrals, and share opt-in referral campaign messages.</p>
+          <p>Your information is used to process appointment requests, confirm booking details, send booking-related service updates, answer questions, manage referrals, and maintain client records.</p>
           <p>Referral rewards are not guaranteed and may vary based on availability, eligibility, timing, and active campaign rules.</p>
         </div>
         <div class="policy-box">
           <h2>SMS Privacy &amp; Consent</h2>
-          <p>By choosing to receive texts from Lovely Locs, you consent to receive appointment updates, booking reminders, follow-up messages, care tips, and occasional referral-related messages from Lovely Locs. Message frequency may vary. Message and data rates may apply.</p>
+          <p>By choosing to receive texts from Lovely Locs, you consent to receive booking-related text messages, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help.</p>
           <p><strong>Lovely Locs does not sell, rent, or share SMS opt-in data, phone numbers, or text messaging consent with third parties for their own marketing or promotional purposes.</strong></p>
         </div>
         <div class="policy-box">
@@ -1303,7 +1351,7 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>SMS Terms</h2>
-          <p>By checking the optional communications consent box, you agree to receive Lovely Locs texts and emails for appointment updates, booking confirmations, reminders, follow-up messages, birthday offers, referral reward updates, loc care tips, and occasional campaign messages. Message frequency may vary. Message and data rates may apply.</p>
+          <p>By checking the optional SMS consent box, you agree to receive Lovely Locs text messages about your booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message frequency varies. Message and data rates may apply.</p>
           <p>Reply STOP to opt out of texts. Reply HELP for help. Opting out may limit text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
         </div>
         <div class="policy-box">
@@ -1329,27 +1377,26 @@ function smsOptInPage() {
   return `
     <section class="hero route-page" id="sms-opt-in-page">
       <h1>SMS Opt-In</h1>
-      <p class="subtitle">Choose whether you want Lovely Locs text updates, care tips, and occasional offer opportunities.</p>
+      <p class="subtitle">Choose whether you want Lovely Locs booking confirmations, payment updates, appointment reminders, and service-related text updates.</p>
     </section>
     <section class="section">
       <div class="narrow legal-stack">
         <div class="policy-box sms-optin-proof">
           <p class="eyebrow">Consent Form</p>
           <h2>Lovely Locs Text Message Opt-In</h2>
-          <p>Complete this form if you would like to receive text messages from Lovely Locs. Texts may include appointment updates, booking reminders, service follow-ups, loc care tips, and referral updates.</p>
-          <p>Referral rewards are not guaranteed and may vary by availability, eligibility, timing, and active campaign rules.</p>
+          <p>Complete this form if you would like to receive booking-related text messages from Lovely Locs. Texts may include appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates.</p>
           <form class="sms-optin-form">
             <label>Full Name<input name="smsOptInName" placeholder="Your name"></label>
             <label>Mobile Number<input name="smsOptInPhone" placeholder="(555) 123-4567"></label>
-            <label class="full policy-ack sms-consent"><input name="smsConsent" type="checkbox"><span>Yes, I agree to receive recurring text messages from Lovely Locs at the phone number provided. Message frequency may vary. Message and data rates may apply. Reply STOP to opt out and HELP for help. I agree to the <a href="#privacy" data-route="privacy">Privacy Policy</a> and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>.</span></label>
+            <label class="full policy-ack sms-consent"><input name="smsConsent" type="checkbox"><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. I agree to the <a href="#privacy" data-route="privacy">Privacy Policy</a> and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>.</span></label>
             <button class="primary-btn" type="button" data-copy-optin-proof>Copy Opt-In Link</button>
           </form>
           <p class="duration">This opt-in checkbox is intentionally not preselected. Clients must choose it themselves.</p>
         </div>
         <div class="policy-box">
           <h2>For Twilio Proof of Consent</h2>
-          <p>Use this page as the consent form URL after your public Render website is live. You can also screenshot this form showing the unchecked consent box and disclosures.</p>
-          <p>Public opt-in URL format: <strong>https://your-render-url.onrender.com/#sms-opt-in</strong></p>
+          <p>Use this page as the consent form URL for Lovely Locs. You can also screenshot this form showing the unchecked consent box and disclosures.</p>
+          <p>Public opt-in URL: <strong>https://lovelylocsnc.com/#sms-opt-in</strong></p>
         </div>
       </div>
     </section>
@@ -1542,7 +1589,7 @@ function adminPage() {
           <p>Use this before testing bookings. The app will show the real email or SMS provider result. SMS is skipped if the Twilio toll-free sender is not verified, so it will not keep spending credits on blocked texts.</p>
           <form class="brand-settings-form" id="notificationTestForm">
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
-            <label>Email<input name="email" type="email" value="lovely2locs@gmail.com"></label>
+            <label>Email<input name="email" type="email" value="lvlc.support@lovelylocsnc.com"></label>
             <label>Phone<input name="phone" type="tel" value="3364711098"></label>
             <label>Channel
               <select name="channel">
@@ -1678,6 +1725,11 @@ function cartMarkup() {
             <div class="service-top"><strong>Subtotal</strong><strong>${money(subtotal)}</strong></div>
             ${discountAmount ? `<div class="service-top discount-total"><strong>Promo Discount</strong><strong>-${money(discountAmount)}</strong></div>` : ""}
             <div class="service-top"><strong>Total</strong><strong>${money(total)}</strong></div>
+            <div class="cart-saved-details">
+              <strong>${savedClientProfile ? "Your saved details are ready" : bookingDraft ? "Your checkout details are saved" : "Make future bookings faster"}</strong>
+              <p>${bookingDraft ? "You can refresh or add another item without starting over." : "Use your booking email and phone to load or manage saved details."}</p>
+              <button type="button" data-open-client-settings>${savedClientProfile ? "Manage saved details" : "Client sign in / saved details"}</button>
+            </div>
             <button class="primary-btn" data-open-booking>Finalize Cart &amp; Enter Details</button>
           </div>
         ` : ""}
@@ -1726,12 +1778,12 @@ function localAvailability(date, bookedTimes = []) {
   return { date, slots: [...regularSlots, ...emergencySlots] };
 }
 
-function slotPickerMarkup() {
+function slotPickerMarkup(profile = {}) {
   return `
     <div class="full time-slot-field">
-      <label class="slot-label">Preferred Time</label>
-      <input id="bookingTime" name="time" type="hidden" required>
-      <input id="bookingEmergencySlot" name="emergencySlot" type="hidden">
+      <label class="slot-label">Appointment Time</label>
+      <input id="bookingTime" name="time" type="hidden" required value="${escapeAttr(profile.time)}">
+      <input id="bookingEmergencySlot" name="emergencySlot" type="hidden" value="${profile.emergencySlot ? "true" : ""}">
       <div class="time-slot-legend">
         <span class="legend-open">Open</span>
         <span class="legend-emergency">Emergency proposal</span>
@@ -1781,27 +1833,47 @@ function updateBookingSummaryTotals() {
   }
 }
 
-function renderTimeSlots(availability) {
+function renderTimeSlots(availability, preferredSlot = null) {
   const grid = document.getElementById("timeSlotGrid");
   const note = document.getElementById("timeSlotNote");
   const timeInput = document.getElementById("bookingTime");
   const emergencyInput = document.getElementById("bookingEmergencySlot");
   if (!grid) return;
+  const restoredSlot = availability.slots.find(slot => (
+    preferredSlot
+    && preferredSlot.date === availability.date
+    && preferredSlot.time === slot.time
+    && slot.status !== "booked"
+  ));
   grid.innerHTML = availability.slots.map(slot => `
-    <button type="button" class="time-slot ${slot.type} ${slot.status}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" ${slot.status === "booked" ? "disabled" : ""}>
+    <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" ${slot.status === "booked" ? "disabled" : ""}>
       <strong>${slot.label}</strong>
       <span>${slot.status === "booked" ? "Booked" : slot.type === "emergency" ? "Emergency +$45" : "Open"}</span>
     </button>
   `).join("");
-  if (timeInput) timeInput.value = "";
-  if (emergencyInput) emergencyInput.value = "";
-  bookingSlotState = { date: availability.date, time: "", type: "", reason: "" };
-  setEmergencyFeeForSlot(false);
-  if (note) note.textContent = availability.holiday ? "Holiday/key dates are emergency proposals and include the $45 emergency fee." : "Choose a purple regular slot or a brown emergency proposal.";
+  const restoredType = restoredSlot?.type || "";
+  if (timeInput) timeInput.value = restoredSlot?.time || "";
+  if (emergencyInput) emergencyInput.value = restoredType === "emergency" ? "true" : "";
+  bookingSlotState = {
+    date: availability.date,
+    time: restoredSlot?.time || "",
+    type: restoredType,
+    reason: restoredSlot?.note || ""
+  };
+  setEmergencyFeeForSlot(restoredType === "emergency");
+  if (note) {
+    note.textContent = restoredSlot
+      ? restoredType === "emergency"
+        ? `${restoredSlot.note} This saved slot includes the Emergency Fee.`
+        : "Your saved regular appointment time has been restored."
+      : availability.holiday
+        ? "Holiday/key dates are emergency proposals and include the $45 emergency fee."
+        : "Choose a purple regular slot or a brown emergency proposal.";
+  }
   bindTimeSlotButtons();
 }
 
-async function loadAvailabilityForDate(date) {
+async function loadAvailabilityForDate(date, preferredSlot = null) {
   if (!date) return;
   const grid = document.getElementById("timeSlotGrid");
   if (grid) grid.innerHTML = `<p class="time-slot-placeholder">Loading open times...</p>`;
@@ -1809,9 +1881,9 @@ async function loadAvailabilityForDate(date) {
     const response = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Availability could not be loaded.");
-    renderTimeSlots(result);
+    renderTimeSlots(result, preferredSlot);
   } catch {
-    renderTimeSlots(localAvailability(date));
+    renderTimeSlots(localAvailability(date), preferredSlot);
   }
 }
 
@@ -1830,6 +1902,7 @@ function bindTimeSlotButtons() {
       if (emergencyInput) emergencyInput.value = type === "emergency" ? "true" : "";
       bookingSlotState = { ...bookingSlotState, time, type, reason: note };
       setEmergencyFeeForSlot(type === "emergency");
+      saveBookingDraft(document.getElementById("bookingForm"));
       if (noteNode) {
         noteNode.textContent = type === "emergency"
           ? `${note} This adds the Emergency Fee to your total before the deposit is calculated.`
@@ -1842,7 +1915,7 @@ function bindTimeSlotButtons() {
 function bookingModal() {
   const selectedServices = cart.filter(item => item.type === "service");
   const addOns = cart.filter(item => item.type !== "service");
-  const profile = savedClientProfile || {};
+  const profile = { ...(savedClientProfile || {}), ...(bookingDraft || {}) };
   const subtotal = cartSubtotal();
   const discountAmount = discountAmountForTotal(subtotal);
   const total = discountedCartTotal();
@@ -1878,14 +1951,17 @@ function bookingModal() {
           <p id="bookingDepositText">Deposit Required to Hold Slot: ${money(deposit)}</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
+        <div class="booking-save-note">
+          <strong>Your details save automatically</strong>
+          <p id="bookingDraftStatus">${bookingDraft ? "Saved details restored. You can refresh or add another item without starting over." : "As you type, this unfinished booking will be saved on this device."}</p>
+        </div>
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
-          <label>Preferred Date<input id="bookingDate" name="date" required type="date"></label>
-          <label>Birthday<input name="birthday" type="date" value="${escapeAttr(profile.birthday)}"><span class="field-note">Birthday rewards are emailed automatically 2 weeks before this date and expire 1 month after it.</span></label>
-          <label>Referral Code<input name="referredByCode" value="${referredByCodeFromUrl()}" placeholder="Friend's code"></label>
-          ${slotPickerMarkup()}
+          <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"></label>
+          <label>Referral Code<input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="Friend's code"></label>
+          ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
             <label><input name="preferredContact" type="radio" value="text_email" ${!profile.preferredContact || profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email</label>
@@ -1893,9 +1969,9 @@ function bookingModal() {
             <label><input name="preferredContact" type="radio" value="email" ${profile.preferredContact === "email" ? "checked" : ""}> Email</label>
             <p>Choose how you want client-facing confirmations delivered. SMS only sends if the client checks the text-message consent box.</p>
           </fieldset>
-          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn || profile.marketingEmailOptIn || profile.referralOptIn ? "checked" : ""}><span>Optional: send me Lovely Locs texts and emails for appointment updates, reminders, follow-ups, birthday offers, referral reward updates, and occasional loc care or campaign messages. Message frequency may vary. Msg &amp; data rates may apply. Reply STOP to opt out of texts or HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
+          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
-          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox"><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
+          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
@@ -2138,7 +2214,21 @@ function bindDynamic() {
   document.querySelectorAll("[data-view-services]").forEach(button => button.addEventListener("click", goToServices));
   document.querySelectorAll("[data-close-booking]").forEach(button => button.addEventListener("click", closeBooking));
   document.querySelectorAll("[data-submit-booking]").forEach(button => button.addEventListener("click", submitBooking));
-  document.getElementById("bookingDate")?.addEventListener("change", event => loadAvailabilityForDate(event.target.value));
+  document.querySelectorAll("[data-open-client-settings]").forEach(button => button.addEventListener("click", openClientSettings));
+  const bookingForm = document.getElementById("bookingForm");
+  bookingForm?.addEventListener("input", () => saveBookingDraft(bookingForm));
+  bookingForm?.addEventListener("change", () => saveBookingDraft(bookingForm));
+  document.getElementById("bookingDate")?.addEventListener("change", event => {
+    const timeInput = document.getElementById("bookingTime");
+    const emergencyInput = document.getElementById("bookingEmergencySlot");
+    if (timeInput) timeInput.value = "";
+    if (emergencyInput) emergencyInput.value = "";
+    bookingSlotState = { date: event.target.value, time: "", type: "", reason: "" };
+    setEmergencyFeeForSlot(false);
+    saveBookingDraft(bookingForm);
+    loadAvailabilityForDate(event.target.value);
+  });
+  if (bookingDraft?.date) loadAvailabilityForDate(bookingDraft.date, bookingDraft);
   document.querySelectorAll("#brandSettingsForm input[type='range']").forEach(input => input.addEventListener("input", previewLogoSettings));
   document.querySelectorAll("[data-logo-align]").forEach(button => {
     button.addEventListener("click", () => {
@@ -2202,6 +2292,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
   document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
+  if (currentRoute() === "client-settings") initializeGoogleSignIn();
   if (currentRoute() === "admin" || currentRoute() === "admin-confirm-deposit") loadAdminNotificationStatus();
   if (currentRoute() === "admin-confirm-deposit") {
     setTimeout(() => {
@@ -2226,6 +2317,12 @@ function goToServices() {
   pendingAnchor = "services";
   window.location.hash = "services";
   render("home");
+}
+function openClientSettings() {
+  closeBooking();
+  closeCart();
+  window.location.hash = "client-settings";
+  render("client-settings");
 }
 function openBooking() {
   if (!cart.length) {
@@ -2289,6 +2386,84 @@ async function lookupClientSettings() {
     });
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Client settings could not be loaded.");
+    clientSettingsResult = result;
+    saveClientProfile({
+      ...(result.client || {}),
+      referralCode: result.referralCode || result.client?.referralCode || ""
+    });
+    render("client-settings");
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+async function fetchGoogleAuthConfig() {
+  if (googleAuthConfig) return googleAuthConfig;
+  const response = await fetch("/api/auth/google/config");
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || "Google sign-in configuration could not be loaded.");
+  googleAuthConfig = result;
+  return result;
+}
+
+async function initializeGoogleSignIn() {
+  const button = document.getElementById("googleSignInButton");
+  const status = document.getElementById("googleSignInStatus");
+  if (!button || !status) return;
+  try {
+    const config = await fetchGoogleAuthConfig();
+    if (!config.configured || !config.clientId) {
+      status.textContent = "Google sign-in is not configured yet. Use booking email and phone for now.";
+      return;
+    }
+    if (!window.google?.accounts?.id) {
+      googleAuthLoadAttempts += 1;
+      if (googleAuthLoadAttempts <= 20) {
+        status.textContent = "Loading Google sign-in...";
+        setTimeout(initializeGoogleSignIn, 250);
+      } else {
+        status.textContent = "Google sign-in could not load. Refresh the page or use booking email and phone.";
+      }
+      return;
+    }
+    googleAuthLoadAttempts = 0;
+    window.google.accounts.id.initialize({
+      client_id: config.clientId,
+      callback: handleGoogleCredential,
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+    button.innerHTML = "";
+    window.google.accounts.id.renderButton(button, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      logo_alignment: "left",
+      width: Math.min(360, Math.max(220, button.clientWidth || 320))
+    });
+    status.textContent = "";
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function handleGoogleCredential(response) {
+  const status = document.getElementById("googleSignInStatus");
+  if (!response?.credential) {
+    if (status) status.textContent = "Google did not return a sign-in credential. Please try again.";
+    return;
+  }
+  if (status) status.textContent = "Verifying your Google account...";
+  try {
+    const request = await fetch("/api/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential })
+    });
+    const result = await request.json();
+    if (!request.ok || !result.ok) throw new Error(result.error || "Google sign-in could not be completed.");
     clientSettingsResult = result;
     saveClientProfile({
       ...(result.client || {}),
@@ -2628,9 +2803,8 @@ function bookingSummaryFromForm(form) {
     `Client: ${client.fullName}`,
     `Email: ${client.email}`,
     `Phone: ${client.phone}`,
-    `Preferred date: ${client.date}`,
-    `Preferred time: ${timeLabel(client.time)}`,
-    client.birthday ? `Birthday credit date: ${client.birthday}` : "",
+    `Appointment date: ${client.date}`,
+    `Appointment time: ${timeLabel(client.time)}`,
     `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
     `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
     `Optional communications opt-in: ${client.smsOptIn ? "Yes" : "No"}`,
@@ -2665,12 +2839,11 @@ function bookingPayloadFromForm(form) {
       phone: data.get("phone") || "",
       date: data.get("date") || "",
       time: data.get("time") || "",
-      birthday: data.get("birthday") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),
       preferredContact: data.get("preferredContact") || "text_email",
       smsOptIn: communicationsOptIn,
-      marketingEmailOptIn: communicationsOptIn,
-      referralOptIn: communicationsOptIn,
+      marketingEmailOptIn: false,
+      referralOptIn: false,
       referredByCode: normalizeDiscountCode(data.get("referredByCode") || "").replace(/[^A-Z0-9]/g, ""),
       specialRequests: data.get("specialRequests") || ""
     },
@@ -2735,6 +2908,7 @@ async function submitBooking() {
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
     saveClientProfile(bookingPayload.client);
+    clearBookingDraft();
     if (result.noCharge) {
       bookingConfirmation = {
         message: result.message || "Free admin test booking saved. No deposit was requested."
@@ -2803,12 +2977,24 @@ document.querySelector("[data-drawer-booking]").addEventListener("click", () => 
   goToServices();
 });
 
-document.getElementById("themeToggle").addEventListener("click", () => {
+const themeToggle = document.getElementById("themeToggle");
+
+function syncThemeToggle() {
+  const isDark = document.documentElement.classList.contains("dark");
+  const label = isDark ? "Switch to light mode" : "Switch to dark mode";
+  themeToggle.textContent = isDark ? String.fromCharCode(9728) : String.fromCharCode(9790);
+  themeToggle.setAttribute?.("aria-label", label);
+  themeToggle.setAttribute?.("title", label);
+}
+
+themeToggle.addEventListener("click", () => {
   document.documentElement.classList.toggle("dark");
   localStorage.setItem("darkMode", document.documentElement.classList.contains("dark") ? "true" : "false");
+  syncThemeToggle();
 });
 
 if (localStorage.getItem("darkMode") === "true") document.documentElement.classList.add("dark");
+syncThemeToggle();
 applyLogoSettings();
 fetchLogoSettings();
 function applyVisualVersion(versionId) {

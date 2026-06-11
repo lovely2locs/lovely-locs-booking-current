@@ -2012,6 +2012,73 @@ function handleAdminBookingLookup(req, res) {
   }
 }
 
+async function handleAdminConfirmationResend(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    if (!tokenIsValid(body.token || "")) {
+      sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
+      return;
+    }
+    const bookingId = String(body.bookingId || "").trim();
+    const savedBooking = findBookingById(bookingId);
+    const email = String(body.email || savedBooking?.client?.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      sendJson(res, 400, { ok: false, error: "Enter the client's valid email address." });
+      return;
+    }
+    const fullName = String(body.fullName || savedBooking?.client?.fullName || "").trim();
+    const date = String(body.date || savedBooking?.client?.date || "").trim();
+    const time = String(body.time || savedBooking?.client?.time || "").trim();
+    if (!fullName || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) {
+      sendJson(res, 400, { ok: false, error: "Enter the client name, appointment date, and appointment time." });
+      return;
+    }
+    const booking = savedBooking ? {
+      ...savedBooking,
+      client: { ...savedBooking.client, fullName, email, date, time },
+    } : {
+      id: bookingId || `RECOVERY-${Date.now()}`,
+      client: { fullName, email, date, time },
+      cart: [],
+      selectedServices: [],
+      deposit: Number(body.deposit || 0),
+      total: Number(body.total || 0),
+    };
+    const message = confirmationEmail(booking);
+    let result;
+    try {
+      result = {
+        channel: "clientEmail",
+        ...(await sendEmail(email, "Your Lovely Locs appointment is confirmed", message.text, { html: message.html })),
+      };
+    } catch (error) {
+      result = {
+        channel: "clientEmail",
+        failed: true,
+        error: error.message,
+        gmailDraftUrl: gmailComposeUrl(email, "Your Lovely Locs appointment is confirmed", message.text),
+      };
+    }
+    appendBookingRecord({
+      type: "confirmation.email.resent",
+      bookingId: booking.id,
+      recipientEmail: email,
+      sentAt: new Date().toISOString(),
+      notificationResults: [result],
+      recoveredBooking: !savedBooking,
+    });
+    sendJson(res, 200, {
+      ok: !result.failed && !result.skipped,
+      bookingId: booking.id,
+      recoveredBooking: !savedBooking,
+      notificationResults: [result],
+    });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
 async function handleStripeWebhook(req, res) {
   try {
     const raw = await readBody(req);
@@ -2497,6 +2564,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/admin/booking") {
     handleAdminBookingLookup(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/admin/confirmation/resend") {
+    handleAdminConfirmationResend(req, res);
     return;
   }
 

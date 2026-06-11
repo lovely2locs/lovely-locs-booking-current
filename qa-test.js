@@ -446,8 +446,12 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="date" required'), "date not required");
   assert(html.includes("Appointment Date"), "appointment date label missing");
   assert(!html.includes("Preferred Date"), "checkout should not show a preferred date label");
-  assert(!html.includes('name="birthday"'), "checkout should not collect a birthday");
-  assert(!html.includes("Birthday rewards are emailed automatically"), "checkout should not show birthday reward date copy");
+  assert(html.includes('name="birthday" type="date"'), "optional guest birthday field missing");
+  assert(html.includes("Guest clients can enter only their birthday"), "guest birthday guidance missing");
+  assert(html.includes("2 weeks before your birthday"), "birthday credit start window missing");
+  assert(html.includes("expires 1 month after it"), "birthday credit expiration window missing");
+  assert(html.includes("No separate preferred redemption date is needed"), "birthday redemption-date guidance missing");
+  assert(html.includes("For scheduling this appointment only"), "appointment-date purpose guidance missing");
   assert(html.includes("Your details save automatically"), "booking autosave notice missing");
   assert(html.includes('name="referredByCode"'), "referral code field missing");
   assert(html.includes('id="bookingTime" name="time"'), "appointment time slot input missing");
@@ -479,8 +483,66 @@ test("client settings route shows referral tracking surface", () => {
   assert(html.includes("Referral code and reward status"), "client settings heading missing");
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
-  assert(html.includes("same email address as your Lovely Locs booking"), "Google booking-email guidance missing");
+  assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
   assert(html.includes("pending referrals"), "client settings pending referral copy missing");
+});
+
+test("new Google clients receive one-time profile onboarding", async () => {
+  const originalFetch = context.fetch;
+  const cartBeforeSignup = localStore.get("lovelyLocsCart") || "";
+  context.fetch = async url => {
+    if (url === "/api/auth/google") {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          needsSignup: true,
+          signup: { email: "newclient@gmail.com", fullName: "New Client" }
+        })
+      };
+    }
+    if (url === "/api/auth/google/config") {
+      return { ok: true, json: async () => ({ ok: true, configured: false, clientId: "" }) };
+    }
+    if (url === "/api/auth/google/signup") {
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          client: {
+            fullName: "New Client",
+            email: "newclient@gmail.com",
+            phone: "(336) 555-3434",
+            birthday: "",
+            locJourneyLength: "",
+            onboardingCompleted: true
+          },
+          referralCode: "LLNEW123",
+          referrals: { pending: [], approved: [] },
+          credits: []
+        })
+      };
+    }
+    return originalFetch(url);
+  };
+  await context.handleGoogleCredential({ credential: "test-google-credential" });
+  const html = appHtml();
+  assert(html.includes('id="googleSignupForm"'), "one-time Google signup form missing");
+  assert(html.includes('name="birthday"'), "optional signup birthday missing");
+  assert(html.includes('name="locJourneyLength"'), "optional loc journey question missing");
+  assert(html.includes("Prefer not to answer"), "optional journey skip choice missing");
+  await context.saveGoogleSignupProfile({
+    fullName: "New Client",
+    email: "newclient@gmail.com",
+    phone: "(336) 555-3434",
+    birthday: "",
+    locJourneyLength: ""
+  });
+  const savedProfile = JSON.parse(localStore.get("lovelyLocsClientProfile") || "{}");
+  assert(savedProfile.onboardingCompleted === true, "completed onboarding was not saved");
+  assert(savedProfile.googleLinked === true, "Google-linked profile flag was not saved");
+  assert((localStore.get("lovelyLocsCart") || "") === cartBeforeSignup, "Google signup should not clear the saved cart");
+  context.fetch = originalFetch;
 });
 
 test("saved client profile pre-fills booking basics", () => {
@@ -488,6 +550,10 @@ test("saved client profile pre-fills booking basics", () => {
     fullName: "Saved Client",
     email: "saved@example.com",
     phone: "(336) 555-1212",
+    birthday: "1998-07-31",
+    birthday: "1998-07-31",
+    locJourneyLength: "3_to_5_years",
+    onboardingCompleted: true,
     preferredContact: "email",
     smsOptIn: true,
     marketingEmailOptIn: true,
@@ -500,10 +566,13 @@ test("saved client profile pre-fills booking basics", () => {
   assert(html.includes('value="Saved Client"'), "saved full name did not prefill");
   assert(html.includes('value="saved@example.com"'), "saved email did not prefill");
   assert(html.includes('value="(336) 555-1212"'), "saved phone did not prefill");
-  assert(!html.includes('name="birthday"'), "saved profile should not restore a birthday field");
+  assert(html.includes('value="1998-07-31"'), "saved birthday did not prefill");
   assert(html.includes('value="email" checked'), "saved preferred contact did not preselect");
   assert(html.includes('name="smsOptIn" type="checkbox" checked'), "saved SMS opt-in did not precheck");
   assert(html.includes("Saved notes"), "saved notes did not prefill");
+  const payload = context.bookingPayloadFromForm(elements.bookingForm);
+  assert(payload.client.birthday === "1998-07-31", "saved birthday should travel with future booking records");
+  assert(payload.client.locJourneyLength === "3_to_5_years", "saved loc journey should travel with future booking records");
   context.clearClientProfile();
 });
 
@@ -511,7 +580,7 @@ test("unfinished booking details persist for refresh and cart changes", () => {
   context.saveBookingDraft(elements.bookingForm);
   const storedDraft = JSON.parse(localStore.get("lovelyLocsBookingDraft") || "{}");
   assert(storedDraft.fullName === "Test Client", "unfinished client name was not saved");
-  assert(!Object.prototype.hasOwnProperty.call(storedDraft, "birthday"), "unfinished booking should not save a birthday");
+  assert(storedDraft.birthday === "1998-07-31", "unfinished birthday was not saved");
   assert(storedDraft.date === "2026-06-01", "unfinished booking date was not saved");
   assert(storedDraft.time === "18:30", "unfinished booking time was not saved");
   context.render(context.currentRoute());
@@ -589,7 +658,7 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
   assert(context.lastFetch.options.body.includes("marketingEmailOptIn"), "booking backend payload should include monthly referral campaign opt-in status");
   assert(context.lastFetch.options.body.includes("referralOptIn"), "booking backend payload should include referral reminder opt-in status");
-  assert(!context.lastFetch.options.body.includes("1998-07-31"), "booking backend payload should not include a birthday");
+  assert(context.lastFetch.options.body.includes("1998-07-31"), "booking backend payload should include the guest birthday");
   assert(context.lastFetch.options.body.includes("LLABC123"), "booking backend payload should include referral code used by new client");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
@@ -658,9 +727,13 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("GOOGLE_CLIENT_ID"), "Google sign-in configuration hook missing");
   assert(server.includes("/api/auth/google/config"), "Google sign-in config endpoint missing");
   assert(server.includes("/api/auth/google"), "Google sign-in endpoint missing");
+  assert(server.includes("/api/auth/google/signup"), "Google signup endpoint missing");
   assert(server.includes("verifyGoogleCredential"), "Google ID token verifier missing");
   assert(server.includes("crypto.verify"), "Google token signature verification missing");
   assert(server.includes("latestClientBookingByEmail"), "Google booking email matcher missing");
+  assert(server.includes("client.profile.saved"), "persistent client profile record missing");
+  assert(server.includes("locJourneyLength"), "loc journey profile field missing");
+  assert(server.includes("process.env.DATA_DIR"), "persistent data directory hook missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
@@ -674,6 +747,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("monthly_referral_campaign"), "monthly referral campaign automation missing");
   assert(!server.includes("birthday_offer"), "birthday offer automation should not be active");
   assert(server.includes("birthday_credit"), "annual birthday credit automation missing");
+  assert(server.includes("if (!booking.client?.birthday) return null;"), "birthday credit should require only a birthday");
+  assert(!server.includes("if (!booking.client?.marketingEmailOptIn || !booking.client?.birthday) return null;"), "birthday credit should not require marketing email opt-in");
   assert(server.includes("activeBirthdayWindow"), "birthday credit date window helper missing");
   assert(server.includes("validFrom"), "birthday credit valid-from date missing");
   assert(server.includes("expiresAt"), "birthday credit expiration date missing");

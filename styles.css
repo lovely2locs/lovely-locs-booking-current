@@ -2588,3 +2588,16 @@ textarea { min-height: 92px; resize: vertical; }
   .product-card-head { align-items: flex-start; flex-direction: column; }
   .source-link { white-space: normal; }
 }
+.google-signup-card {
+  grid-column: 1 / -1;
+}
+
+.google-sign-in {
+  min-height: 44px;
+}
+
+.optional-label {
+  font-size: 0.8em;
+  font-weight: 500;
+  opacity: 0.72;
+}

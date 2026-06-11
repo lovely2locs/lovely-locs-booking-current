@@ -30,8 +30,10 @@ loadEnvFile();
 
 const port = Number(process.env.PORT || 4175);
 const host = process.env.HOST || "0.0.0.0";
-const bookingsFile = path.join(root, "bookings.jsonl");
-const settingsFile = path.join(root, "site-settings.json");
+const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : root;
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+const bookingsFile = path.join(dataDir, "bookings.jsonl");
+const settingsFile = path.join(dataDir, "site-settings.json");
 const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lvlc.support@lovelylocsnc.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
 const emailLogoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
@@ -86,6 +88,7 @@ const productCatalog = [
 ];
 
 const allowedBaseProducts = new Set(["Oil and Water", "Foam", "Gel"]);
+const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
   ["Natural C Parts", 0],
@@ -159,8 +162,8 @@ function bookingText(booking) {
     `Client: ${booking.client?.fullName || ""}`,
     `Email: ${booking.client?.email || ""}`,
     `Phone: ${booking.client?.phone || ""}`,
-    `Preferred date: ${booking.client?.date || ""}`,
-    `Preferred time: ${timeLabel(booking.client?.time)}`,
+    `Appointment date: ${booking.client?.date || ""}`,
+    `Appointment time: ${timeLabel(booking.client?.time)}`,
     booking.client?.birthday ? `Birthday: ${booking.client.birthday}` : "",
     `Appointment type: ${booking.client?.appointmentType || "standard"}`,
     `Preferred contact: ${contactPreferenceLabel(booking.client?.preferredContact)}`,
@@ -868,6 +871,37 @@ function latestClientBookingByEmail(email, records = readBookingRecords()) {
   return null;
 }
 
+function latestClientProfile(client, records = readBookingRecords()) {
+  const key = clientIdentityKey(client);
+  if (!key) return null;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (record.type === "client.profile.saved" && clientIdentityKey(record.client) === key) return record;
+  }
+  return null;
+}
+
+function latestClientProfileByEmail(email, records = readBookingRecords()) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail) return null;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (record.type !== "client.profile.saved") continue;
+    if (String(record.client?.email || "").trim().toLowerCase() === cleanEmail) return record;
+  }
+  return null;
+}
+
+function latestClientProfileByGoogleSubject(subject, records = readBookingRecords()) {
+  const cleanSubject = String(subject || "").trim();
+  if (!cleanSubject) return null;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (record.type === "client.profile.saved" && record.googleSubject === cleanSubject) return record;
+  }
+  return null;
+}
+
 function findReferrerByCode(code, records = readBookingRecords()) {
   const cleanCode = normalizeReferralCode(code);
   if (!cleanCode) return null;
@@ -1237,6 +1271,7 @@ function sanitizeClient(client = {}) {
   const date = String(client.date || "").trim();
   const time = String(client.time || "").trim();
   const birthday = String(client.birthday || "").trim();
+  const locJourneyLength = String(client.locJourneyLength || "").trim();
   const slot = date && time ? classifyAppointmentTime(date, time) : { type: "standard", emergency: false, reason: "" };
   return {
     fullName: String(client.fullName || "").trim(),
@@ -1245,6 +1280,8 @@ function sanitizeClient(client = {}) {
     date,
     time,
     birthday: /^\d{4}-\d{2}-\d{2}$/.test(birthday) || /^\d{2}-\d{2}$/.test(birthday) ? birthday : "",
+    locJourneyLength: allowedLocJourneyLengths.has(locJourneyLength) ? locJourneyLength : "",
+    onboardingCompleted: Boolean(client.onboardingCompleted),
     appointmentType: slot.type,
     emergencySlot: slot.emergency,
     emergencyReason: slot.reason,
@@ -1607,7 +1644,7 @@ async function runReferralReminderAutomation(booking, records, now) {
 }
 
 async function runBirthdayCreditAutomation(booking, records, now) {
-  if (!booking.client?.marketingEmailOptIn || !booking.client?.birthday) return null;
+  if (!booking.client?.birthday) return null;
   const key = clientIdentityKey(booking.client);
   if (!key) return null;
   const window = activeBirthdayWindow(booking.client.birthday, now);
@@ -1962,10 +1999,13 @@ async function handleStripeWebhook(req, res) {
 function clientSettingsFor(client, req) {
   const records = readBookingRecords();
   const latest = latestClientBooking(client, records);
-  const profile = latest?.client || {
+  const savedProfile = latestClientProfile(client, records);
+  const profile = {
     fullName: String(client.fullName || "").trim(),
     email: String(client.email || "").trim(),
     phone: String(client.phone || "").trim(),
+    ...(latest?.client || {}),
+    ...(savedProfile?.client || {}),
   };
   const key = clientIdentityKey(profile);
   const referralCode = normalizeReferralCode(profile.referralCode || referralCodeForClient(profile));
@@ -1993,12 +2033,15 @@ function clientSettingsFor(client, req) {
   });
   return {
     ok: true,
-    clientFound: Boolean(latest),
+    clientFound: Boolean(latest || savedProfile),
     client: {
       fullName: profile.fullName || "",
       email: profile.email || "",
       phone: profile.phone || "",
       birthday: profile.birthday || "",
+      locJourneyLength: profile.locJourneyLength || "",
+      onboardingCompleted: Boolean(profile.onboardingCompleted || savedProfile),
+      googleLinked: Boolean(savedProfile?.googleSubject),
       preferredContact: profile.preferredContact || "text_email",
       smsOptIn: Boolean(profile.smsOptIn),
       marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
@@ -2108,20 +2151,80 @@ async function handleGoogleSignIn(req, res) {
     const body = JSON.parse(raw || "{}");
     const claims = await verifyGoogleCredential(body.credential);
     const records = readBookingRecords();
+    const savedProfile = latestClientProfileByGoogleSubject(claims.sub, records)
+      || latestClientProfileByEmail(claims.email, records);
     const booking = latestClientBookingByEmail(claims.email, records);
-    if (!booking) {
-      sendJson(res, 404, {
-        ok: false,
-        error: "No Lovely Locs booking matches this Google email. Use the booking email and phone lookup instead.",
+    if (!savedProfile && !booking) {
+      sendJson(res, 200, {
+        ok: true,
+        needsSignup: true,
+        signup: {
+          email: String(claims.email).trim().toLowerCase(),
+          fullName: String(claims.name || "").trim(),
+        },
       });
       return;
     }
     sendJson(res, 200, {
-      ...clientSettingsFor(booking.client, req),
+      ...clientSettingsFor(savedProfile?.client || booking.client, req),
       auth: {
         provider: "google",
         email: String(claims.email).trim().toLowerCase(),
       },
+    });
+  } catch (error) {
+    sendJson(res, 401, { ok: false, error: error.message });
+  }
+}
+
+async function handleGoogleSignup(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    const claims = await verifyGoogleCredential(body.credential);
+    const records = readBookingRecords();
+    const existingProfile = latestClientProfileByGoogleSubject(claims.sub, records)
+      || latestClientProfileByEmail(claims.email, records);
+    if (existingProfile) {
+      sendJson(res, 200, {
+        ...clientSettingsFor(existingProfile.client, req),
+        auth: { provider: "google", email: String(claims.email).trim().toLowerCase() },
+      });
+      return;
+    }
+    const requestedBirthday = String(body.birthday || "").trim();
+    if (requestedBirthday && !/^\d{4}-\d{2}-\d{2}$/.test(requestedBirthday)) {
+      sendJson(res, 400, { ok: false, error: "Enter a valid birthday or leave it blank." });
+      return;
+    }
+    const client = sanitizeClient({
+      fullName: body.fullName || claims.name || "",
+      email: claims.email,
+      phone: body.phone || "",
+      birthday: requestedBirthday,
+      locJourneyLength: body.locJourneyLength || "",
+      onboardingCompleted: true,
+      date: "2099-01-01",
+      time: "18:30",
+    });
+    if (!client.fullName || phoneDigits(client.phone).length < 10) {
+      sendJson(res, 400, { ok: false, error: "Enter your full name and a valid phone number." });
+      return;
+    }
+    client.referralCode = referralCodeForClient(client);
+    appendBookingRecord({
+      type: "client.profile.saved",
+      profileId: `google:${claims.sub}`,
+      googleSubject: String(claims.sub || ""),
+      clientKey: clientIdentityKey(client),
+      client,
+      onboardingCompleted: true,
+      createdAt: new Date().toISOString(),
+    });
+    sendJson(res, 201, {
+      ...clientSettingsFor(client, req),
+      created: true,
+      auth: { provider: "google", email: String(claims.email).trim().toLowerCase() },
     });
   } catch (error) {
     sendJson(res, 401, { ok: false, error: error.message });
@@ -2306,6 +2409,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/auth/google") {
     handleGoogleSignIn(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/auth/google/signup") {
+    handleGoogleSignup(req, res);
     return;
   }
 

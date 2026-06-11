@@ -1649,6 +1649,23 @@ function adminPage() {
           </form>
         </div>
         <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Email Recovery</p>
+          <h2>Resend Client Confirmation</h2>
+          <p>Use this if the client did not receive their confirmation or their original booking record is unavailable. Enter the corrected email and appointment details. This sends email only and does not charge or confirm another deposit.</p>
+          <form class="brand-settings-form" id="confirmationResendForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Booking ID<input name="bookingId" placeholder="LL-1781219564994"></label>
+            <label>Client Email<input name="email" type="email" placeholder="client@gmail.com" required></label>
+            <label>Client Name<input name="fullName" placeholder="Client name" required></label>
+            <label>Appointment Date<input name="date" type="date" required></label>
+            <label>Appointment Time<input name="time" type="time" required></label>
+            <label>Deposit Paid<input name="deposit" type="number" min="0" step="1" value="0"></label>
+            <label>Estimated Total<input name="total" type="number" min="0" step="1" value="0"></label>
+            <p class="form-error" id="confirmationResendStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-resend-client-confirmation>Resend Client Confirmation Email</button>
+          </form>
+        </div>
+        <div class="policy-box brand-settings-box">
           <p class="eyebrow">Notification Test</p>
           <h2>Send Notification Test</h2>
           <p>Use this before testing bookings. The app will show the real email or SMS provider result. SMS is skipped if the Twilio toll-free sender is not verified, so it will not keep spending credits on blocked texts.</p>
@@ -2319,6 +2336,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
+  document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
   document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
@@ -2800,6 +2818,46 @@ async function confirmManualDeposit() {
   }
 }
 
+async function resendClientConfirmation() {
+  const form = document.getElementById("confirmationResendForm");
+  const status = document.getElementById("confirmationResendStatus");
+  if (!form) return;
+  if (!form.reportValidity()) {
+    if (status) status.textContent = "Complete the client email and appointment details.";
+    return;
+  }
+  const data = new FormData(form);
+  const payload = {
+    token: String(data.get("token") || "").trim(),
+    bookingId: String(data.get("bookingId") || "").trim(),
+    email: String(data.get("email") || "").trim(),
+    fullName: String(data.get("fullName") || "").trim(),
+    date: String(data.get("date") || "").trim(),
+    time: String(data.get("time") || "").trim(),
+    deposit: Number(data.get("deposit") || 0),
+    total: Number(data.get("total") || 0),
+  };
+  if (!payload.token) {
+    if (status) status.textContent = "Enter the admin token first.";
+    return;
+  }
+  if (status) status.textContent = "Resending confirmation...";
+  try {
+    const response = await fetch("/api/admin/confirmation/resend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Confirmation email could not be resent.");
+    if (status) {
+      status.innerHTML = `Confirmation resend submitted.<br>${notificationResultsHtml(result.notificationResults)}<br>Accepted means Resend received the message; verify Delivered or Bounced in the Resend dashboard.`;
+    }
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
 function notificationResultsHtml(results = []) {
   if (!results.length) return "No notification tasks were returned.";
   return results.map(result => {
@@ -2811,7 +2869,7 @@ function notificationResultsHtml(results = []) {
       return `<span>${deliveryLabel} - ${escapeAttr(result.error || "Unknown error")}${fallback}${draft}</span>`;
     }
     if (result.skipped) return `<span>${label}: skipped - ${escapeAttr(result.reason || "Provider not ready")}</span>`;
-    const parts = [`${label}: accepted by ${escapeAttr(result.provider || "provider")}`];
+    const parts = [`${label}: accepted by ${escapeAttr(result.provider || "provider")} (not yet proof of inbox delivery)`];
     if (result.id) parts.push(`email id ${escapeAttr(result.id)}`);
     if (result.sid) parts.push(`sms sid ${escapeAttr(result.sid)}`);
     if (result.status) parts.push(`status ${escapeAttr(result.status)}`);

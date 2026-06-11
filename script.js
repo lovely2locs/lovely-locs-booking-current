@@ -393,6 +393,7 @@ function saveBookingDraft(form) {
     phone: data.get("phone") || "",
     date: data.get("date") || "",
     time: data.get("time") || "",
+    birthday: data.get("birthday") || "",
     referredByCode: data.get("referredByCode") || "",
     emergencySlot: Boolean(data.get("emergencySlot")),
     preferredContact: data.get("preferredContact") || "text_email",
@@ -497,6 +498,10 @@ function saveClientProfile(profile = {}) {
     fullName: profile.fullName || "",
     email: profile.email || "",
     phone: profile.phone || "",
+    birthday: profile.birthday || "",
+    locJourneyLength: profile.locJourneyLength || "",
+    onboardingCompleted: Boolean(profile.onboardingCompleted),
+    googleLinked: Boolean(profile.googleLinked),
     preferredContact: profile.preferredContact || "text_email",
     smsOptIn: Boolean(profile.smsOptIn),
     marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
@@ -510,6 +515,7 @@ function saveClientProfile(profile = {}) {
 }
 
 function clearClientProfile() {
+  window.google?.accounts?.id?.disableAutoSelect();
   if (localStorage.removeItem) localStorage.removeItem("lovelyLocsClientProfile");
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
@@ -571,6 +577,8 @@ let clientSettingsResult = null;
 let lastRoute = null;
 let googleAuthConfig = null;
 let googleAuthLoadAttempts = 0;
+let googleSignupCredential = "";
+let googleSignupState = null;
 
 const app = document.getElementById("app");
 const drawer = document.getElementById("drawer");
@@ -845,6 +853,37 @@ function referralShareSection() {
   `;
 }
 
+function googleSignupFormMarkup() {
+  if (!googleSignupState) return "";
+  const saved = savedClientProfile?.email === googleSignupState.email ? savedClientProfile : {};
+  return `
+    <div class="policy-box google-signup-card">
+      <p class="eyebrow">One-Time Setup</p>
+      <h2>Create Your Lovely Locs Profile</h2>
+      <p>Save a few details once so future bookings can be faster. Birthday and loc-journey length are optional and can support future rewards.</p>
+      <form class="form-grid" id="googleSignupForm">
+        <label>Full Name<input name="fullName" required autocomplete="name" value="${escapeAttr(saved.fullName || googleSignupState.fullName)}"></label>
+        <label>Google Email<input name="email" type="email" readonly value="${escapeAttr(googleSignupState.email)}"></label>
+        <label>Phone Number<input name="phone" required autocomplete="tel" placeholder="(555) 123-4567" value="${escapeAttr(saved.phone)}"></label>
+        <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(saved.birthday)}"></label>
+        <label class="full">How long have you been on your loc journey? <span class="optional-label">(optional)</span>
+          <select name="locJourneyLength">
+            <option value="">Prefer not to answer</option>
+            <option value="exploring" ${saved.locJourneyLength === "exploring" ? "selected" : ""}>Exploring or preparing to start</option>
+            <option value="under_1_year" ${saved.locJourneyLength === "under_1_year" ? "selected" : ""}>Less than 1 year</option>
+            <option value="1_to_3_years" ${saved.locJourneyLength === "1_to_3_years" ? "selected" : ""}>1 to 3 years</option>
+            <option value="3_to_5_years" ${saved.locJourneyLength === "3_to_5_years" ? "selected" : ""}>3 to 5 years</option>
+            <option value="5_plus_years" ${saved.locJourneyLength === "5_plus_years" ? "selected" : ""}>5 years or more</option>
+          </select>
+        </label>
+        <label class="full policy-ack"><input name="profileConsent" type="checkbox" required><span>Save these details to my Lovely Locs client profile for future bookings and reward eligibility. I can clear the saved copy on this device at any time.</span></label>
+        <p class="form-error" id="googleSignupStatus" aria-live="polite"></p>
+        <button class="primary-btn" type="button" data-google-signup>Create My Profile</button>
+      </form>
+    </div>
+  `;
+}
+
 function clientSettingsPage() {
   const result = clientSettingsResult;
   const profile = savedClientProfile || result?.client || {};
@@ -871,6 +910,7 @@ function clientSettingsPage() {
     </section>
     <section class="section">
       <div class="container admin-grid">
+        ${googleSignupFormMarkup()}
         <div class="policy-box">
           <h2>Look Up Your Settings</h2>
           ${savedClientProfile ? `<p class="promo-status success">Saved profile: ${escapeAttr(savedClientProfile.email || savedClientProfile.phone)}</p>` : ""}
@@ -886,8 +926,15 @@ function clientSettingsPage() {
           <h2>Easy Sign In</h2>
           <div id="googleSignInButton" class="google-sign-in"></div>
           <p id="googleSignInStatus" class="form-error" aria-live="polite">Loading Google sign-in...</p>
-          <p>Use the Google account with the same email address as your Lovely Locs booking.</p>
+          <p>Returning clients can sign in instantly. New clients will complete a short one-time profile before booking.</p>
         </div>
+        ${savedClientProfile && cart.length ? `
+          <div class="policy-box">
+            <h2>Continue Your Booking</h2>
+            <p>Your saved cart still has ${cart.length} ${cart.length === 1 ? "item" : "items"}. It stays there until you remove it.</p>
+            <button class="primary-btn" type="button" data-resume-saved-cart>Return to My Cart</button>
+          </div>
+        ` : ""}
         <div class="policy-box">
           <h2>Your Referral Code</h2>
           ${result ? `
@@ -1959,7 +2006,8 @@ function bookingModal() {
           <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
-          <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"></label>
+          <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
+          <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
           <label>Referral Code<input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="Friend's code"></label>
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
@@ -2292,6 +2340,12 @@ function bindDynamic() {
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
   document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
+  document.querySelectorAll("[data-google-signup]").forEach(button => button.addEventListener("click", submitGoogleSignup));
+  document.querySelectorAll("[data-resume-saved-cart]").forEach(button => button.addEventListener("click", () => {
+    window.location.hash = "home";
+    render("home");
+    openCart();
+  }));
   if (currentRoute() === "client-settings") initializeGoogleSignIn();
   if (currentRoute() === "admin" || currentRoute() === "admin-confirm-deposit") loadAdminNotificationStatus();
   if (currentRoute() === "admin-confirm-deposit") {
@@ -2455,6 +2509,7 @@ async function handleGoogleCredential(response) {
     if (status) status.textContent = "Google did not return a sign-in credential. Please try again.";
     return;
   }
+  googleSignupCredential = response.credential;
   if (status) status.textContent = "Verifying your Google account...";
   try {
     const request = await fetch("/api/auth/google", {
@@ -2464,12 +2519,82 @@ async function handleGoogleCredential(response) {
     });
     const result = await request.json();
     if (!request.ok || !result.ok) throw new Error(result.error || "Google sign-in could not be completed.");
+    if (result.needsSignup) {
+      googleSignupState = {
+        email: result.signup?.email || "",
+        fullName: result.signup?.fullName || ""
+      };
+      const saved = savedClientProfile;
+      if (saved?.onboardingCompleted && saved.email === googleSignupState.email) {
+        await saveGoogleSignupProfile(saved, { automatic: true });
+        return;
+      }
+      render("client-settings");
+      return;
+    }
+    googleSignupState = null;
+    googleSignupCredential = "";
     clientSettingsResult = result;
     saveClientProfile({
       ...(result.client || {}),
-      referralCode: result.referralCode || result.client?.referralCode || ""
+      referralCode: result.referralCode || result.client?.referralCode || "",
+      onboardingCompleted: true,
+      googleLinked: true
     });
     render("client-settings");
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+async function saveGoogleSignupProfile(profile, options = {}) {
+  const status = document.getElementById("googleSignupStatus") || document.getElementById("googleSignInStatus");
+  if (status) status.textContent = options.automatic ? "Restoring your saved profile..." : "Creating your profile...";
+  const request = await fetch("/api/auth/google/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      credential: googleSignupCredential,
+      fullName: profile.fullName || "",
+      phone: profile.phone || "",
+      birthday: profile.birthday || "",
+      locJourneyLength: profile.locJourneyLength || ""
+    })
+  });
+  const result = await request.json();
+  if (!request.ok || !result.ok) throw new Error(result.error || "Your Lovely Locs profile could not be created.");
+  googleSignupState = null;
+  googleSignupCredential = "";
+  clientSettingsResult = result;
+  saveClientProfile({
+    ...(result.client || {}),
+    referralCode: result.referralCode || result.client?.referralCode || "",
+    onboardingCompleted: true,
+    googleLinked: true
+  });
+  render("client-settings");
+}
+
+async function submitGoogleSignup() {
+  const form = document.getElementById("googleSignupForm");
+  const status = document.getElementById("googleSignupStatus");
+  if (!form || !googleSignupCredential) {
+    if (status) status.textContent = "Sign in with Google again to create your profile.";
+    return;
+  }
+  if (!form.reportValidity()) {
+    if (status) status.textContent = "Enter your name and phone number, then confirm that you want to save your profile.";
+    return;
+  }
+  const data = new FormData(form);
+  try {
+    await saveGoogleSignupProfile({
+      fullName: data.get("fullName") || "",
+      email: googleSignupState?.email || "",
+      phone: data.get("phone") || "",
+      birthday: data.get("birthday") || "",
+      locJourneyLength: data.get("locJourneyLength") || ""
+    });
   } catch (error) {
     if (status) status.textContent = error.message;
   }
@@ -2805,6 +2930,7 @@ function bookingSummaryFromForm(form) {
     `Phone: ${client.phone}`,
     `Appointment date: ${client.date}`,
     `Appointment time: ${timeLabel(client.time)}`,
+    client.birthday ? `Birthday credit date: ${client.birthday}` : "",
     `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
     `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
     `Optional communications opt-in: ${client.smsOptIn ? "Yes" : "No"}`,
@@ -2837,6 +2963,9 @@ function bookingPayloadFromForm(form) {
       fullName: data.get("fullName") || "",
       email: data.get("email") || "",
       phone: data.get("phone") || "",
+      birthday: data.get("birthday") || savedClientProfile?.birthday || "",
+      locJourneyLength: savedClientProfile?.locJourneyLength || "",
+      onboardingCompleted: Boolean(savedClientProfile?.onboardingCompleted),
       date: data.get("date") || "",
       time: data.get("time") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),

@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=20260603-products" />
+    <link rel="stylesheet" href="styles.css?v=20260610-booking-draft" />
   </head>
   <body>
     <div class="announcement">Deposits accepted through Venmo or Apple Pay</div>
@@ -32,7 +32,7 @@
           <a class="nav-link" href="#privacy" data-route="privacy">Privacy</a>
           <a class="nav-link" href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>
           <a class="nav-link" href="#client-settings" data-route="client-settings">Client Login</a>
-          <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">Dark</button>
+          <button class="theme-toggle" id="themeToggle" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790;</button>
           <button class="text-button" data-header-booking>Book</button>
         </div>
       </nav>
@@ -68,10 +68,12 @@
       <h3>Lovely Locs</h3>
       <p>In-Home Studio | Loctician Services</p>
       <p>Piedmont Triad, North Carolina</p>
-      <p class="small">lovely2locs@gmail.com</p>
+      <p class="small">lvlc.support@lovelylocsnc.com</p>
       <p class="legal-links"><a href="#products" data-route="products">Products</a> <span>|</span> <a href="#client-settings" data-route="client-settings">Client Login</a> <span>|</span> <a href="#admin" data-route="admin">Owner Admin</a> <span>|</span> <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a> <span>|</span> <a href="#privacy" data-route="privacy">Privacy Policy</a> <span>|</span> <a href="#terms" data-route="terms">Terms &amp; Conditions</a></p>
     </footer>
 
-    <script src="script.js?v=20260603-checkout-consent"></script>
+    <script src="https://accounts.google.com/gsi/client" async></script>
+    <script src="script.js?v=20260611-google-login"></script>
+    <script src="checkout-cleanup.js?v=20260611-birthday-field-removed"></script>
   </body>
 </html>

@@ -442,6 +442,47 @@ function normalizeReferralCode(code) {
     .slice(0, 64);
 }
 
+function referralCodeForName(fullName) {
+  const username = String(fullName || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 40);
+  return username ? `LOVELYLOCS/${username}` : "";
+}
+
+function referralShareUrlForCode(code) {
+  if (!code) return "";
+  const origin = window.location.origin || "http://127.0.0.1:4175";
+  return `${origin}/?ref=${encodeURIComponent(code)}#services`;
+}
+
+function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview = false } = {}) {
+  const referralCode = normalizeReferralCode(code || referralCodeForName(fullName));
+  const referralUrl = shareUrl || referralShareUrlForCode(referralCode);
+  const codeMarkup = referralCode
+    ? `<strong class="personal-referral-code">${escapeAttr(referralCode)}</strong>`
+    : `<strong class="personal-referral-code muted">Enter your name above to create your code</strong>`;
+  return `
+    <div class="personal-referral-card ${preview ? "preview" : ""}" data-personal-referral-card>
+      <div>
+        <p class="eyebrow">Good People Know Good People</p>
+        <h3>Your Personal Referral</h3>
+        <p>Share your code or link in seconds. Your referral reward becomes available after the new client's deposit is confirmed.</p>
+      </div>
+      ${codeMarkup}
+      ${referralCode ? `
+        <div class="personal-referral-actions">
+          <button type="button" data-copy-personal-referral-code="${escapeAttr(referralCode)}">Copy Code</button>
+          <button type="button" data-copy-personal-referral-link="${escapeAttr(referralUrl)}">Copy Link</button>
+          <button type="button" data-share-personal-referral="${escapeAttr(referralUrl)}" data-referral-code="${escapeAttr(referralCode)}">Share</button>
+        </div>
+      ` : ""}
+      <p class="personal-referral-status" data-referral-action-status aria-live="polite"></p>
+    </div>`;
+}
+
 function loadDiscountSettings() {
   try {
     return { ...defaultDiscountSettings, ...JSON.parse(localStorage.getItem("lovelyLocsDiscountSettings") || "{}") };
@@ -1510,6 +1551,9 @@ function pendingPaymentDetails() {
     bookingId: params.get("booking") || stored.id || "Your booking ID",
     deposit: Number(params.get("deposit") || stored.deposit || 0),
     total: Number(stored.total || 0),
+    fullName: stored.fullName || "",
+    referralCode: stored.referralCode || "",
+    referralShareUrl: stored.referralShareUrl || "",
     paymentOptions: Array.isArray(stored.paymentOptions) && stored.paymentOptions.length ? stored.paymentOptions : manualPaymentFallbackOptions
   };
 }
@@ -1544,6 +1588,11 @@ function paymentOptionsPage() {
           <strong>Confirmation timing</strong>
           <p>This page is not the final appointment confirmation. Your confirmation message is sent only after Lovely Locs confirms the deposit receipt in Gmail. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>
         </div>
+        ${personalReferralCard({
+          fullName: details.fullName,
+          code: details.referralCode,
+          shareUrl: details.referralShareUrl
+        })}
       </div>
     </section>
     ${cartMarkup()}
@@ -2047,7 +2096,7 @@ function bookingModal() {
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
-          <label>Referral Code<input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/USERNAME"></label>
+          <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
@@ -2060,6 +2109,9 @@ function bookingModal() {
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
           <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
+        <div id="bookingReferralPreview">
+          ${personalReferralCard({ fullName: profile.fullName, preview: true })}
+        </div>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
         <div class="modal-summary">
@@ -2303,8 +2355,12 @@ function bindDynamic() {
   document.querySelectorAll("[data-submit-booking]").forEach(button => button.addEventListener("click", submitBooking));
   document.querySelectorAll("[data-open-client-settings]").forEach(button => button.addEventListener("click", openClientSettings));
   const bookingForm = document.getElementById("bookingForm");
-  bookingForm?.addEventListener("input", () => saveBookingDraft(bookingForm));
+  bookingForm?.addEventListener("input", event => {
+    saveBookingDraft(bookingForm);
+    if (event.target?.name === "fullName") updateBookingReferralPreview(event.target.value);
+  });
   bookingForm?.addEventListener("change", () => saveBookingDraft(bookingForm));
+  bindPersonalReferralActions(document);
   document.getElementById("bookingDate")?.addEventListener("change", event => {
     const timeInput = document.getElementById("bookingTime");
     const emergencyInput = document.getElementById("bookingEmergencySlot");
@@ -2659,6 +2715,54 @@ async function copyClientReferralLink() {
   const link = clientSettingsResult?.shareUrl || "";
   if (!link) return;
   await navigator.clipboard?.writeText(link);
+}
+
+function setPersonalReferralStatus(button, message) {
+  const card = button?.closest?.("[data-personal-referral-card]");
+  const status = card?.querySelector?.("[data-referral-action-status]");
+  if (status) status.textContent = message;
+}
+
+async function copyReferralValue(button, value, successMessage) {
+  if (!value) return;
+  await navigator.clipboard?.writeText(value);
+  setPersonalReferralStatus(button, successMessage);
+}
+
+async function sharePersonalReferral(button) {
+  const url = button.dataset.sharePersonalReferral || "";
+  const code = button.dataset.referralCode || "";
+  if (!url) return;
+  const data = {
+    title: "Lovely Locs Referral",
+    text: `Use my Lovely Locs referral code ${code} when you book.`,
+    url
+  };
+  if (navigator.share) {
+    await navigator.share(data);
+    setPersonalReferralStatus(button, "Referral ready to share.");
+    return;
+  }
+  await copyReferralValue(button, url, "Referral link copied.");
+}
+
+function bindPersonalReferralActions(root = document) {
+  root.querySelectorAll?.("[data-copy-personal-referral-code]").forEach(button => {
+    button.addEventListener("click", () => copyReferralValue(button, button.dataset.copyPersonalReferralCode, "Referral code copied."));
+  });
+  root.querySelectorAll?.("[data-copy-personal-referral-link]").forEach(button => {
+    button.addEventListener("click", () => copyReferralValue(button, button.dataset.copyPersonalReferralLink, "Referral link copied."));
+  });
+  root.querySelectorAll?.("[data-share-personal-referral]").forEach(button => {
+    button.addEventListener("click", () => sharePersonalReferral(button));
+  });
+}
+
+function updateBookingReferralPreview(fullName) {
+  const target = document.getElementById("bookingReferralPreview");
+  if (!target) return;
+  target.innerHTML = personalReferralCard({ fullName, preview: true });
+  bindPersonalReferralActions(target);
 }
 
 async function copyBookingLink() {
@@ -3131,7 +3235,10 @@ async function submitBooking() {
     });
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
-    saveClientProfile(bookingPayload.client);
+    saveClientProfile({
+      ...bookingPayload.client,
+      referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName)
+    });
     clearBookingDraft();
     if (result.noCharge) {
       bookingConfirmation = {
@@ -3146,6 +3253,9 @@ async function submitBooking() {
       id: result.id,
       deposit: result.deposit,
       total: result.total,
+      fullName: bookingPayload.client.fullName,
+      referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName),
+      referralShareUrl: result.referralShareUrl || referralShareUrlForCode(result.referralCode || referralCodeForName(bookingPayload.client.fullName)),
       paymentOptions: result.paymentOptions || manualPaymentFallbackOptions
     }));
     bookingConfirmation = {

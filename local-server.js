@@ -789,8 +789,9 @@ function normalizeReferralCode(code) {
   return String(code || "")
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 16);
+    .replace(/\s+/g, "")
+    .replace(/[^A-Z0-9/_-]/g, "")
+    .slice(0, 64);
 }
 
 function phoneDigits(phone) {
@@ -805,9 +806,18 @@ function clientIdentityKey(client = {}) {
 }
 
 function referralCodeForClient(client = {}) {
+  const username = String(client.username || client.fullName || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 40);
+  if (username) return `LOVELYLOCS/${username}`;
+
   const identity = clientIdentityKey(client);
   if (!identity) return "";
-  return `LL${crypto.createHash("sha1").update(identity).digest("hex").slice(0, 6).toUpperCase()}`;
+  const fallback = crypto.createHash("sha1").update(identity).digest("hex").slice(0, 8).toUpperCase();
+  return `LOVELYLOCS/CLIENT${fallback}`;
 }
 
 function birthdayMonthDay(value) {
@@ -908,8 +918,9 @@ function findReferrerByCode(code, records = readBookingRecords()) {
   const bookings = latestBookingRecords(records);
   for (let index = bookings.length - 1; index >= 0; index -= 1) {
     const booking = bookings[index];
-    const bookingCode = normalizeReferralCode(booking.client?.referralCode || referralCodeForClient(booking.client));
-    if (bookingCode === cleanCode) return booking;
+    const storedCode = normalizeReferralCode(booking.client?.referralCode);
+    const currentCode = normalizeReferralCode(referralCodeForClient(booking.client));
+    if (storedCode === cleanCode || currentCode === cleanCode) return booking;
   }
   return null;
 }
@@ -1289,7 +1300,7 @@ function sanitizeClient(client = {}) {
     smsOptIn: Boolean(client.smsOptIn),
     marketingEmailOptIn: Boolean(client.marketingEmailOptIn),
     referralOptIn: Boolean(client.referralOptIn),
-    referralCode: normalizeReferralCode(client.referralCode) || referralCodeForClient(client),
+    referralCode: referralCodeForClient(client) || normalizeReferralCode(client.referralCode),
     referredByCode: normalizeReferralCode(client.referredByCode),
     specialRequests: String(client.specialRequests || "").trim(),
   };
@@ -1954,6 +1965,53 @@ async function handleManualPaymentConfirm(req, res) {
   }
 }
 
+function handleAdminBookingLookup(req, res) {
+  try {
+    const url = new URL(req.url || "/", publicSiteUrl(req));
+    const token = url.searchParams.get("token") || "";
+    const bookingId = String(url.searchParams.get("booking") || "").trim();
+    if (!tokenIsValid(token)) {
+      sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
+      return;
+    }
+    const booking = findBookingById(bookingId);
+    if (!booking) {
+      sendJson(res, 404, { ok: false, error: "No matching Lovely Locs booking was found." });
+      return;
+    }
+    const records = readBookingRecords();
+    const events = records
+      .filter(record => bookingRecordId(record) === bookingId && record !== booking)
+      .map(record => ({
+        type: record.type || "",
+        status: record.status || "",
+        receivedAt: record.receivedAt || record.sentAt || record.approvedAt || "",
+        notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
+      }));
+    sendJson(res, 200, {
+      ok: true,
+      booking: {
+        id: booking.id,
+        status: bookingStatus(booking, records),
+        receivedAt: booking.receivedAt || "",
+        client: {
+          fullName: booking.client?.fullName || "",
+          email: booking.client?.email || "",
+          phone: booking.client?.phone || "",
+        },
+        appointment: {
+          date: booking.client?.date || "",
+          time: booking.client?.time || "",
+        },
+      },
+      initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
+      events,
+    });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
 async function handleStripeWebhook(req, res) {
   try {
     const raw = await readBody(req);
@@ -2008,7 +2066,7 @@ function clientSettingsFor(client, req) {
     ...(savedProfile?.client || {}),
   };
   const key = clientIdentityKey(profile);
-  const referralCode = normalizeReferralCode(profile.referralCode || referralCodeForClient(profile));
+  const referralCode = normalizeReferralCode(referralCodeForClient(profile) || profile.referralCode);
   const siteUrl = publicSiteUrl(req);
   const shareUrl = `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
   const pendingReferrals = records.filter(record => record.type === "referral.reward.pending" && record.referrerKey === key);
@@ -2434,6 +2492,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/manual-payment/confirm") {
     handleManualPaymentConfirm(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/admin/booking") {
+    handleAdminBookingLookup(req, res);
     return;
   }
 

@@ -1911,7 +1911,7 @@ function renderTimeSlots(availability, preferredSlot = null) {
     && slot.status !== "booked"
   ));
   grid.innerHTML = availability.slots.map(slot => `
-    <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" ${slot.status === "booked" ? "disabled" : ""}>
+    <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" aria-pressed="${restoredSlot?.time === slot.time ? "true" : "false"}" ${slot.status === "booked" ? "disabled" : ""}>
       <strong>${slot.label}</strong>
       <span>${slot.status === "booked" ? "Booked" : slot.type === "emergency" ? "Emergency +$45" : "Open"}</span>
     </button>
@@ -1955,8 +1955,12 @@ async function loadAvailabilityForDate(date, preferredSlot = null) {
 function bindTimeSlotButtons() {
   document.querySelectorAll("[data-time-slot]").forEach(button => {
     button.addEventListener("click", () => {
-      document.querySelectorAll("[data-time-slot]").forEach(item => item.classList.remove("selected"));
+      document.querySelectorAll("[data-time-slot]").forEach(item => {
+        item.classList.remove("selected");
+        item.setAttribute("aria-pressed", "false");
+      });
       button.classList.add("selected");
+      button.setAttribute("aria-pressed", "true");
       const time = button.dataset.timeSlot;
       const type = button.dataset.slotType;
       const note = button.dataset.slotNote || "";
@@ -1970,8 +1974,8 @@ function bindTimeSlotButtons() {
       saveBookingDraft(document.getElementById("bookingForm"));
       if (noteNode) {
         noteNode.textContent = type === "emergency"
-          ? `${note} This adds the Emergency Fee to your total before the deposit is calculated.`
-          : "This is a regular Lovely Locs evening appointment time.";
+          ? `Selected: ${timeLabel(time)}. ${note} This adds the Emergency Fee to your total before the deposit is calculated.`
+          : `Selected: ${timeLabel(time)}. This is a regular Lovely Locs evening appointment time.`;
       }
     });
   });

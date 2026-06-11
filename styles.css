@@ -1926,7 +1926,9 @@ h1, h2, h3,
   gap: 4px;
   min-height: 68px;
   padding: 10px;
+  position: relative;
   text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
 }
 
 .time-slot strong {
@@ -1953,11 +1955,37 @@ h1, h2, h3,
 }
 
 .time-slot.selected {
-  box-shadow: 0 0 0 4px rgba(125, 87, 112, 0.16);
+  border: 4px solid var(--dark-brown);
+  background: rgba(125, 87, 112, 0.2);
+  box-shadow: 0 0 0 4px rgba(125, 87, 112, 0.28), 0 10px 22px rgba(75, 51, 44, 0.18);
+  padding: 8px;
+  transform: translateY(-2px);
+}
+
+.time-slot.selected::after {
+  content: "Selected \2713";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border-radius: 999px;
+  background: var(--dark-brown);
+  color: var(--white);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 4px 7px;
+  text-transform: uppercase;
 }
 
 .time-slot.emergency.selected {
-  box-shadow: 0 0 0 4px rgba(75, 51, 44, 0.16);
+  border-color: #3b241d;
+  background: rgba(127, 78, 51, 0.22);
+  box-shadow: 0 0 0 4px rgba(75, 51, 44, 0.3), 0 10px 22px rgba(59, 36, 29, 0.2);
+}
+
+.time-slot:focus-visible {
+  outline: 4px solid #111;
+  outline-offset: 3px;
 }
 
 .time-slot-note {
@@ -1994,6 +2022,17 @@ h1, h2, h3,
 .dark .time-slot.booked {
   border-color: rgba(255, 247, 241, 0.2);
   background: rgba(255, 247, 241, 0.08);
+}
+
+.dark .time-slot.selected {
+  border-color: #fff4e8;
+  background: rgba(231, 189, 220, 0.24);
+  box-shadow: 0 0 0 4px rgba(255, 244, 232, 0.32), 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+.dark .time-slot.selected::after {
+  background: #fff4e8;
+  color: #291a28;
 }
 
 .dark .hero {

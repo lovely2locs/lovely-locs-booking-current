@@ -463,6 +463,7 @@ test("booking form has required client fields", () => {
   assert(html.includes('id="bookingTime" name="time"'), "appointment time slot input missing");
   assert(html.includes("Appointment Time"), "appointment time label missing");
   assert(html.includes("time-slot-grid"), "time slot picker missing");
+  assert(html.includes('aria-pressed="false"') || html.includes("time-slot-placeholder"), "time slots should expose selected state accessibly");
   assert(html.includes("Emergency proposal"), "emergency slot legend missing");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
   assert(html.includes('name="smsOptIn"'), "optional communications opt-in checkbox missing");
@@ -769,6 +770,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("referral_reminder"), "referral reminder automation missing");
   assert(server.includes("automation.notification.sent"), "automation duplicate guard event missing");
   const script = fs.readFileSync("script.js", "utf8");
+  const styles = fs.readFileSync("styles.css", "utf8");
+  assert(script.includes('setAttribute("aria-pressed", "true")'), "selected time should update aria-pressed");
+  assert(script.includes("Selected: ${timeLabel(time)}"), "selected time confirmation text missing");
+  assert(styles.includes('content: "Selected \\2713"'), "visible selected time badge missing");
+  assert(styles.includes("border: 4px solid var(--dark-brown)"), "prominent selected time border missing");
   assert(script.includes("button_auto_select: false"), "FedCM button auto-selection should be disabled");
   assert(script.includes("use_fedcm_for_button: false"), "FedCM button flow should stay off for explicit account choice");
   assert(script.includes("function switchGoogleAccount"), "Google account switch handler missing");

@@ -240,6 +240,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-refresh-notification-status"), "notification status refresh control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
   assert(html.includes("data-confirm-manual-deposit"), "manual deposit confirmation control missing");
+  assert(html.includes("Resend Client Confirmation"), "client confirmation recovery section missing");
+  assert(html.includes("data-resend-client-confirmation"), "client confirmation resend control missing");
   assert(html.includes("Send Notification Test"), "admin notification test section missing");
   assert(html.includes("data-send-notification-test"), "admin notification test control missing");
   context.addAdminTestBooking();
@@ -718,6 +720,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("/api/admin/booking"), "protected owner booking lookup endpoint missing");
   assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
+  assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");
+  assert(server.includes("handleAdminConfirmationResend"), "confirmation resend handler missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
   assert(server.includes("handleNotificationTest"), "notification test handler missing");
@@ -781,6 +785,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("use_fedcm_for_button: false"), "FedCM button flow should stay off for explicit account choice");
   assert(script.includes("function switchGoogleAccount"), "Google account switch handler missing");
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
+  assert(script.includes("async function resendClientConfirmation"), "client confirmation resend handler missing");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
   assert(script.includes("Open Gmail draft for client confirmation"), "admin Gmail draft fallback link missing");

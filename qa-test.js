@@ -716,6 +716,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("gmailComposeUrl"), "Gmail compose fallback missing");
   assert(server.includes("gmailDraftUrl"), "client confirmation Gmail draft link missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
+  assert(server.includes("/api/admin/booking"), "protected owner booking lookup endpoint missing");
+  assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
   assert(server.includes("handleNotificationTest"), "notification test handler missing");

@@ -25,16 +25,20 @@ Health Check Path: /healthz
 
 ```text
 PUBLIC_SITE_URL=https://lovely-locs-booking.onrender.com
+GOOGLE_CLIENT_ID=your_web_client_id.apps.googleusercontent.com
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-BOOKING_OWNER_EMAIL=lovely2locs@gmail.com
+BOOKING_OWNER_EMAIL=lvlc.support@lovelylocsnc.com
 BOOKING_OWNER_PHONE=3364711098
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_FROM_NUMBER=+18447522370
 RESEND_API_KEY=
-CONFIRMATION_FROM_EMAIL=
+CONFIRMATION_FROM_EMAIL=Lovely Locs <lvlc.support@lovelylocsnc.com>
+RESEND_DOMAIN_VERIFIED=false
 ```
+
+The Google login uses the Web application Client ID only. Do not add a Google Client Secret to Render or commit it to this project. In Google Auth Platform, authorize `https://lovelylocsnc.com` and `https://www.lovelylocsnc.com` as JavaScript origins.
 
 5. Deploy.
 6. In Stripe, add a webhook endpoint for `https://lovely-locs-booking.onrender.com/api/stripe/webhook` and subscribe to `checkout.session.completed`.

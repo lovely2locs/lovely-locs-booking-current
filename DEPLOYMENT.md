@@ -25,6 +25,7 @@ Health Check Path: /healthz
 
 ```text
 PUBLIC_SITE_URL=https://lovely-locs-booking.onrender.com
+DATA_DIR=
 GOOGLE_CLIENT_ID=your_web_client_id.apps.googleusercontent.com
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
@@ -39,6 +40,8 @@ RESEND_DOMAIN_VERIFIED=false
 ```
 
 The Google login uses the Web application Client ID only. Do not add a Google Client Secret to Render or commit it to this project. In Google Auth Platform, authorize `https://lovelylocsnc.com` and `https://www.lovelylocsnc.com` as JavaScript origins.
+
+New Google users complete a one-time Lovely Locs profile. The app saves the profile in the existing server record store and saves a device copy for fast autofill and interrupted-booking recovery. For cross-device profiles that survive service rebuilds, attach persistent storage and set `DATA_DIR` to that mounted directory.
 
 5. Deploy.
 6. In Stripe, add a webhook endpoint for `https://lovely-locs-booking.onrender.com/api/stripe/webhook` and subscribe to `checkout.session.completed`.

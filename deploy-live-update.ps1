@@ -82,7 +82,6 @@ $files = @(
   "index.html",
   "styles.css",
   "script.js",
-  "checkout-cleanup.js",
   "local-server.js",
   "package.json",
   "render.yaml",

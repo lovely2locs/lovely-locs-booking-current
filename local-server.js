@@ -32,7 +32,7 @@ const port = Number(process.env.PORT || 4175);
 const host = process.env.HOST || "0.0.0.0";
 const bookingsFile = path.join(root, "bookings.jsonl");
 const settingsFile = path.join(root, "site-settings.json");
-const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lovely2locs@gmail.com";
+const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lvlc.support@lovelylocsnc.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
 const emailLogoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
 const dayMs = 24 * 60 * 60 * 1000;
@@ -40,6 +40,7 @@ const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
 const referredNewClientCreditAmount = Number(process.env.REFERRED_NEW_CLIENT_CREDIT_AMOUNT || 15);
 const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
 let stripeClient = null;
+let googleJwksCache = { expiresAt: 0, keys: [] };
 
 const defaultSiteSettings = {
   logo: {
@@ -391,11 +392,19 @@ function emailReadiness() {
       reason: "Owner test email can work, but client emails require a verified custom domain in Resend. Gmail and resend.dev cannot send production client confirmations.",
     };
   }
+  if (process.env.RESEND_DOMAIN_VERIFIED !== "true") {
+    return {
+      configured: true,
+      clientReady: false,
+      from,
+      reason: "The sender uses a custom domain, but RESEND_DOMAIN_VERIFIED is not true. Verify the domain in Resend before enabling client confirmations.",
+    };
+  }
   return {
     configured: true,
     clientReady: true,
     from,
-    reason: "Email sender uses a custom domain. Confirm the domain is verified in Resend before launch.",
+    reason: "Email sender uses a custom domain marked verified in Resend.",
   };
 }
 
@@ -845,6 +854,16 @@ function latestClientBooking(client, records = readBookingRecords()) {
   const bookings = latestBookingRecords(records);
   for (let index = bookings.length - 1; index >= 0; index -= 1) {
     if (clientIdentityKey(bookings[index].client) === key) return bookings[index];
+  }
+  return null;
+}
+
+function latestClientBookingByEmail(email, records = readBookingRecords()) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  if (!cleanEmail) return null;
+  const bookings = latestBookingRecords(records);
+  for (let index = bookings.length - 1; index >= 0; index -= 1) {
+    if (String(bookings[index].client?.email || "").trim().toLowerCase() === cleanEmail) return bookings[index];
   }
   return null;
 }
@@ -1378,7 +1397,7 @@ async function notifyDepositPaid(booking, session) {
       paidAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
+  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your $${booking.deposit} deposit has been received. Reply STOP to opt out or HELP for help.`;
   const ownerText = `Stripe deposit paid for ${booking.client.fullName}: $${booking.deposit}. Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`;
   const clientEmail = confirmationEmail(booking);
   const ownerHtml = ownerBookingEmail(booking, {
@@ -1451,7 +1470,7 @@ async function notifyManualDepositPaid(booking, method) {
       confirmedAt,
     },
   });
-  const clientText = `Lovely Locs received your $${booking.deposit} deposit, and your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Emergency appointments may receive a follow-up if the proposed time needs owner approval.`;
+  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your $${booking.deposit} deposit has been received. Reply STOP to opt out or HELP for help.`;
   const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}.`;
   const clientEmail = confirmationEmail(booking);
   const ownerHtml = ownerBookingEmail(booking, {
@@ -1488,7 +1507,7 @@ async function notifyManualDepositPaid(booking, method) {
 
 async function notifyNoChargeTestBooking(booking) {
   const details = bookingText(booking);
-  const clientText = `Lovely Locs test booking received for ${booking.client.date}. This was a no-charge admin test, so no deposit was requested.`;
+  const clientText = `Lovely Locs: your test booking was received for ${booking.client.date}. This was a no-charge admin test, so no deposit was requested. Reply STOP to opt out or HELP for help.`;
   const ownerText = `No-charge admin test booking submitted for ${booking.client.fullName}. Preferred date: ${booking.client.date}.`;
   const clientEmail = confirmationEmail(booking, { test: true });
   const ownerHtml = ownerBookingEmail(booking, {
@@ -1529,7 +1548,7 @@ async function runDepositReminderAutomation(booking, records, now) {
     `Pay options: ${payUrl}`,
     "Reply if you need help matching your Venmo or Apple Pay receipt.",
   ].join("\n");
-  const sms = `Lovely Locs reminder: your $${booking.deposit} deposit is still needed to confirm ${booking.client.date} at ${timeLabel(booking.client.time)}. Pay options: ${payUrl}`;
+  const sms = `Lovely Locs reminder: your $${booking.deposit} deposit is still needed to confirm ${booking.client.date} at ${timeLabel(booking.client.time)}. Pay options: ${payUrl}. Reply STOP to opt out or HELP for help.`;
   return sendClientAutomation(booking, "deposit_reminder", cycleKey, "Lovely Locs deposit reminder", text, sms);
 }
 
@@ -1549,7 +1568,7 @@ async function runAppointmentReminderAutomation(booking, records, now) {
       "Please arrive with your hair ready for the service you selected unless Lovely Locs has told you otherwise.",
       "The private studio address is shared after confirmation. Reply if you need to update your appointment details.",
     ].join("\n");
-    const sms = `Lovely Locs ${window.label} reminder: your appointment is ${booking.client.date} at ${timeLabel(booking.client.time)}. Reply if you need to update details.`;
+    const sms = `Lovely Locs reminder: your appointment is ${booking.client.date} at ${timeLabel(booking.client.time)}. Please arrive with hair clean and ready for service. Reply STOP to opt out or HELP for help.`;
     sent.push(await sendClientAutomation(booking, window.type, booking.client.date, `Lovely Locs ${window.label} appointment reminder`, text, sms));
   }
   return sent;
@@ -1565,8 +1584,7 @@ async function runReviewRequestAutomation(booking, records, now) {
     "If your service felt good, a quick review helps new loc clients feel confident before booking.",
     `Review link: ${reviewUrl}`,
   ].join("\n");
-  const sms = `Thank you for booking Lovely Locs. A quick review helps new loc clients feel confident: ${reviewUrl}`;
-  return sendClientAutomation(booking, "review_request", booking.id, "How was your Lovely Locs appointment?", text, sms);
+  return sendClientAutomation(booking, "review_request", booking.id, "How was your Lovely Locs appointment?", text, text, { emailOnly: true });
 }
 
 async function runReferralReminderAutomation(booking, records, now) {
@@ -2032,6 +2050,84 @@ async function handleClientSettings(req, res) {
   }
 }
 
+function decodeJwtPart(value) {
+  return JSON.parse(Buffer.from(String(value || ""), "base64url").toString("utf8"));
+}
+
+async function googleSigningKeys(forceRefresh = false) {
+  if (!forceRefresh && googleJwksCache.expiresAt > Date.now() && googleJwksCache.keys.length) {
+    return googleJwksCache.keys;
+  }
+  const response = await fetch("https://www.googleapis.com/oauth2/v3/certs");
+  if (!response.ok) throw new Error("Google's sign-in keys could not be loaded.");
+  const body = await response.json();
+  const cacheControl = response.headers.get("cache-control") || "";
+  const maxAge = Number(cacheControl.match(/max-age=(\d+)/)?.[1] || 3600);
+  googleJwksCache = {
+    expiresAt: Date.now() + Math.max(300, maxAge) * 1000,
+    keys: Array.isArray(body.keys) ? body.keys : [],
+  };
+  return googleJwksCache.keys;
+}
+
+async function verifyGoogleCredential(credential) {
+  const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+  if (!clientId) throw new Error("Google sign-in is not configured.");
+  const parts = String(credential || "").split(".");
+  if (parts.length !== 3) throw new Error("Google returned an invalid sign-in credential.");
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const header = decodeJwtPart(encodedHeader);
+  const claims = decodeJwtPart(encodedPayload);
+  if (header.alg !== "RS256" || !header.kid) throw new Error("Google returned an unsupported sign-in credential.");
+  let signingKey = (await googleSigningKeys()).find(key => key.kid === header.kid && key.kty === "RSA");
+  if (!signingKey) {
+    signingKey = (await googleSigningKeys(true)).find(key => key.kid === header.kid && key.kty === "RSA");
+  }
+  if (!signingKey) throw new Error("Google's sign-in key could not be verified. Please try again.");
+  const publicKey = crypto.createPublicKey({ key: signingKey, format: "jwk" });
+  const signatureValid = crypto.verify(
+    "RSA-SHA256",
+    Buffer.from(`${encodedHeader}.${encodedPayload}`),
+    publicKey,
+    Buffer.from(encodedSignature, "base64url")
+  );
+  if (!signatureValid) throw new Error("Google sign-in verification failed.");
+  const now = Math.floor(Date.now() / 1000);
+  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!["accounts.google.com", "https://accounts.google.com"].includes(claims.iss)) throw new Error("Google sign-in issuer is invalid.");
+  if (!audiences.includes(clientId)) throw new Error("Google sign-in was issued for a different application.");
+  if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= now) throw new Error("Google sign-in expired. Please try again.");
+  if (claims.iat && Number(claims.iat) > now + 300) throw new Error("Google sign-in time is invalid.");
+  if (!claims.email || claims.email_verified !== true) throw new Error("Use a Google account with a verified email address.");
+  return claims;
+}
+
+async function handleGoogleSignIn(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    const claims = await verifyGoogleCredential(body.credential);
+    const records = readBookingRecords();
+    const booking = latestClientBookingByEmail(claims.email, records);
+    if (!booking) {
+      sendJson(res, 404, {
+        ok: false,
+        error: "No Lovely Locs booking matches this Google email. Use the booking email and phone lookup instead.",
+      });
+      return;
+    }
+    sendJson(res, 200, {
+      ...clientSettingsFor(booking.client, req),
+      auth: {
+        provider: "google",
+        email: String(claims.email).trim().toLowerCase(),
+      },
+    });
+  } catch (error) {
+    sendJson(res, 401, { ok: false, error: error.message });
+  }
+}
+
 async function handleNotificationTest(req, res) {
   try {
     const raw = await readBody(req);
@@ -2155,6 +2251,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/auth/google/config") {
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+    sendJson(res, 200, { ok: true, configured: Boolean(clientId), clientId });
+    return;
+  }
+
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/site-settings") {
     readBody(req).then(raw => {
       const body = JSON.parse(raw || "{}");
@@ -2199,6 +2301,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/client-settings") {
     handleClientSettings(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/auth/google") {
+    handleGoogleSignIn(req, res);
     return;
   }
 

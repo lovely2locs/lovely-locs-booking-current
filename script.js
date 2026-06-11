@@ -433,6 +433,15 @@ function normalizeDiscountCode(code) {
   return String(code || "").trim().toUpperCase();
 }
 
+function normalizeReferralCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/[^A-Z0-9/_-]/g, "")
+    .slice(0, 64);
+}
+
 function loadDiscountSettings() {
   try {
     return { ...defaultDiscountSettings, ...JSON.parse(localStorage.getItem("lovelyLocsDiscountSettings") || "{}") };
@@ -923,9 +932,18 @@ function clientSettingsPage() {
         </div>
         <div class="policy-box">
           <h2>Easy Sign In</h2>
-          <div id="googleSignInButton" class="google-sign-in"></div>
-          <p id="googleSignInStatus" class="form-error" aria-live="polite">Loading Google sign-in...</p>
-          <button class="outline-btn" type="button" data-switch-google-account>Use a Different Google Account</button>
+          ${savedClientProfile?.googleLinked ? `
+            <div class="connected-google-account">
+              <span>Connected Google Account</span>
+              <strong>${escapeAttr(savedClientProfile.email)}</strong>
+            </div>
+            <p id="googleSignInStatus" class="form-error" aria-live="polite"></p>
+            <button class="outline-btn" type="button" data-switch-google-account>Switch Google Account</button>
+          ` : `
+            <div id="googleSignInButton" class="google-sign-in"></div>
+            <p id="googleSignInStatus" class="form-error" aria-live="polite">Loading Google sign-in...</p>
+            <button class="outline-btn" type="button" data-switch-google-account>Use a Different Google Account</button>
+          `}
           <p>Returning clients can sign in instantly. New clients will complete a short one-time profile before booking.</p>
         </div>
         ${savedClientProfile && cart.length ? `
@@ -2008,7 +2026,7 @@ function bookingModal() {
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
-          <label>Referral Code<input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="Friend's code"></label>
+          <label>Referral Code<input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/USERNAME"></label>
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
@@ -2399,7 +2417,7 @@ function bookingShareUrl() {
 function referredByCodeFromUrl() {
   try {
     const code = new URLSearchParams(window.location.search || "").get("ref") || localStorage.getItem("lovelyLocsReferredByCode") || "";
-    const clean = normalizeDiscountCode(code).replace(/[^A-Z0-9]/g, "");
+    const clean = normalizeReferralCode(code);
     if (clean) localStorage.setItem("lovelyLocsReferredByCode", clean);
     return clean;
   } catch {
@@ -2515,9 +2533,7 @@ function switchGoogleAccount() {
   clientSettingsResult = null;
   googleSignupCredential = "";
   googleSignupState = null;
-  const status = document.getElementById("googleSignInStatus");
-  if (status) status.textContent = "Account selection reset. Click Sign in with Google and choose the account you want to use.";
-  initializeGoogleSignIn();
+  render("client-settings");
 }
 
 async function handleGoogleCredential(response) {
@@ -2990,7 +3006,7 @@ function bookingPayloadFromForm(form) {
       smsOptIn: communicationsOptIn,
       marketingEmailOptIn: false,
       referralOptIn: false,
-      referredByCode: normalizeDiscountCode(data.get("referredByCode") || "").replace(/[^A-Z0-9]/g, ""),
+      referredByCode: normalizeReferralCode(data.get("referredByCode") || ""),
       specialRequests: data.get("specialRequests") || ""
     },
     cart,

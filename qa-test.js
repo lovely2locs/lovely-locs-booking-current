@@ -136,7 +136,7 @@ context.FormData = class {
       ["date", "2026-06-01"],
       ["time", "18:30"],
       ["birthday", "1998-07-31"],
-      ["referredByCode", "LLABC123"],
+      ["referredByCode", "lovelylocs/Test Client"],
       ["emergencySlot", ""],
       ["preferredContact", "text_email"],
       ["smsOptIn", "on"],
@@ -346,6 +346,12 @@ test("promo code can be applied and included in booking payload", async () => {
   context.saveAppliedDiscount(null);
 });
 
+test("referral codes use the LOVELYLOCS username format", () => {
+  const payload = context.bookingPayloadFromForm(elements.bookingForm);
+  assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");
+  assert(context.normalizeReferralCode(" lovelylocs / Referral Owner ") === "LOVELYLOCS/REFERRALOWNER", "referral code normalizer should remove username spaces");
+});
+
 test("service selection opens cart before client details", () => {
   const script = fs.readFileSync("script.js", "utf8");
   const handlerStart = script.indexOf('document.querySelectorAll("[data-add-service]")');
@@ -518,7 +524,7 @@ test("new Google clients receive one-time profile onboarding", async () => {
             locJourneyLength: "",
             onboardingCompleted: true
           },
-          referralCode: "LLNEW123",
+          referralCode: "LOVELYLOCS/NEWCLIENT",
           referrals: { pending: [], approved: [] },
           credits: []
         })
@@ -542,7 +548,14 @@ test("new Google clients receive one-time profile onboarding", async () => {
   const savedProfile = JSON.parse(localStore.get("lovelyLocsClientProfile") || "{}");
   assert(savedProfile.onboardingCompleted === true, "completed onboarding was not saved");
   assert(savedProfile.googleLinked === true, "Google-linked profile flag was not saved");
+  const connectedHtml = appHtml();
+  assert(connectedHtml.includes("Connected Google Account"), "connected Google account status missing");
+  assert(connectedHtml.includes("newclient@gmail.com"), "connected Google account should show the verified email");
+  assert(!connectedHtml.includes('id="googleSignInButton"'), "Google button should be hidden after an account is connected");
   assert((localStore.get("lovelyLocsCart") || "") === cartBeforeSignup, "Google signup should not clear the saved cart");
+  context.switchGoogleAccount();
+  assert(appHtml().includes('id="googleSignInButton"'), "Google button should return when switching accounts");
+  assert((localStore.get("lovelyLocsCart") || "") === cartBeforeSignup, "switching Google accounts should preserve the cart");
   context.fetch = originalFetch;
 });
 
@@ -660,7 +673,7 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes("marketingEmailOptIn"), "booking backend payload should include monthly referral campaign opt-in status");
   assert(context.lastFetch.options.body.includes("referralOptIn"), "booking backend payload should include referral reminder opt-in status");
   assert(context.lastFetch.options.body.includes("1998-07-31"), "booking backend payload should include the guest birthday");
-  assert(context.lastFetch.options.body.includes("LLABC123"), "booking backend payload should include referral code used by new client");
+  assert(context.lastFetch.options.body.includes("LOVELYLOCS/TESTCLIENT"), "booking backend payload should include referral code used by new client");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
   assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until deposit is confirmed");

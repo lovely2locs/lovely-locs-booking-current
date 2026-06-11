@@ -60,6 +60,8 @@ Google sign-in is enabled when `GOOGLE_CLIENT_ID` is configured. Returning clien
 
 The Google button disables both classic and FedCM automatic account selection. Clients can use **Use a Different Google Account** to reset the local Lovely Locs identity, preserve their cart and unfinished booking draft, and reopen Google's account chooser.
 
+After Google signup or sign-in succeeds, the Google-rendered button is replaced by **Connected Google Account** plus the verified profile email. This prevents Google's remembered browser-account label from being mistaken for the account Lovely Locs actually saved.
+
 ## Scheduler URLs
 
 Use a scheduler such as Render Cron, UptimeRobot, Zapier, or Make to call these URLs:

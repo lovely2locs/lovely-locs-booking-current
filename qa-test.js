@@ -742,6 +742,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");
   assert(server.includes("handleAdminConfirmationResend"), "confirmation resend handler missing");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
+  assert(server.includes("alreadyConfirmed"), "manual deposit confirmation retry guard missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
   assert(server.includes("handleNotificationTest"), "notification test handler missing");
   assert(server.includes("TWILIO_TOLLFREE_VERIFIED"), "Twilio toll-free verification guard missing");
@@ -806,6 +807,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
   assert(script.includes("async function resendClientConfirmation"), "client confirmation resend handler missing");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
+  assert(script.includes("completed confirmations will not be duplicated"), "manual deposit interrupted-response guidance missing");
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
   assert(script.includes("Open Gmail draft for client confirmation"), "admin Gmail draft fallback link missing");
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");

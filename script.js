@@ -2901,6 +2901,7 @@ async function saveDiscountSettings() {
 async function confirmManualDeposit() {
   const form = document.getElementById("manualDepositConfirmForm");
   const status = document.getElementById("manualDepositConfirmStatus");
+  const button = form?.querySelector("[data-confirm-manual-deposit]");
   if (!form) return;
   const data = new FormData(form);
   const booking = String(data.get("booking") || "").trim();
@@ -2910,15 +2911,33 @@ async function confirmManualDeposit() {
     if (status) status.textContent = "Enter the booking ID and admin token.";
     return;
   }
-  if (status) status.textContent = "Confirming deposit...";
+  if (status) status.textContent = `Confirming deposit for ${booking}...`;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Confirming...";
+  }
   try {
     const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}&format=json`;
-    const response = await fetch(url);
-    const result = await response.json();
+    const response = await fetch(url, { method: "POST" });
+    const responseText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      throw new Error(`The server response was interrupted for ${booking}. Press the button again safely; completed confirmations will not be duplicated.`);
+    }
     if (!response.ok || !result.ok) throw new Error(result.error || "Deposit confirmation failed.");
-    if (status) status.innerHTML = `Deposit confirmed.<br>${notificationResultsHtml(result.notificationResults)}`;
+    const heading = result.alreadyConfirmed
+      ? `${escapeAttr(booking)} was already confirmed. No duplicate messages were sent.`
+      : `${escapeAttr(booking)} is confirmed.`;
+    if (status) status.innerHTML = `${heading}<br>${notificationResultsHtml(result.notificationResults)}`;
   } catch (error) {
-    if (status) status.textContent = error.message;
+    if (status) status.textContent = `${error.message} The booking is not shown as confirmed until this panel displays a success result.`;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Confirm Deposit & Send Client Confirmation";
+    }
   }
 }
 

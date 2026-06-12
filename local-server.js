@@ -213,7 +213,7 @@ function serviceSummaryHtml(booking) {
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
-    ].filter(Boolean).join(" • ");
+    ].filter(Boolean).join(" . ");
     return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
   }).join("");
 }
@@ -263,7 +263,7 @@ function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], serv
             </tr>
             <tr>
               <td style="padding:20px 28px;background:#fff3ee;color:#7a6257;font-size:13px;line-height:1.5;text-align:center;">
-                Lovely Locs • Private in-home studio • Address shared after confirmation
+                Lovely Locs . Private in-home studio . Address shared after confirmation
               </td>
             </tr>
           </table>
@@ -1958,6 +1958,27 @@ async function handleManualPaymentConfirm(req, res) {
       return;
     }
 
+    const existingConfirmation = readBookingRecords()
+      .reverse()
+      .find(record => bookingRecordId(record) === bookingId && record.type === "manual.deposit.confirmed");
+    if (existingConfirmation) {
+      const notificationResults = Array.isArray(existingConfirmation.notificationResults)
+        ? existingConfirmation.notificationResults
+        : [];
+      if (wantsJson) {
+        sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: true, notificationResults });
+        return;
+      }
+      sendHtml(res, 200, ownerConfirmPageHtml({
+        title: "Deposit already confirmed",
+        intro: "This booking was already marked paid. No duplicate confirmation messages were sent.",
+        bookingId,
+        adminUrl,
+        notificationResults,
+      }));
+      return;
+    }
+
     const notificationResults = await notifyManualDepositPaid(booking, method);
     const referralReward = approveReferralReward(booking);
     const redeemedCredit = redeemBookingCredit(booking);
@@ -1973,7 +1994,7 @@ async function handleManualPaymentConfirm(req, res) {
     });
 
     if (wantsJson) {
-      sendJson(res, 200, { ok: true, bookingId, notificationResults, referralReward, redeemedCredit });
+      sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: false, notificationResults, referralReward, redeemedCredit });
       return;
     }
     sendHtml(res, 200, ownerConfirmPageHtml({
@@ -2630,7 +2651,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/manual-payment/confirm") {
+  if (["GET", "POST"].includes(req.method) && (req.url || "").split("?")[0] === "/api/manual-payment/confirm") {
     handleManualPaymentConfirm(req, res);
     return;
   }

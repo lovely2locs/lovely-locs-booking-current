@@ -50,9 +50,12 @@ Use E.164 format for the Twilio number, for example `+13364711098`.
 RESEND_API_KEY=
 CONFIRMATION_FROM_EMAIL=Lovely Locs <lvlc.support@lovelylocsnc.com>
 RESEND_DOMAIN_VERIFIED=false
+RESEND_WEBHOOK_SECRET=
 ```
 
 Set `RESEND_DOMAIN_VERIFIED=true` only after the Resend Domains dashboard shows `lovelylocsnc.com` as verified.
+
+Register `https://lovelylocsnc.com/api/resend/webhook` in Resend for `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.failed`, and `email.suppressed`. Save the returned signing secret as `RESEND_WEBHOOK_SECRET`. The endpoint verifies the raw Svix signature, ignores duplicate webhook IDs, stores delivery events on the persistent disk, and emails the owner when a client confirmation bounces, fails, or is suppressed.
 8. Start the site with `OPEN_WEBSITE.bat` or run:
 
 ```powershell

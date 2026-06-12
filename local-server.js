@@ -562,6 +562,65 @@ function bookingRecordId(record = {}) {
   return record.bookingId || (record.client && Array.isArray(record.cart) ? record.id : "");
 }
 
+function bookingEventSummary(record = {}) {
+  return {
+    type: record.type || "",
+    status: record.status || "",
+    receivedAt: record.receivedAt || record.sentAt || record.approvedAt || record.createdAt || "",
+    notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
+    delivery: record.delivery || null,
+  };
+}
+
+function findNotificationByProviderId(providerMessageId, records = readBookingRecords()) {
+  if (!providerMessageId) return null;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    const notificationResults = Array.isArray(record.notificationResults) ? record.notificationResults : [];
+    const notification = notificationResults.find(result => result?.id === providerMessageId);
+    if (notification) {
+      return {
+        bookingId: bookingRecordId(record),
+        channel: notification.channel || "",
+        notification,
+        record,
+      };
+    }
+  }
+  return null;
+}
+
+function verifyResendWebhook(raw, headers = {}) {
+  const secret = String(process.env.RESEND_WEBHOOK_SECRET || "").trim();
+  if (!secret.startsWith("whsec_")) throw new Error("Resend webhook signing secret is not configured.");
+  const id = String(headers["svix-id"] || "").trim();
+  const timestamp = String(headers["svix-timestamp"] || "").trim();
+  const signatures = String(headers["svix-signature"] || "").trim();
+  if (!id || !timestamp || !signatures) throw new Error("Resend webhook signature headers are missing.");
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) {
+    throw new Error("Resend webhook timestamp is outside the allowed window.");
+  }
+  const secretBytes = Buffer.from(secret.slice("whsec_".length), "base64");
+  const expected = crypto
+    .createHmac("sha256", secretBytes)
+    .update(`${id}.${timestamp}.${raw}`)
+    .digest();
+  const valid = signatures.split(/\s+/).some(value => {
+    const [version, encoded] = value.split(",", 2);
+    if (version !== "v1" || !encoded) return false;
+    let actual;
+    try {
+      actual = Buffer.from(encoded, "base64");
+    } catch {
+      return false;
+    }
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  });
+  if (!valid) throw new Error("Resend webhook signature is invalid.");
+  return { id, event: JSON.parse(raw || "{}") };
+}
+
 function latestBookingRecords(records = readBookingRecords()) {
   const bookings = new Map();
   for (const record of records) {
@@ -2033,12 +2092,7 @@ function handleAdminBookingLookup(req, res) {
     const records = readBookingRecords();
     const events = records
       .filter(record => bookingRecordId(record) === bookingId && record !== booking)
-      .map(record => ({
-        type: record.type || "",
-        status: record.status || "",
-        receivedAt: record.receivedAt || record.sentAt || record.approvedAt || "",
-        notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
-      }));
+      .map(bookingEventSummary);
     sendJson(res, 200, {
       ok: true,
       booking: {
@@ -2093,12 +2147,7 @@ function handleAdminRecentBookings(req, res) {
         initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
         events: records
           .filter(record => bookingRecordId(record) === booking.id && record !== booking)
-          .map(record => ({
-            type: record.type || "",
-            status: record.status || "",
-            receivedAt: record.receivedAt || record.sentAt || record.approvedAt || "",
-            notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
-          })),
+          .map(bookingEventSummary),
       }));
     sendJson(res, 200, { ok: true, bookings });
   } catch (error) {
@@ -2168,6 +2217,71 @@ async function handleAdminConfirmationResend(req, res) {
       recoveredBooking: !savedBooking,
       notificationResults: [result],
     });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleResendWebhook(req, res) {
+  try {
+    const raw = await readBody(req);
+    const verified = verifyResendWebhook(raw, req.headers);
+    const records = readBookingRecords();
+    if (records.some(record => record.type === "resend.email.event" && record.webhookId === verified.id)) {
+      sendJson(res, 200, { ok: true, duplicate: true });
+      return;
+    }
+    const event = verified.event || {};
+    const eventType = String(event.type || "");
+    if (!eventType.startsWith("email.")) {
+      sendJson(res, 200, { ok: true, ignored: true });
+      return;
+    }
+    const providerMessageId = String(event.data?.email_id || "");
+    const linked = findNotificationByProviderId(providerMessageId, records);
+    const detail = event.data?.bounce?.message
+      || event.data?.failed?.message
+      || event.data?.suppressed?.message
+      || event.data?.reason
+      || "";
+    const deliveryRecord = {
+      type: "resend.email.event",
+      bookingId: linked?.bookingId || "",
+      webhookId: verified.id,
+      providerMessageId,
+      receivedAt: new Date().toISOString(),
+      delivery: {
+        status: eventType.replace(/^email\./, ""),
+        eventType,
+        createdAt: event.created_at || event.data?.created_at || "",
+        channel: linked?.channel || "",
+        recipient: Array.isArray(event.data?.to) ? event.data.to[0] || "" : "",
+        subject: event.data?.subject || "",
+        detail,
+      },
+    };
+    if (linked?.channel === "clientEmail" && ["email.bounced", "email.failed", "email.suppressed"].includes(eventType)) {
+      const booking = findBookingById(linked.bookingId);
+      const clientName = booking?.client?.fullName || "a client";
+      const alertText = [
+        `Client confirmation delivery problem for ${clientName}.`,
+        `Booking ID: ${linked.bookingId || "unknown"}`,
+        `Delivery status: ${eventType.replace(/^email\./, "")}`,
+        detail ? `Provider detail: ${detail}` : "",
+        "Open Owner Admin and use Resend Client Confirmation after correcting the email address.",
+      ].filter(Boolean).join("\n");
+      try {
+        deliveryRecord.ownerAlert = await sendEmail(
+          ownerEmail,
+          `Lovely Locs email delivery problem: ${linked.bookingId || clientName}`,
+          alertText
+        );
+      } catch (error) {
+        deliveryRecord.ownerAlert = { failed: true, error: error.message };
+      }
+    }
+    appendBookingRecord(deliveryRecord);
+    sendJson(res, 200, { ok: true });
   } catch (error) {
     sendJson(res, 400, { ok: false, error: error.message });
   }
@@ -2553,6 +2667,10 @@ const server = http.createServer((req, res) => {
       emailConfigured: email.configured,
       emailReadyForClients: email.clientReady,
       emailReadinessReason: email.reason,
+      emailDeliveryTrackingConfigured: Boolean(process.env.RESEND_WEBHOOK_SECRET),
+      emailDeliveryTrackingReason: process.env.RESEND_WEBHOOK_SECRET
+        ? "Signed Resend delivery webhooks are configured."
+        : "Set RESEND_WEBHOOK_SECRET after registering the production webhook.",
       confirmationFromEmail: email.from || configuredEmailAddress(process.env.CONFIRMATION_FROM_EMAIL || ""),
       ownerEmail,
       smsConfigured: configuredForSms,
@@ -2643,6 +2761,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/stripe/webhook") {
     handleStripeWebhook(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/resend/webhook") {
+    handleResendWebhook(req, res);
     return;
   }
 

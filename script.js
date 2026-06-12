@@ -1674,7 +1674,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box" id="manual-deposit-confirm-panel">
           <p class="eyebrow">Launch Readiness</p>
           <h2>Notification Status</h2>
-          <p>Check this before launch. Owner test email can work while client confirmation email still needs a verified sending domain.</p>
+          <p>Check this before launch. The email sender and signed delivery tracking should both show ready.</p>
           <div class="readiness-list" id="adminNotificationStatus">
             <p>Loading notification status...</p>
           </div>
@@ -3057,6 +3057,7 @@ async function loadAdminNotificationStatus() {
     target.innerHTML = [
       readinessLine("Owner Email", Boolean(result.emailConfigured), result.emailConfigured ? `Owner email target: ${result.ownerEmail}` : result.emailReadinessReason),
       readinessLine("Client Confirmation Email", Boolean(result.emailReadyForClients), result.emailReadinessReason),
+      readinessLine("Email Delivery Tracking", Boolean(result.emailDeliveryTrackingConfigured), result.emailDeliveryTrackingReason),
       readinessLine("SMS", Boolean(result.smsReady), result.smsBlockedReason || (result.smsConfigured ? "SMS provider is configured." : "Twilio env vars are not configured.")),
       readinessLine("Admin Token", Boolean(result.automation?.tokenConfigured), result.automation?.tokenConfigured ? "Admin actions and automations have a token configured." : "Set AUTOMATION_RUN_TOKEN or MANUAL_DEPOSIT_CONFIRM_TOKEN.")
     ].join("");

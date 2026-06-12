@@ -776,6 +776,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("locJourneyLength"), "loc journey profile field missing");
   assert(server.includes("process.env.DATA_DIR"), "persistent data directory hook missing");
   assert(server.includes("/api/stripe/webhook"), "Stripe webhook endpoint missing");
+  assert(server.includes("/api/resend/webhook"), "Resend delivery webhook endpoint missing");
+  assert(server.includes("verifyResendWebhook"), "Resend webhook signature verification missing");
+  assert(server.includes("crypto.timingSafeEqual"), "constant-time Resend signature comparison missing");
+  assert(server.includes("resend.email.event"), "persistent Resend delivery event missing");
+  assert(server.includes("emailDeliveryTrackingConfigured"), "Resend delivery readiness status missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
   assert(server.includes("notifyNoChargeTestBooking"), "no-charge test booking notifier missing");

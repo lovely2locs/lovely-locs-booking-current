@@ -545,6 +545,7 @@ function loadClientProfile() {
 
 function saveClientProfile(profile = {}) {
   const clean = {
+    username: profile.username || "",
     fullName: profile.fullName || "",
     email: profile.email || "",
     phone: profile.phone || "",
@@ -561,7 +562,41 @@ function saveClientProfile(profile = {}) {
   };
   localStorage.setItem("lovelyLocsClientProfile", JSON.stringify(clean));
   savedClientProfile = clean;
+  if (isOwnerAccount(clean)) ownerAdminAccessNotice = "";
+  syncOwnerAdminAccess();
   return clean;
+}
+
+const ownerAccountUsername = "LOVELY2LOCS";
+
+function normalizeAccountUsername(value = "") {
+  return String(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function accountUsernames(profile = {}) {
+  const emailUsername = String(profile.email || "").split("@")[0];
+  const referralUsername = String(profile.referralCode || "").split("/").pop();
+  return [profile.username, emailUsername, referralUsername, profile.fullName]
+    .map(normalizeAccountUsername)
+    .filter(Boolean);
+}
+
+function isOwnerAccount(profile = savedClientProfile) {
+  return Boolean(profile && accountUsernames(profile).includes(ownerAccountUsername));
+}
+
+function syncOwnerAdminAccess() {
+  const allowed = isOwnerAccount();
+  document.querySelectorAll("[data-owner-admin]").forEach(link => {
+    link.hidden = !allowed;
+    link.setAttribute?.("aria-hidden", allowed ? "false" : "true");
+    if (allowed) link.removeAttribute?.("tabindex");
+    else link.setAttribute?.("tabindex", "-1");
+  });
 }
 
 function clearClientProfile() {
@@ -570,6 +605,7 @@ function clearClientProfile() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
+  syncOwnerAdminAccess();
   render(currentRoute());
 }
 
@@ -628,9 +664,107 @@ let googleAuthConfig = null;
 let googleAuthLoadAttempts = 0;
 let googleSignupCredential = "";
 let googleSignupState = null;
+let ownerAdminAccessNotice = "";
 
 const app = document.getElementById("app");
 const drawer = document.getElementById("drawer");
+
+const friendTestCheckpoints = [
+  { id: "home", label: "Home" },
+  { id: "services", label: "Services" },
+  { id: "products", label: "Products" },
+  { id: "policies", label: "Policies & FAQ" },
+  { id: "contact", label: "Contact" },
+  { id: "privacy", label: "Privacy" },
+  { id: "sms-opt-in", label: "SMS Opt-In" },
+  { id: "terms", label: "Terms" }
+];
+
+function normalizeFriendTestCode(value = "") {
+  const clean = String(value).trim().toUpperCase();
+  return /^LL-FRIEND-(0[1-9]|10)$/.test(clean) ? clean : "";
+}
+
+function loadFriendTestState() {
+  const inviteCode = normalizeFriendTestCode(new URLSearchParams(window.location.search || "").get("friend-test"));
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem("lovelyLocsFriendTest") || "null");
+  } catch {
+    stored = null;
+  }
+  const storedCode = normalizeFriendTestCode(stored?.code);
+  const code = inviteCode || storedCode;
+  if (!code) return null;
+  const visited = Array.isArray(stored?.visited)
+    ? [...new Set(stored.visited.filter(id => friendTestCheckpoints.some(checkpoint => checkpoint.id === id)))]
+    : [];
+  const state = {
+    code,
+    startedAt: storedCode === code && stored?.startedAt ? stored.startedAt : new Date().toISOString(),
+    visited
+  };
+  localStorage.setItem("lovelyLocsFriendTest", JSON.stringify(state));
+  return state;
+}
+
+let friendTestState = loadFriendTestState();
+
+function saveFriendTestState() {
+  if (friendTestState) localStorage.setItem("lovelyLocsFriendTest", JSON.stringify(friendTestState));
+}
+
+function markFriendTestCheckpoint(route) {
+  if (!friendTestState) return;
+  const hash = String(window.location.hash || "").replace("#", "").split("?")[0];
+  const checkpoint = route === "home" && hash === "services" ? "services" : route;
+  if (!friendTestCheckpoints.some(item => item.id === checkpoint)) return;
+  if (!friendTestState.visited.includes(checkpoint)) {
+    friendTestState.visited.push(checkpoint);
+    saveFriendTestState();
+  }
+}
+
+function friendTestSnapshot(bookingSubmitted = false) {
+  if (!friendTestState) return null;
+  const visited = friendTestCheckpoints
+    .map(checkpoint => checkpoint.id)
+    .filter(id => friendTestState.visited.includes(id));
+  const missing = friendTestCheckpoints
+    .filter(checkpoint => !visited.includes(checkpoint.id))
+    .map(checkpoint => checkpoint.label);
+  return {
+    code: friendTestState.code,
+    startedAt: friendTestState.startedAt,
+    visited,
+    completedCheckpoints: visited.length,
+    totalCheckpoints: friendTestCheckpoints.length,
+    percentComplete: Math.round((visited.length / friendTestCheckpoints.length) * 100),
+    complete: missing.length === 0,
+    missing,
+    bookingSubmitted
+  };
+}
+
+function friendTestThankYouMarkup(test) {
+  if (!test?.code) return "";
+  const complete = Boolean(test.complete);
+  const completed = Number(test.completedCheckpoints || 0);
+  const total = Number(test.totalCheckpoints || friendTestCheckpoints.length);
+  const testerNumber = Number(test.slot || 0);
+  const testerLabel = testerNumber ? ` You are tester ${testerNumber} of 10.` : "";
+  return `
+    <div class="friend-test-finish ${complete ? "complete" : ""}">
+      <p class="eyebrow">Friends Website Test</p>
+      <h2>Thank you for testing the Lovely Locs booking service for me.</h2>
+      <p>Your full appointment request went through successfully.${testerLabel} Your honest feedback will help make the website easier and clearer for future clients.</p>
+      ${complete
+        ? `<p><strong>You also found the Golden Loc.</strong> You made it through all ${total} website checkpoints.</p>`
+        : completed ? `<p>You explored ${completed} of ${total} website checkpoints during your test.</p>` : ""}
+      <p class="friend-test-code">Tester code: <strong>${escapeAttr(test.code)}</strong></p>
+    </div>
+  `;
+}
 
 function money(value) {
   return `$${Number(value).toFixed(0)}`;
@@ -959,6 +1093,7 @@ function clientSettingsPage() {
     </section>
     <section class="section">
       <div class="container admin-grid">
+        ${ownerAdminAccessNotice ? `<div class="policy-box"><p class="promo-status">${ownerAdminAccessNotice}</p></div>` : ""}
         ${googleSignupFormMarkup()}
         <div class="policy-box">
           <h2>Look Up Your Settings</h2>
@@ -1554,6 +1689,7 @@ function pendingPaymentDetails() {
     fullName: stored.fullName || "",
     referralCode: stored.referralCode || "",
     referralShareUrl: stored.referralShareUrl || "",
+    friendTest: stored.friendTest || null,
     paymentOptions: Array.isArray(stored.paymentOptions) && stored.paymentOptions.length ? stored.paymentOptions : manualPaymentFallbackOptions
   };
 }
@@ -1567,6 +1703,7 @@ function paymentOptionsPage() {
     </section>
     <section class="section payment-options-section">
       <div class="container">
+        ${friendTestThankYouMarkup(details.friendTest)}
         <div class="payment-summary-panel">
           <div>
             <p class="eyebrow">Deposit Step</p>
@@ -1833,7 +1970,7 @@ function cartMarkup() {
           ${partingMessage ? `<div class="cart-advisory"><strong>Parting preference saved</strong><p>${partingMessage}</p></div>` : ""}
           ${cart.length ? cart.map(item => `
             <div class="cart-item">
-              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${money(item.price)}</p></div>
+              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${money(item.price)}</p></div>
               <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
@@ -2097,6 +2234,7 @@ function bookingModal() {
           <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
           <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
+          ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
@@ -2130,6 +2268,13 @@ function bookingModal() {
 }
 
 function render(route = currentRoute()) {
+  if ((route === "admin" || route === "admin-confirm-deposit") && !isOwnerAccount()) {
+    ownerAdminAccessNotice = "Owner Admin is available only when the LOVELY2LOCS account is signed in.";
+    route = "client-settings";
+    window.location.hash = "client-settings";
+  }
+  syncOwnerAdminAccess();
+  markFriendTestCheckpoint(route);
   if (route === "policies") app.innerHTML = policiesPage();
   else if (route === "products") app.innerHTML = productsPage();
   else if (route === "contact") app.innerHTML = contactPage();
@@ -2163,6 +2308,10 @@ function currentRoute() {
   if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "admin-confirm-deposit", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
+  if ((route === "admin" || route === "admin-confirm-deposit") && !isOwnerAccount()) {
+    ownerAdminAccessNotice = "Owner Admin is available only when the LOVELY2LOCS account is signed in.";
+    return "client-settings";
+  }
   return route;
 }
 
@@ -2182,6 +2331,11 @@ function clearCart() {
 }
 
 function addAdminTestBooking() {
+  if (!isOwnerAccount()) {
+    ownerAdminAccessNotice = "Owner Admin is available only when the LOVELY2LOCS account is signed in.";
+    render("client-settings");
+    return;
+  }
   cart = [{ ...adminTestService, type: "service" }];
   advisoryMessage = "";
   baseProductMessage = "";
@@ -2609,6 +2763,7 @@ function switchGoogleAccount() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
+  syncOwnerAdminAccess();
   googleSignupCredential = "";
   googleSignupState = null;
   render("client-settings");
@@ -3178,6 +3333,7 @@ function bookingPayloadFromForm(form) {
   const deposit = bookingDeposit(total, cart);
   const communicationsOptIn = Boolean(data.get("smsOptIn"));
   return {
+    ...(isAdminTestBooking(cart) ? { adminToken: data.get("adminToken") || "" } : {}),
     client: {
       fullName: data.get("fullName") || "",
       email: data.get("email") || "",
@@ -3201,7 +3357,8 @@ function bookingPayloadFromForm(form) {
     total,
     deposit,
     discountCode: appliedDiscount?.code || "",
-    policyAcknowledgement: Boolean(data.get("policyAcknowledgement"))
+    policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
+    friendTest: friendTestSnapshot(true)
   };
 }
 
@@ -3255,10 +3412,12 @@ async function submitBooking() {
     });
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Booking could not be submitted.");
-    saveClientProfile({
-      ...bookingPayload.client,
-      referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName)
-    });
+    if (!result.noCharge) {
+      saveClientProfile({
+        ...bookingPayload.client,
+        referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName)
+      });
+    }
     clearBookingDraft();
     if (result.noCharge) {
       bookingConfirmation = {
@@ -3276,6 +3435,7 @@ async function submitBooking() {
       fullName: bookingPayload.client.fullName,
       referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName),
       referralShareUrl: result.referralShareUrl || referralShareUrlForCode(result.referralCode || referralCodeForName(bookingPayload.client.fullName)),
+      friendTest: result.friendTest || bookingPayload.friendTest,
       paymentOptions: result.paymentOptions || manualPaymentFallbackOptions
     }));
     bookingConfirmation = {
@@ -3350,6 +3510,7 @@ themeToggle.addEventListener("click", () => {
 if (localStorage.getItem("darkMode") === "true") document.documentElement.classList.add("dark");
 syncThemeToggle();
 applyLogoSettings();
+syncOwnerAdminAccess();
 fetchLogoSettings();
 function applyVisualVersion(versionId) {
   visualVersions.forEach(version => document.documentElement.classList.remove(`visual-${version.id}`));

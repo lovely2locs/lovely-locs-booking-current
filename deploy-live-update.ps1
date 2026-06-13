@@ -82,6 +82,7 @@ $files = @(
   "index.html",
   "styles.css",
   "script.js",
+  "friend-test-thank-you.js",
   "local-server.js",
   "package.json",
   "render.yaml",

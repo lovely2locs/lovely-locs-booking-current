@@ -96,6 +96,9 @@ const allowedPartingFees = new Map([
 ]);
 
 const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
+const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"];
+const friendTestCampaign = "friends-booking-test-2026-06";
+const friendTestCampaignLimit = 10;
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const holidayDates = new Set([
   "2026-01-01",
@@ -170,6 +173,9 @@ function bookingText(booking) {
     `Optional communications opt-in: ${booking.client?.smsOptIn ? "Yes" : "No"}`,
     booking.client?.referralCode ? `Client referral code: ${booking.client.referralCode}` : "",
     booking.client?.referredByCode ? `Referred by code: ${booking.client.referredByCode}` : "",
+    booking.friendTest ? `Friend website test: ${booking.friendTest.code}` : "",
+    booking.friendTest ? `Website coverage: ${booking.friendTest.completedCheckpoints}/${booking.friendTest.totalCheckpoints} checkpoints (${booking.friendTest.percentComplete}%)` : "",
+    booking.friendTest ? `Missing checkpoints: ${booking.friendTest.missing.join(", ") || "None - Golden Loc unlocked"}` : "",
     "",
     "Services / products:",
     serviceLines.length ? serviceLines.join("\n") : "- No cart items included",
@@ -213,7 +219,7 @@ function serviceSummaryHtml(booking) {
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
-    ].filter(Boolean).join(" . ");
+    ].filter(Boolean).join(" • ");
     return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
   }).join("");
 }
@@ -263,7 +269,7 @@ function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], serv
             </tr>
             <tr>
               <td style="padding:20px 28px;background:#fff3ee;color:#7a6257;font-size:13px;line-height:1.5;text-align:center;">
-                Lovely Locs . Private in-home studio . Address shared after confirmation
+                Lovely Locs • Private in-home studio • Address shared after confirmation
               </td>
             </tr>
           </table>
@@ -330,14 +336,22 @@ function ownerBookingEmail(booking, { title, intro, ctaUrl = "", ctaLabel = "" }
     { label: "Booking ID", value: booking.id },
     { label: "Deposit", value: `$${booking.deposit || 0}` },
     { label: "Estimated Total", value: `$${booking.total || 0}` },
-  ];
+    booking.friendTest ? { label: "Friend Test", value: booking.friendTest.code } : null,
+    booking.friendTest ? { label: "Website Coverage", value: `${booking.friendTest.completedCheckpoints}/${booking.friendTest.totalCheckpoints} checkpoints (${booking.friendTest.percentComplete}%)` } : null,
+  ].filter(Boolean);
+  const friendTestNote = booking.friendTest
+    ? `Friend test ${booking.friendTest.complete ? "complete" : "incomplete"}. Missing: ${booking.friendTest.missing.join(", ") || "none"}.`
+    : "";
   return brandEmailHtml({
     eyebrow: "Owner Update",
     title,
     intro,
     rows,
     services: serviceSummaryHtml(booking),
-    note: booking.client?.specialRequests ? `Client notes: ${booking.client.specialRequests}` : "No special client notes were added.",
+    note: [
+      booking.client?.specialRequests ? `Client notes: ${booking.client.specialRequests}` : "No special client notes were added.",
+      friendTestNote,
+    ].filter(Boolean).join(" "),
     ctaUrl,
     ctaLabel,
   });
@@ -1100,12 +1114,24 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   };
 }
 
-function referredNewClientDiscount(client, total, records = readBookingRecords()) {
+function qualifiesForReferredNewClientDiscount(selectedServices = []) {
+  return selectedServices.some(service => (
+    service
+    && service.type === "service"
+    && service.category !== "add-ons"
+    && service.category !== "admin-test"
+    && !service.autoEmergencyFee
+    && Number(service.price) > 75
+  ));
+}
+
+function referredNewClientDiscount(client, total, selectedServices = [], records = readBookingRecords()) {
   const code = normalizeReferralCode(client?.referredByCode);
   if (!code) return null;
   const referrer = findReferrerByCode(code, records);
   if (!referrer || sameClient(referrer.client, client)) return null;
   if (latestClientBooking(client, records)) return null;
+  if (!qualifiesForReferredNewClientDiscount(selectedServices)) return null;
   const amountOff = Math.min(total, Math.max(0, Math.round(referredNewClientCreditAmount)));
   if (!amountOff) return null;
   return {
@@ -1387,6 +1413,56 @@ function sanitizeClient(client = {}) {
   };
 }
 
+function sanitizeFriendTest(test = {}) {
+  const code = String(test.code || "").trim().toUpperCase();
+  if (!/^LL-FRIEND-(0[1-9]|10)$/.test(code)) return null;
+  const slot = Number(code.split("-").pop());
+  const visited = [...new Set(Array.isArray(test.visited) ? test.visited : [])]
+    .filter(checkpoint => friendTestCheckpoints.includes(checkpoint));
+  const missing = friendTestCheckpoints.filter(checkpoint => !visited.includes(checkpoint));
+  const startedAt = String(test.startedAt || "").trim();
+  return {
+    code,
+    campaign: friendTestCampaign,
+    slot,
+    automatic: false,
+    startedAt: Number.isFinite(Date.parse(startedAt)) ? new Date(startedAt).toISOString() : "",
+    visited,
+    completedCheckpoints: visited.length,
+    totalCheckpoints: friendTestCheckpoints.length,
+    percentComplete: Math.round((visited.length / friendTestCheckpoints.length) * 100),
+    complete: missing.length === 0,
+    missing,
+    bookingSubmitted: Boolean(test.bookingSubmitted),
+  };
+}
+
+function nextAutomaticFriendTest() {
+  const usedSlots = new Set(
+    latestBookingRecords(readBookingRecords())
+      .filter(booking => booking.friendTest?.campaign === friendTestCampaign)
+      .map(booking => Number(booking.friendTest?.slot || 0))
+      .filter(slot => slot >= 1 && slot <= friendTestCampaignLimit)
+  );
+  let slot = 1;
+  while (usedSlots.has(slot) && slot <= friendTestCampaignLimit) slot += 1;
+  if (slot > friendTestCampaignLimit) return null;
+  return {
+    code: `LL-FRIEND-${String(slot).padStart(2, "0")}`,
+    campaign: friendTestCampaign,
+    slot,
+    automatic: true,
+    startedAt: new Date().toISOString(),
+    visited: [],
+    completedCheckpoints: 0,
+    totalCheckpoints: friendTestCheckpoints.length,
+    percentComplete: 0,
+    complete: false,
+    missing: [...friendTestCheckpoints],
+    bookingSubmitted: true,
+  };
+}
+
 function pricedCartItem(item = {}) {
   const exactService = serviceCatalog.find(service => service.id === item.id);
   if (exactService) {
@@ -1446,7 +1522,7 @@ function priceBooking(booking) {
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
   const saleDiscount = activeDiscountForCode(booking.discountCode);
   const clientCredit = availableClientCredit(client, subtotal);
-  const referredClientDiscount = referredNewClientDiscount(client, subtotal);
+  const referredClientDiscount = referredNewClientDiscount(client, subtotal, selectedServices);
   const discount = isAdminTestBooking(cart) ? null : chooseBookingDiscount(subtotal, saleDiscount, clientCredit, referredClientDiscount);
   const discountAmount = isAdminTestBooking(cart) ? 0 : discountAmountForTotal(subtotal, discount);
   const total = Math.max(0, subtotal - discountAmount);
@@ -1471,6 +1547,7 @@ function priceBooking(booking) {
     total,
     deposit,
     policyAcknowledgement: true,
+    friendTest: sanitizeFriendTest(booking.friendTest),
   };
 }
 
@@ -1912,8 +1989,21 @@ async function handleBooking(req, res) {
   try {
     const raw = await readBody(req);
     const booking = JSON.parse(raw || "{}");
+    const containsAdminTestService = Array.isArray(booking.cart)
+      && booking.cart.some(item => item?.id === "admin-test-booking");
+    if (containsAdminTestService && !isAdminTestBooking(booking.cart)) {
+      sendJson(res, 400, { ok: false, error: "The admin test service cannot be combined with other items." });
+      return;
+    }
+    if (containsAdminTestService && !tokenIsValid(booking.adminToken || "")) {
+      sendJson(res, 403, { ok: false, error: "The owner admin token is missing or invalid." });
+      return;
+    }
     const pricedBooking = priceBooking(booking);
     const id = `LL-${Date.now()}`;
+    const friendTest = pricedBooking.deposit === 0
+      ? pricedBooking.friendTest
+      : pricedBooking.friendTest || nextAutomaticFriendTest();
     const referralCode = normalizeReferralCode(pricedBooking.client.referralCode || referralCodeForClient(pricedBooking.client));
     const referralShareUrl = `${publicSiteUrl(req)}/?ref=${encodeURIComponent(referralCode)}#services`;
     const pendingBooking = {
@@ -1921,6 +2011,7 @@ async function handleBooking(req, res) {
       receivedAt: new Date().toISOString(),
       status: pricedBooking.deposit === 0 ? "no_charge_test" : "pending_payment",
       ...pricedBooking,
+      friendTest,
       client: { ...pricedBooking.client, referralCode },
       referralShareUrl,
     };
@@ -1941,6 +2032,7 @@ async function handleBooking(req, res) {
         deposit: pendingBooking.deposit,
         referralCode,
         referralShareUrl,
+        friendTest: pendingBooking.friendTest,
         message: "Free admin test booking saved. No deposit was requested. Confirmation messages were attempted with the connected providers.",
         notificationResults,
       });
@@ -1971,6 +2063,7 @@ async function handleBooking(req, res) {
       deposit: savedBooking.deposit,
       referralCode,
       referralShareUrl,
+      friendTest: savedBooking.friendTest,
       message: "Appointment request saved. Pay options are ready; Lovely Locs will send the official confirmation after the deposit receipt is verified in Gmail.",
     });
   } catch (error) {
@@ -2108,6 +2201,7 @@ function handleAdminBookingLookup(req, res) {
           date: booking.client?.date || "",
           time: booking.client?.time || "",
         },
+        friendTest: booking.friendTest || null,
       },
       initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
       events,
@@ -2144,6 +2238,7 @@ function handleAdminRecentBookings(req, res) {
           date: booking.client?.date || "",
           time: booking.client?.time || "",
         },
+        friendTest: booking.friendTest || null,
         initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
         events: records
           .filter(record => bookingRecordId(record) === booking.id && record !== booking)

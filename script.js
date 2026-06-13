@@ -47,6 +47,11 @@ const defaultDiscountSettings = {
   enabled: false,
   expiresAt: ""
 };
+const defaultFirstTimeCodeSettings = {
+  code: "LOVELYLOCS",
+  amountOff: 15,
+  enabled: true
+};
 
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
@@ -509,6 +514,28 @@ function saveDiscountSettingsLocal(settings) {
   }
 }
 
+function loadFirstTimeCodeSettings() {
+  try {
+    return {
+      ...defaultFirstTimeCodeSettings,
+      ...JSON.parse(localStorage.getItem("lovelyLocsFirstTimeCodeSettings") || "{}")
+    };
+  } catch {
+    return { ...defaultFirstTimeCodeSettings };
+  }
+}
+
+function saveFirstTimeCodeSettingsLocal(settings) {
+  firstTimeCodeSettings = {
+    ...defaultFirstTimeCodeSettings,
+    ...settings,
+    code: normalizeDiscountCode(settings?.code || defaultFirstTimeCodeSettings.code),
+    amountOff: Number(settings?.amountOff ?? defaultFirstTimeCodeSettings.amountOff),
+    enabled: Boolean(settings?.enabled)
+  };
+  localStorage.setItem("lovelyLocsFirstTimeCodeSettings", JSON.stringify(firstTimeCodeSettings));
+}
+
 function loadAppliedDiscount() {
   try {
     const saved = JSON.parse(localStorage.getItem("lovelyLocsAppliedDiscount") || "null");
@@ -629,6 +656,9 @@ async function fetchLogoSettings() {
     if (result.ok && result.settings?.discount) {
       saveDiscountSettingsLocal(result.settings.discount);
     }
+    if (result.ok && result.settings?.firstTimeCode) {
+      saveFirstTimeCodeSettingsLocal(result.settings.firstTimeCode);
+    }
   } catch {
     applyLogoSettings();
   }
@@ -652,6 +682,7 @@ let bookingSlotState = {
 };
 let logoSettings = loadLogoSettings();
 let discountSettings = loadDiscountSettings();
+let firstTimeCodeSettings = loadFirstTimeCodeSettings();
 let appliedDiscount = loadAppliedDiscount();
 let savedClientProfile = loadClientProfile();
 let advisoryMessage = "";
@@ -1769,6 +1800,7 @@ function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
   const settings = { ...defaultLogoSettings, ...logoSettings };
   const discount = { ...defaultDiscountSettings, ...discountSettings };
+  const firstTimeCode = { ...defaultFirstTimeCodeSettings, ...firstTimeCodeSettings };
   const confirmParams = manualDepositConfirmParams();
   const confirmNotice = confirmParams.active
     ? `<p class="advisory-copy">Owner confirm link loaded. Review the matching Venmo or Apple Pay receipt, then press the confirmation button below. If the token field is blank, enter your owner confirmation token first.</p>`
@@ -1896,6 +1928,19 @@ function adminPage() {
             </div>
             <p class="form-error" id="brandSettingsStatus" aria-live="polite"></p>
             <button class="primary-btn" type="button" data-save-logo-settings>Save Logo Settings</button>
+          </form>
+        </div>
+        <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Owner Promotions</p>
+          <h2>First-Time Client Code</h2>
+          <p>This permanent code gives a verified first-time client a flat discount on an eligible service over $75. It has no expiration date and stays available until you turn it off here.</p>
+          <form class="brand-settings-form" id="firstTimeCodeSettingsForm">
+            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label>Code<input name="code" value="${firstTimeCode.code}" maxlength="24" readonly></label>
+            <label>Discount Amount<input name="amountOff" type="number" min="0" max="500" value="${firstTimeCode.amountOff}"></label>
+            <label class="full toggle-line"><input name="enabled" type="checkbox" ${firstTimeCode.enabled ? "checked" : ""}> First-time code is active</label>
+            <p class="form-error" id="firstTimeCodeSettingsStatus" aria-live="polite"></p>
+            <button class="primary-btn" type="button" data-save-first-time-code-settings>Save First-Time Code</button>
           </form>
         </div>
         <div class="policy-box brand-settings-box">
@@ -2233,7 +2278,7 @@ function bookingModal() {
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
-          <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
+          <label>Referral or First-Time Code <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS or LOVELYLOCS/FRIENDNAME"><span class="field-note">First-time clients can enter LOVELYLOCS, or enter the personal code shared by the client who referred you.</span></label>
           ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
@@ -2545,6 +2590,7 @@ function bindDynamic() {
   });
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
+  document.querySelectorAll("[data-save-first-time-code-settings]").forEach(button => button.addEventListener("click", saveFirstTimeCodeSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
@@ -3048,6 +3094,43 @@ async function saveDiscountSettings() {
     saveDiscountSettingsLocal(result.settings.discount);
     if (!result.settings.discount.enabled) saveAppliedDiscount(null);
     if (status) status.textContent = "Discount code saved for the live site.";
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  }
+}
+
+function firstTimeCodeSettingsFromForm() {
+  const form = document.getElementById("firstTimeCodeSettingsForm");
+  const data = new FormData(form);
+  return {
+    code: normalizeDiscountCode(data.get("code")),
+    amountOff: Number(data.get("amountOff")),
+    enabled: Boolean(data.get("enabled"))
+  };
+}
+
+async function saveFirstTimeCodeSettings() {
+  const form = document.getElementById("firstTimeCodeSettingsForm");
+  const status = document.getElementById("firstTimeCodeSettingsStatus");
+  if (!form) return;
+  const data = new FormData(form);
+  const token = data.get("token") || "";
+  const settings = firstTimeCodeSettingsFromForm();
+  if (status) status.textContent = "Saving first-time code...";
+  try {
+    const response = await fetch("/api/site-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, firstTimeCode: settings })
+    });
+    const result = await response.json();
+    if (!result.ok) throw new Error(result.error || "First-time code could not be saved.");
+    saveFirstTimeCodeSettingsLocal(result.settings.firstTimeCode);
+    if (status) {
+      status.textContent = result.settings.firstTimeCode.enabled
+        ? `${result.settings.firstTimeCode.code} is active with no expiration date.`
+        : `${result.settings.firstTimeCode.code} is revoked.`;
+    }
   } catch (error) {
     if (status) status.textContent = error.message;
   }

@@ -262,6 +262,9 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
   assert(html.includes("Discount Code Settings"), "admin discount settings section missing");
   assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
+  assert(html.includes("First-Time Client Code"), "admin first-time code settings section missing");
+  assert(html.includes("data-save-first-time-code-settings"), "admin first-time code save control missing");
+  assert(html.includes('value="LOVELYLOCS"'), "permanent first-time code should default to LOVELYLOCS");
   assert(html.includes("Notification Status"), "launch readiness notification status missing");
   assert(html.includes("data-refresh-notification-status"), "notification status refresh control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
@@ -449,6 +452,7 @@ test("referral codes use the LOVELYLOCS username format", () => {
   assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");
   assert(context.normalizeReferralCode(" lovelylocs / Referral Owner ") === "LOVELYLOCS/REFERRALOWNER", "referral code normalizer should remove username spaces");
   assert(context.referralCodeForName("Fatima Diallo") === "LOVELYLOCS/FATIMADIALLO", "client name should create the visible personal referral code");
+  assert(context.normalizeReferralCode("lovelylocs") === "LOVELYLOCS", "general first-time code should normalize to LOVELYLOCS");
   const card = context.personalReferralCard({ fullName: "Fatima Diallo", preview: true });
   assert(card.includes("LOVELYLOCS/FATIMADIALLO"), "personal referral preview should plug in the supplied client name");
   assert(card.includes("Copy Code") && card.includes("Copy Link") && card.includes("Share"), "personal referral preview should offer one-click sharing controls");
@@ -858,6 +862,10 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/site-settings"), "site settings endpoint missing");
   assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
   assert(server.includes("sanitizeDiscountSettings"), "discount settings sanitizer missing");
+  assert(server.includes("sanitizeFirstTimeCodeSettings"), "first-time code settings sanitizer missing");
+  assert(server.includes("activeFirstTimeCodeFor"), "first-time code validator missing");
+  assert(server.includes('"LOVELYLOCS"'), "permanent LOVELYLOCS code missing");
+  assert(server.includes('"first_time_client_code"'), "first-time code booking source missing");
   assert(server.includes("/api/discount/validate"), "discount validation endpoint missing");
   assert(server.includes("/api/discount/email"), "discount email endpoint missing");
   assert(server.includes("activeDiscountForCode"), "server discount validator missing");

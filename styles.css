@@ -24,6 +24,10 @@
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .visual-v1 {
   --cream: #fbf7f1;
   --taupe: #bca892;
@@ -2195,6 +2199,12 @@ h1, h2, h3,
   gap: 12px;
 }
 .cart-item strong { color: var(--brown); }
+.cart-item-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 8px 0;
+}
 
 .cart-advisory,
 .advisory-copy {
@@ -2734,6 +2744,22 @@ textarea { min-height: 92px; resize: vertical; }
   .primary-btn, .outline-btn { width: 100%; }
   .product-card-head { align-items: flex-start; flex-direction: column; }
   .source-link { white-space: normal; }
+  .cart-panel {
+    width: 100%;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 22px 18px calc(32px + env(safe-area-inset-bottom));
+  }
+  .cart-items {
+    flex: none;
+    overflow: visible;
+    padding: 20px 0 28px;
+  }
+  .cart-item {
+    min-height: 112px;
+    align-items: flex-start;
+  }
 }
 .google-signup-card {
   grid-column: 1 / -1;
@@ -2766,4 +2792,26 @@ textarea { min-height: 92px; resize: vertical; }
   font-size: 0.8em;
   font-weight: 500;
   opacity: 0.72;
+}
+.friend-test-finish {
+  margin-top: 24px;
+  padding: 26px;
+  border: 1px dashed rgba(91, 45, 111, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(247, 239, 250, 0.95), rgba(255, 249, 241, 0.95));
+  box-shadow: 0 14px 34px rgba(61, 32, 72, 0.08);
+}
+
+.friend-test-finish.complete {
+  border-color: rgba(169, 122, 31, 0.65);
+  background: linear-gradient(135deg, rgba(255, 249, 224, 0.98), rgba(247, 239, 250, 0.98));
+}
+
+.friend-test-finish h2 {
+  margin: 4px 0 10px;
+}
+
+.friend-test-code {
+  margin-bottom: 0;
+  font-size: 0.9rem;
 }

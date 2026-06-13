@@ -119,6 +119,18 @@ const context = {
         ],
         total: 100,
         deposit: 30,
+        friendTest: {
+          code: "LL-FRIEND-01",
+          campaign: "friends-booking-test-2026-06",
+          slot: 1,
+          automatic: true,
+          completedCheckpoints: 0,
+          totalCheckpoints: 8,
+          percentComplete: 0,
+          complete: false,
+          missing: ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"],
+          bookingSubmitted: true
+        },
         referralCode: "LOVELYLOCS/TESTCLIENT",
         referralShareUrl: "http://127.0.0.1:4175/?ref=LOVELYLOCS%2FTESTCLIENT#services"
       })
@@ -138,6 +150,7 @@ context.FormData = class {
       ["date", "2026-06-01"],
       ["time", "18:30"],
       ["birthday", "1998-07-31"],
+      ["adminToken", "OWNER-TEST-TOKEN"],
       ["referredByCode", "lovelylocs/Test Client"],
       ["emergencySlot", ""],
       ["preferredContact", "text_email"],
@@ -183,11 +196,17 @@ test("home renders core client sections", () => {
   assert(html.includes("data-copy-booking"), "copy booking button missing");
 });
 
-test("site shell exposes client login and owner admin access", () => {
+test("site shell keeps public policy links in the left menu and hides owner admin by default", () => {
   const html = fs.readFileSync("index.html", "utf8");
+  const nav = html.slice(html.indexOf('<div class="nav-actions">'), html.indexOf("</nav>"));
+  const drawerMarkup = html.slice(html.indexOf('<aside class="drawer"'), html.indexOf("</aside>"));
   assert(html.includes('href="#products" data-route="products">Products'), "products link missing from site shell");
   assert(html.includes('href="#client-settings" data-route="client-settings">Client Login'), "client login link missing from site shell");
-  assert(html.includes('href="#admin" data-route="admin">Owner Admin'), "owner admin link missing from site shell");
+  for (const route of ["policies", "contact", "privacy", "sms-opt-in"]) {
+    assert(!nav.includes(`data-route="${route}"`), `${route} should not remain in the top navigation`);
+    assert(drawerMarkup.includes(`data-route="${route}"`), `${route} should remain in the left menu`);
+  }
+  assert(html.includes('data-route="admin" data-owner-admin hidden'), "owner admin link should be hidden by default");
 });
 
 test("policies route renders FAQ and policies", () => {
@@ -228,6 +247,11 @@ test("version route renders rollback options", () => {
 });
 
 test("admin route offers free no-charge test booking", () => {
+  context.saveClientProfile({
+    username: "LOVELY2LOCS",
+    email: "lovely2locs@gmail.com",
+    referralCode: "LOVELYLOCS/LOVELY2LOCS"
+  });
   context.window.location.hash = "#admin";
   context.render(context.currentRoute());
   let html = appHtml();
@@ -250,7 +274,22 @@ test("admin route offers free no-charge test booking", () => {
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
   assert(html.includes("Deposit Required to Hold Slot: $0"), "admin test deposit should be zero");
+  assert(html.includes('name="adminToken"'), "admin no-charge booking should require the owner token");
   assert(html.includes("Submit No-Charge Test Booking"), "admin no-charge submit button missing");
+});
+
+test("non-owner accounts cannot render admin features", () => {
+  context.saveClientProfile({
+    fullName: "Regular Client",
+    email: "client@example.com",
+    referralCode: "LOVELYLOCS/REGULARCLIENT"
+  });
+  context.window.location.hash = "#admin";
+  context.render("admin");
+  const html = appHtml();
+  assert(html.includes("Owner Admin is available only when the LOVELY2LOCS account is signed in."), "non-owner admin access notice missing");
+  assert(!html.includes("data-save-logo-settings"), "non-owner account should not receive admin controls");
+  assert(context.window.location.hash === "client-settings", "non-owner admin route should return to client login");
 });
 
 test("payment options route renders manual deposit instructions", () => {
@@ -278,7 +317,54 @@ test("payment options route renders manual deposit instructions", () => {
   assert(html.includes("data-copy-personal-referral-code"), "payment page referral code copy button missing");
   assert(html.includes("data-copy-personal-referral-link"), "payment page referral link copy button missing");
   assert(html.includes("data-share-personal-referral"), "payment page referral share button missing");
+  assert(!html.includes("Friends Website Test"), "regular clients should not see the friend-test thank-you");
   context.window.location.search = "";
+});
+
+test("friend test invite tracks checkpoints and unlocks the checkout Easter egg", () => {
+  context.window.location.search = "?friend-test=LL-FRIEND-01";
+  context.window.location.hash = "#home";
+  vm.runInContext("friendTestState = loadFriendTestState()", context);
+  context.render(context.currentRoute());
+
+  context.window.location.hash = "#services";
+  context.render(context.currentRoute());
+  for (const route of ["products", "policies", "contact", "privacy", "sms-opt-in", "terms"]) {
+    context.window.location.hash = `#${route}`;
+    context.render(context.currentRoute());
+  }
+
+  const state = JSON.parse(localStore.get("lovelyLocsFriendTest") || "{}");
+  assert(state.code === "LL-FRIEND-01", "friend-test invite code was not stored");
+  assert(state.visited.length === 8, "all friend-test checkpoints should be recorded once");
+  const snapshot = context.friendTestSnapshot(true);
+  assert(snapshot.complete, "complete friend-test journey should be recognized");
+  assert(snapshot.percentComplete === 100, "complete friend-test journey should report 100 percent");
+
+  localStore.set("lovelyLocsPendingPayment", JSON.stringify({
+    id: "LL-FRIEND-TEST",
+    deposit: 30,
+    fullName: "Friend Tester",
+    referralCode: "LOVELYLOCS/FRIENDTESTER",
+    referralShareUrl: "http://127.0.0.1:4175/?ref=LOVELYLOCS%2FFRIENDTESTER#services",
+    friendTest: snapshot,
+    paymentOptions: [
+      { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." }
+    ]
+  }));
+  context.window.location.search = "?booking=LL-FRIEND-TEST&deposit=30";
+  context.window.location.hash = "#payment-options";
+  context.render(context.currentRoute());
+  assert(appHtml().includes("Thank you for testing the Lovely Locs booking service for me."), "completed friend tester should see the testing thank-you");
+  assert(appHtml().includes("You also found the Golden Loc."), "completed friend tester should see the Easter egg");
+  assert(appHtml().includes("LL-FRIEND-01"), "friend-test completion should show the tester code");
+
+  context.window.location.search = "";
+  context.window.location.hash = "#home";
+  localStore.delete("lovelyLocsFriendTest");
+  localStore.delete("lovelyLocsPendingPayment");
+  vm.runInContext("friendTestState = null", context);
+  context.render(context.currentRoute());
 });
 
 test("contact route renders public business contact", () => {
@@ -328,6 +414,7 @@ test("sms opt-in route renders consent proof form", () => {
 });
 
 test("adding a service updates cart and booking modal", () => {
+  context.clearClientProfile();
   context.window.location.hash = "";
   context.clearCart();
   context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
@@ -692,6 +779,8 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.options.body.includes("LOVELYLOCS/TESTCLIENT"), "booking backend payload should include referral code used by new client");
   assert(context.window.location.href === "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options", "valid booking should redirect to pay options");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LL-TEST"), "manual payment details should be stored for the pay options page");
+  assert(localStore.get("lovelyLocsPendingPayment").includes("Thank you") === false, "pending payment should store tester data, not rendered thank-you copy");
+  assert(localStore.get("lovelyLocsPendingPayment").includes("LL-FRIEND-01"), "automatic friend-test assignment should be stored for checkout");
   assert(localStore.get("lovelyLocsPendingPayment").includes("LOVELYLOCS/TESTCLIENT"), "pending payment details should preserve the client's personal referral code");
   assert(localStore.get("lovelyLocsCart") !== "[]", "cart should stay available until deposit is confirmed");
   assert(!localStore.get("lovelyLocsBookingDraft"), "completed booking should clear the unfinished draft");
@@ -706,6 +795,11 @@ test("admin no-charge booking submission does not require pay options URL", asyn
       json: async () => ({ ok: true, id: "LL-TEST-FREE", noCharge: true, total: 0, deposit: 0, message: "Free admin test booking saved." })
     };
   };
+  context.saveClientProfile({
+    username: "LOVELY2LOCS",
+    email: "lovely2locs@gmail.com",
+    referralCode: "LOVELYLOCS/LOVELY2LOCS"
+  });
   context.window.location.hash = "#admin";
   context.window.location.href = "";
   context.addAdminTestBooking();
@@ -713,6 +807,7 @@ test("admin no-charge booking submission does not require pay options URL", asyn
   await context.submitBooking();
   assert(context.lastFetch.url === "/api/bookings", "admin test should post to booking backend");
   assert(context.lastFetch.options.body.includes("admin-test-booking"), "admin test payload missing service id");
+  assert(context.lastFetch.options.body.includes('"adminToken":"OWNER-TEST-TOKEN"'), "admin test payload missing owner token");
   assert(context.lastFetch.options.body.includes('"deposit":0'), "admin test payload should carry zero deposit");
   assert(context.window.location.href === "", "admin test should not redirect to pay options");
   assert(appHtml().includes("Free admin test booking saved."), "admin test confirmation message missing");
@@ -739,8 +834,15 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
   assert(server.includes("/api/admin/bookings"), "protected recent bookings endpoint missing");
   assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
+  assert(server.includes("sanitizeFriendTest"), "friend-test payload sanitizer missing");
+  assert(server.includes("nextAutomaticFriendTest"), "automatic first-ten friend-test assignment missing");
+  assert(server.includes("friendTestCampaignLimit = 10"), "friend-test campaign should be limited to ten bookings");
+  assert(server.includes("friendTestCheckpoints"), "friend-test checkpoint allowlist missing");
+  assert(server.includes("Website coverage:"), "friend-test owner coverage report missing");
+  assert(server.includes("booking.friendTest || null"), "admin booking response should include friend-test coverage");
   assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");
   assert(server.includes("handleAdminConfirmationResend"), "confirmation resend handler missing");
+  assert(server.includes("containsAdminTestService && !tokenIsValid"), "admin test booking endpoint should require the owner token");
   assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
   assert(server.includes("alreadyConfirmed"), "manual deposit confirmation retry guard missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
@@ -821,6 +923,15 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");
 });
 
+test("live fallback thanks invited testers after a successful booking", () => {
+  const fallback = fs.readFileSync("friend-test-thank-you.js", "utf8");
+  const html = fs.readFileSync("index.html", "utf8");
+  assert(fallback.includes("Thank you for testing the Lovely Locs booking service for me."), "fallback thank-you copy missing");
+  assert(fallback.includes("/api\\/bookings"), "fallback should watch successful booking submissions");
+  assert(fallback.includes("payment-options"), "fallback should display on the pay-options screen");
+  assert(html.includes("friend-test-thank-you.js?v=20260612-live-fallback"), "fallback script is not loaded by the site shell");
+});
+
 test("referral share link copies the booking page", async () => {
   context.window.location.origin = "http://127.0.0.1:4175";
   await context.copyBookingLink();
@@ -838,12 +949,13 @@ test("visual version preview updates stored class and route", () => {
 
 test("product add button state prevents duplicate cart additions", () => {
   context.window.location.hash = "#products";
-  context.addToCart({ id: "product-Gold Sparkle Sprinkles", type: "product", name: "Gold Sparkle Sprinkles", price: 12 });
-  context.addToCart({ id: "product-Gold Sparkle Sprinkles", type: "product", name: "Gold Sparkle Sprinkles", price: 12 });
+  context.addToCart({ id: "product-Gold Sparkle Sprinkles", type: "product", name: "Gold Sparkle Sprinkles", price: 12, description: "Premium gold glitter loc accessories for a touch of elegance." });
+  context.addToCart({ id: "product-Gold Sparkle Sprinkles", type: "product", name: "Gold Sparkle Sprinkles", price: 12, description: "Premium gold glitter loc accessories for a touch of elegance." });
   const html = appHtml();
   const storedItems = JSON.parse(localStore.get("lovelyLocsCart") || "[]");
   const goldItems = storedItems.filter(item => item.id === "product-Gold Sparkle Sprinkles");
   assert(html.includes("Added"), "product added state missing");
+  assert(html.includes("Premium gold glitter loc accessories for a touch of elegance."), "product description missing from cart item");
   assert(goldItems.length === 1, "duplicate product changed cart storage unexpectedly");
   assert(localStore.get("lovelyLocsCart").includes("Gold Sparkle Sprinkles"), "cart selection should be stored until checkout");
 });
@@ -855,6 +967,14 @@ test("service cards stay compact while showing details", () => {
   assert(html.includes("service-meta"), "service metadata missing");
   assert(html.includes("detail-chips"), "service detail chips missing");
   assert(html.includes("Aftercare guidance") || html.includes("Retwist care"), "service detail text missing");
+});
+
+test("mobile cart uses one roomy full-height scroll area", () => {
+  const styles = fs.readFileSync("styles.css", "utf8");
+  assert(styles.includes("height: 100dvh"), "mobile cart should fill the available phone height");
+  assert(styles.includes("overscroll-behavior: contain"), "mobile cart should contain its page scroll");
+  assert(styles.includes(".cart-items {\n    flex: none;\n    overflow: visible;"), "mobile cart items should not collapse into a short nested scroller");
+  assert(styles.includes("min-height: 112px"), "mobile cart item cards should preserve enough room for item details");
 });
 
 test("redesigned hero is proof-led instead of abstract art-led", () => {

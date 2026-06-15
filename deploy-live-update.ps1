@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $root
 
-$repo = if ($env:GITHUB_REPO) { $env:GITHUB_REPO } else { "lovely2locs/lovely-locs-booking" }
+$repo = if ($env:GITHUB_REPO) { $env:GITHUB_REPO } else { "lovely2locs/lovely-locs-booking-current" }
 $branch = if ($env:GITHUB_BRANCH) { $env:GITHUB_BRANCH } else { "main" }
 $renderServiceId = if ($env:RENDER_SERVICE_ID) { $env:RENDER_SERVICE_ID } else { "srv-d8b3dc8jo6nc73cdi2bg" }
 $publicSiteUrl = if ($env:PUBLIC_SITE_URL) { $env:PUBLIC_SITE_URL.TrimEnd("/") } else { "https://lovely-locs-booking.onrender.com" }
@@ -26,6 +26,10 @@ function Get-SecretValue {
   )
 
   $existing = [Environment]::GetEnvironmentVariable($EnvironmentName)
+  if ($existing) { return $existing }
+  $existing = [Environment]::GetEnvironmentVariable($EnvironmentName, "User")
+  if ($existing) { return $existing }
+  $existing = [Environment]::GetEnvironmentVariable($EnvironmentName, "Machine")
   if ($existing) { return $existing }
 
   if ($Optional) {
@@ -56,12 +60,20 @@ function Invoke-GitHubJson {
     [object]$Body = $null
   )
 
-  if ($null -eq $Body) {
-    return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers
+  $json = if ($null -eq $Body) { $null } else { $Body | ConvertTo-Json -Depth 12 }
+  for ($attempt = 1; $attempt -le 3; $attempt += 1) {
+    try {
+      if ($null -eq $json) {
+        return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers
+      }
+      return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $json -ContentType "application/json"
+    } catch {
+      $status = $_.Exception.Response.StatusCode.value__
+      $retryable = -not $status -or $status -eq 408 -or $status -eq 429 -or $status -ge 500
+      if (-not $retryable -or $attempt -eq 3) { throw }
+      Start-Sleep -Seconds ([Math]::Pow(2, $attempt))
+    }
   }
-
-  $json = $Body | ConvertTo-Json -Depth 12
-  return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $json -ContentType "application/json"
 }
 
 $githubToken = Get-SecretValue -EnvironmentName "GITHUB_TOKEN" -Prompt "Paste temporary GitHub token"

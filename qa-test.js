@@ -190,10 +190,21 @@ test("home renders core client sections", () => {
   assert(html.includes("How Booking Works"), "booking process missing");
   assert(html.includes("Booking Prep Checklist"), "prep checklist missing");
   assert(html.includes("Mini Service Quiz"), "service quiz missing");
+  assert(html.includes("On schedule (6 to 8 weeks since last retwist)"), "on-schedule timing clarification missing");
+  assert(html.includes("Loc accessories only"), "loc-accessories quiz option missing");
+  assert(!html.includes("Style or sparkle too"), "outdated style-or-sparkle quiz option still shown");
   assert(html.includes("Referral Rewards"), "referral share section missing");
   assert(html.includes("data-share-booking"), "share booking button missing");
   assert(html.includes("ios-share-icon"), "iphone-style share icon missing");
   assert(html.includes("data-copy-booking"), "copy booking button missing");
+});
+
+test("site shell loads the deployed mini-quiz wording patch", () => {
+  const html = fs.readFileSync("index.html", "utf8");
+  const patch = fs.readFileSync("quiz-copy-hotfix.js", "utf8");
+  assert(html.includes("quiz-copy-hotfix.js?v=20260613-timing-labels"), "mini-quiz wording patch is not loaded");
+  assert(patch.includes("On schedule (6 to 8 weeks since last retwist)"), "deployed on-schedule wording missing");
+  assert(patch.includes("Loc accessories only"), "deployed accessories-only wording missing");
 });
 
 test("site shell keeps public policy links in the left menu and hides owner admin by default", () => {
@@ -262,9 +273,6 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
   assert(html.includes("Discount Code Settings"), "admin discount settings section missing");
   assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
-  assert(html.includes("First-Time Client Code"), "admin first-time code settings section missing");
-  assert(html.includes("data-save-first-time-code-settings"), "admin first-time code save control missing");
-  assert(html.includes('value="LOVELYLOCS"'), "permanent first-time code should default to LOVELYLOCS");
   assert(html.includes("Notification Status"), "launch readiness notification status missing");
   assert(html.includes("data-refresh-notification-status"), "notification status refresh control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
@@ -406,6 +414,8 @@ test("sms opt-in route renders consent proof form", () => {
   const html = appHtml();
   assert(html.includes("SMS Opt-In"), "sms opt-in page missing");
   assert(html.includes("Lovely Locs Text Message Opt-In"), "sms consent form heading missing");
+  assert(html.includes("Coming Soon"), "sms opt-in page should mark text messaging as coming soon");
+  assert(html.includes("Text service is not active yet"), "sms opt-in page should explain current text availability");
   assert(html.includes("appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates"), "transactional opt-in scope missing");
   assert(html.includes('name="smsConsent" type="checkbox"'), "sms consent checkbox missing");
   assert(!html.includes('name="smsConsent" type="checkbox" checked'), "sms consent checkbox must not be preselected");
@@ -452,7 +462,6 @@ test("referral codes use the LOVELYLOCS username format", () => {
   assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");
   assert(context.normalizeReferralCode(" lovelylocs / Referral Owner ") === "LOVELYLOCS/REFERRALOWNER", "referral code normalizer should remove username spaces");
   assert(context.referralCodeForName("Fatima Diallo") === "LOVELYLOCS/FATIMADIALLO", "client name should create the visible personal referral code");
-  assert(context.normalizeReferralCode("lovelylocs") === "LOVELYLOCS", "general first-time code should normalize to LOVELYLOCS");
   const card = context.personalReferralCard({ fullName: "Fatima Diallo", preview: true });
   assert(card.includes("LOVELYLOCS/FATIMADIALLO"), "personal referral preview should plug in the supplied client name");
   assert(card.includes("Copy Code") && card.includes("Copy Link") && card.includes("Share"), "personal referral preview should offer one-click sharing controls");
@@ -580,6 +589,9 @@ test("booking form has required client fields", () => {
   assert(html.includes('value="text"'), "text contact option missing");
   assert(html.includes('value="email"'), "email contact option missing");
   assert(html.includes('Text + Email'), "text plus email contact option missing");
+  assert(html.includes("Text messaging is coming soon while carrier approval is completed"), "checkout should explain that text messaging is coming soon");
+  assert((html.match(/Coming Soon/g) || []).length >= 2, "checkout should mark both text contact choices as coming soon");
+  assert(html.includes('value="email" checked'), "new bookings should default to the active email contact option");
   assert(!html.includes('name="address"'), "address field should not be shown for studio-only bookings");
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
@@ -862,10 +874,6 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/site-settings"), "site settings endpoint missing");
   assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
   assert(server.includes("sanitizeDiscountSettings"), "discount settings sanitizer missing");
-  assert(server.includes("sanitizeFirstTimeCodeSettings"), "first-time code settings sanitizer missing");
-  assert(server.includes("activeFirstTimeCodeFor"), "first-time code validator missing");
-  assert(server.includes('"LOVELYLOCS"'), "permanent LOVELYLOCS code missing");
-  assert(server.includes('"first_time_client_code"'), "first-time code booking source missing");
   assert(server.includes("/api/discount/validate"), "discount validation endpoint missing");
   assert(server.includes("/api/discount/email"), "discount email endpoint missing");
   assert(server.includes("activeDiscountForCode"), "server discount validator missing");

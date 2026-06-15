@@ -59,11 +59,6 @@ const defaultSiteSettings = {
     enabled: false,
     expiresAt: "",
   },
-  firstTimeCode: {
-    code: "LOVELYLOCS",
-    amountOff: 15,
-    enabled: true,
-  },
 };
 
 const serviceCatalog = [
@@ -1035,15 +1030,6 @@ function sanitizeDiscountSettings(discount = {}) {
   };
 }
 
-function sanitizeFirstTimeCodeSettings(firstTimeCode = {}) {
-  return {
-    code: normalizeDiscountCode(firstTimeCode.code || defaultSiteSettings.firstTimeCode.code)
-      || defaultSiteSettings.firstTimeCode.code,
-    amountOff: clampNumber(firstTimeCode.amountOff, 0, 500, defaultSiteSettings.firstTimeCode.amountOff),
-    enabled: Boolean(firstTimeCode.enabled),
-  };
-}
-
 function readSiteSettings() {
   if (!fs.existsSync(settingsFile)) return defaultSiteSettings;
   try {
@@ -1053,7 +1039,6 @@ function readSiteSettings() {
       ...saved,
       logo: sanitizeLogoSettings(saved.logo || {}),
       discount: sanitizeDiscountSettings(saved.discount || {}),
-      firstTimeCode: sanitizeFirstTimeCodeSettings(saved.firstTimeCode || defaultSiteSettings.firstTimeCode),
     };
   } catch {
     return defaultSiteSettings;
@@ -1067,7 +1052,6 @@ function saveSiteSettings(settings = {}) {
     ...current,
     logo: sanitizeLogoSettings(settings.logo || current.logo),
     discount: sanitizeDiscountSettings(settings.discount || current.discount),
-    firstTimeCode: sanitizeFirstTimeCodeSettings(settings.firstTimeCode || current.firstTimeCode),
   };
   fs.writeFileSync(settingsFile, JSON.stringify(clean, null, 2), "utf8");
   return clean;
@@ -1089,14 +1073,6 @@ function activeDiscountForCode(code) {
   if (!requestedCode) return null;
   if (!settings.enabled) return null;
   if (discountIsExpired(settings)) return null;
-  if (normalizeDiscountCode(settings.code) !== requestedCode) return null;
-  return settings;
-}
-
-function activeFirstTimeCodeFor(code) {
-  const settings = readSiteSettings().firstTimeCode;
-  const requestedCode = normalizeDiscountCode(code);
-  if (!requestedCode || !settings.enabled) return null;
   if (normalizeDiscountCode(settings.code) !== requestedCode) return null;
   return settings;
 }
@@ -1152,19 +1128,17 @@ function qualifiesForReferredNewClientDiscount(selectedServices = []) {
 function referredNewClientDiscount(client, total, selectedServices = [], records = readBookingRecords()) {
   const code = normalizeReferralCode(client?.referredByCode);
   if (!code) return null;
-  const firstTimeCode = activeFirstTimeCodeFor(code);
-  const referrer = firstTimeCode ? null : findReferrerByCode(code, records);
-  if (!firstTimeCode && (!referrer || sameClient(referrer.client, client))) return null;
+  const referrer = findReferrerByCode(code, records);
+  if (!referrer || sameClient(referrer.client, client)) return null;
   if (latestClientBooking(client, records)) return null;
   if (!qualifiesForReferredNewClientDiscount(selectedServices)) return null;
-  const configuredAmount = firstTimeCode ? firstTimeCode.amountOff : referredNewClientCreditAmount;
-  const amountOff = Math.min(total, Math.max(0, Math.round(configuredAmount)));
+  const amountOff = Math.min(total, Math.max(0, Math.round(referredNewClientCreditAmount)));
   if (!amountOff) return null;
   return {
-    type: firstTimeCode ? "first_time_client" : "referral_new_client",
+    type: "referral_new_client",
     code: `NEW-${code}`,
     amountOff,
-    source: firstTimeCode ? "first_time_client_code" : "referral_new_client_rate",
+    source: "referral_new_client_rate",
   };
 }
 
@@ -2825,11 +2799,7 @@ const server = http.createServer((req, res) => {
         sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
         return;
       }
-      const settings = saveSiteSettings({
-        logo: body.logo,
-        discount: body.discount,
-        firstTimeCode: body.firstTimeCode,
-      });
+      const settings = saveSiteSettings({ logo: body.logo, discount: body.discount });
       sendJson(res, 200, { ok: true, settings });
     }).catch(error => {
       sendJson(res, 400, { ok: false, error: error.message });

@@ -47,11 +47,6 @@ const defaultDiscountSettings = {
   enabled: false,
   expiresAt: ""
 };
-const defaultFirstTimeCodeSettings = {
-  code: "LOVELYLOCS",
-  amountOff: 15,
-  enabled: true
-};
 
 const services = [
   { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
@@ -307,9 +302,9 @@ const serviceQuizQuestions = [
     id: "timing",
     label: "Timing",
     options: [
-      { value: "fresh", label: "On schedule", guide: "maintenance" },
+      { value: "fresh", label: "On schedule (6 to 8 weeks since last retwist)", guide: "maintenance" },
       { value: "overdue", label: "4+ months since retwist", guide: "maintenance", highlight: "Overdue Retwist" },
-      { value: "extra", label: "Style or sparkle too", guide: "extra-style" }
+      { value: "extra", label: "Loc accessories only", guide: "extra-style" }
     ]
   }
 ];
@@ -401,7 +396,7 @@ function saveBookingDraft(form) {
     birthday: data.get("birthday") || "",
     referredByCode: data.get("referredByCode") || "",
     emergencySlot: Boolean(data.get("emergencySlot")),
-    preferredContact: data.get("preferredContact") || "text_email",
+    preferredContact: data.get("preferredContact") || "email",
     smsOptIn: Boolean(data.get("smsOptIn")),
     specialRequests: data.get("specialRequests") || "",
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
@@ -514,28 +509,6 @@ function saveDiscountSettingsLocal(settings) {
   }
 }
 
-function loadFirstTimeCodeSettings() {
-  try {
-    return {
-      ...defaultFirstTimeCodeSettings,
-      ...JSON.parse(localStorage.getItem("lovelyLocsFirstTimeCodeSettings") || "{}")
-    };
-  } catch {
-    return { ...defaultFirstTimeCodeSettings };
-  }
-}
-
-function saveFirstTimeCodeSettingsLocal(settings) {
-  firstTimeCodeSettings = {
-    ...defaultFirstTimeCodeSettings,
-    ...settings,
-    code: normalizeDiscountCode(settings?.code || defaultFirstTimeCodeSettings.code),
-    amountOff: Number(settings?.amountOff ?? defaultFirstTimeCodeSettings.amountOff),
-    enabled: Boolean(settings?.enabled)
-  };
-  localStorage.setItem("lovelyLocsFirstTimeCodeSettings", JSON.stringify(firstTimeCodeSettings));
-}
-
 function loadAppliedDiscount() {
   try {
     const saved = JSON.parse(localStorage.getItem("lovelyLocsAppliedDiscount") || "null");
@@ -580,7 +553,7 @@ function saveClientProfile(profile = {}) {
     locJourneyLength: profile.locJourneyLength || "",
     onboardingCompleted: Boolean(profile.onboardingCompleted),
     googleLinked: Boolean(profile.googleLinked),
-    preferredContact: profile.preferredContact || "text_email",
+    preferredContact: profile.preferredContact || "email",
     smsOptIn: Boolean(profile.smsOptIn),
     marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
     referralOptIn: Boolean(profile.referralOptIn),
@@ -656,9 +629,6 @@ async function fetchLogoSettings() {
     if (result.ok && result.settings?.discount) {
       saveDiscountSettingsLocal(result.settings.discount);
     }
-    if (result.ok && result.settings?.firstTimeCode) {
-      saveFirstTimeCodeSettingsLocal(result.settings.firstTimeCode);
-    }
   } catch {
     applyLogoSettings();
   }
@@ -682,7 +652,6 @@ let bookingSlotState = {
 };
 let logoSettings = loadLogoSettings();
 let discountSettings = loadDiscountSettings();
-let firstTimeCodeSettings = loadFirstTimeCodeSettings();
 let appliedDiscount = loadAppliedDiscount();
 let savedClientProfile = loadClientProfile();
 let advisoryMessage = "";
@@ -1649,13 +1618,14 @@ function smsOptInPage() {
   return `
     <section class="hero route-page" id="sms-opt-in-page">
       <h1>SMS Opt-In</h1>
-      <p class="subtitle">Choose whether you want Lovely Locs booking confirmations, payment updates, appointment reminders, and service-related text updates.</p>
+      <p class="subtitle">Text messaging is coming soon. You can provide consent now for future booking confirmations, payment updates, appointment reminders, and service-related text updates.</p>
     </section>
     <section class="section">
       <div class="narrow legal-stack">
         <div class="policy-box sms-optin-proof">
           <p class="eyebrow">Consent Form</p>
-          <h2>Lovely Locs Text Message Opt-In</h2>
+          <h2>Lovely Locs Text Message Opt-In <span class="coming-soon-badge">Coming Soon</span></h2>
+          <p class="coming-soon-notice"><strong>Text service is not active yet.</strong> Email confirmations remain available while Lovely Locs completes carrier approval.</p>
           <p>Complete this form if you would like to receive booking-related text messages from Lovely Locs. Texts may include appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates.</p>
           <form class="sms-optin-form">
             <label>Full Name<input name="smsOptInName" placeholder="Your name"></label>
@@ -1800,7 +1770,6 @@ function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
   const settings = { ...defaultLogoSettings, ...logoSettings };
   const discount = { ...defaultDiscountSettings, ...discountSettings };
-  const firstTimeCode = { ...defaultFirstTimeCodeSettings, ...firstTimeCodeSettings };
   const confirmParams = manualDepositConfirmParams();
   const confirmNotice = confirmParams.active
     ? `<p class="advisory-copy">Owner confirm link loaded. Review the matching Venmo or Apple Pay receipt, then press the confirmation button below. If the token field is blank, enter your owner confirmation token first.</p>`
@@ -1928,19 +1897,6 @@ function adminPage() {
             </div>
             <p class="form-error" id="brandSettingsStatus" aria-live="polite"></p>
             <button class="primary-btn" type="button" data-save-logo-settings>Save Logo Settings</button>
-          </form>
-        </div>
-        <div class="policy-box brand-settings-box">
-          <p class="eyebrow">Owner Promotions</p>
-          <h2>First-Time Client Code</h2>
-          <p>This permanent code gives a verified first-time client a flat discount on an eligible service over $75. It has no expiration date and stays available until you turn it off here.</p>
-          <form class="brand-settings-form" id="firstTimeCodeSettingsForm">
-            <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
-            <label>Code<input name="code" value="${firstTimeCode.code}" maxlength="24" readonly></label>
-            <label>Discount Amount<input name="amountOff" type="number" min="0" max="500" value="${firstTimeCode.amountOff}"></label>
-            <label class="full toggle-line"><input name="enabled" type="checkbox" ${firstTimeCode.enabled ? "checked" : ""}> First-time code is active</label>
-            <p class="form-error" id="firstTimeCodeSettingsStatus" aria-live="polite"></p>
-            <button class="primary-btn" type="button" data-save-first-time-code-settings>Save First-Time Code</button>
           </form>
         </div>
         <div class="policy-box brand-settings-box">
@@ -2278,15 +2234,15 @@ function bookingModal() {
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
           <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
-          <label>Referral or First-Time Code <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS or LOVELYLOCS/FRIENDNAME"><span class="field-note">First-time clients can enter LOVELYLOCS, or enter the personal code shared by the client who referred you.</span></label>
+          <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
           ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
-            <label><input name="preferredContact" type="radio" value="text_email" ${!profile.preferredContact || profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email</label>
-            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}> Text</label>
-            <label><input name="preferredContact" type="radio" value="email" ${profile.preferredContact === "email" ? "checked" : ""}> Email</label>
-            <p>Choose how you want client-facing confirmations delivered. SMS only sends if the client checks the text-message consent box.</p>
+            <label><input name="preferredContact" type="radio" value="text_email" ${profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email <span class="coming-soon-label">Coming Soon</span></label>
+            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}> Text <span class="coming-soon-label">Coming Soon</span></label>
+            <label><input name="preferredContact" type="radio" value="email" ${!profile.preferredContact || profile.preferredContact === "email" ? "checked" : ""}> Email</label>
+            <p>Text messaging is coming soon while carrier approval is completed. Choose Email for active confirmations. You may still provide optional text-message consent now.</p>
           </fieldset>
           <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
@@ -2590,7 +2546,6 @@ function bindDynamic() {
   });
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
-  document.querySelectorAll("[data-save-first-time-code-settings]").forEach(button => button.addEventListener("click", saveFirstTimeCodeSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
@@ -3099,43 +3054,6 @@ async function saveDiscountSettings() {
   }
 }
 
-function firstTimeCodeSettingsFromForm() {
-  const form = document.getElementById("firstTimeCodeSettingsForm");
-  const data = new FormData(form);
-  return {
-    code: normalizeDiscountCode(data.get("code")),
-    amountOff: Number(data.get("amountOff")),
-    enabled: Boolean(data.get("enabled"))
-  };
-}
-
-async function saveFirstTimeCodeSettings() {
-  const form = document.getElementById("firstTimeCodeSettingsForm");
-  const status = document.getElementById("firstTimeCodeSettingsStatus");
-  if (!form) return;
-  const data = new FormData(form);
-  const token = data.get("token") || "";
-  const settings = firstTimeCodeSettingsFromForm();
-  if (status) status.textContent = "Saving first-time code...";
-  try {
-    const response = await fetch("/api/site-settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, firstTimeCode: settings })
-    });
-    const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "First-time code could not be saved.");
-    saveFirstTimeCodeSettingsLocal(result.settings.firstTimeCode);
-    if (status) {
-      status.textContent = result.settings.firstTimeCode.enabled
-        ? `${result.settings.firstTimeCode.code} is active with no expiration date.`
-        : `${result.settings.firstTimeCode.code} is revoked.`;
-    }
-  } catch (error) {
-    if (status) status.textContent = error.message;
-  }
-}
-
 async function confirmManualDeposit() {
   const form = document.getElementById("manualDepositConfirmForm");
   const status = document.getElementById("manualDepositConfirmStatus");
@@ -3427,7 +3345,7 @@ function bookingPayloadFromForm(form) {
       date: data.get("date") || "",
       time: data.get("time") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),
-      preferredContact: data.get("preferredContact") || "text_email",
+      preferredContact: data.get("preferredContact") || "email",
       smsOptIn: communicationsOptIn,
       marketingEmailOptIn: false,
       referralOptIn: false,

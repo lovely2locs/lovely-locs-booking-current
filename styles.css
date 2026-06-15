@@ -2443,6 +2443,39 @@ textarea { min-height: 92px; resize: vertical; }
   margin: 2px 0 0;
 }
 
+.coming-soon-label,
+.coming-soon-badge {
+  border: 1px solid rgba(173, 98, 65, 0.35);
+  border-radius: 999px;
+  background: rgba(173, 98, 65, 0.1);
+  color: var(--brown);
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 5px 7px;
+  text-transform: uppercase;
+}
+
+.coming-soon-label {
+  margin-left: auto;
+}
+
+.coming-soon-badge {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.coming-soon-notice {
+  border: 1px solid rgba(173, 98, 65, 0.28);
+  border-radius: 12px;
+  background: rgba(173, 98, 65, 0.08);
+  color: var(--brown);
+  padding: 12px 14px;
+}
+
 .policy-ack {
   display: grid;
   grid-template-columns: 20px 1fr;

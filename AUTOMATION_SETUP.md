@@ -24,7 +24,7 @@ Those provider secrets stay in Render environment variables. They should not be 
 
 For full automation, use:
 
-- `GITHUB_TOKEN`: GitHub token with contents read/write access for `lovely2locs/lovely-locs-booking`.
+- `GITHUB_TOKEN`: GitHub token with contents read/write access for `lovely2locs/lovely-locs-booking-current`. Store it in the Windows user environment so local deploy scripts and scheduled Codex jobs can use it without placing the token in project files.
 - `RENDER_API_KEY`: Render API key for triggering the deploy.
 
 Optional environment overrides:

@@ -651,6 +651,8 @@ function bookingStatus(booking, records) {
     if (bookingRecordId(record) !== booking.id) continue;
     if (record.status === "deposit_paid" || record.type === "stripe.checkout.session.completed" || record.type === "manual.deposit.confirmed") {
       status = "deposit_paid";
+    } else if (record.status === "released_unpaid" || record.type === "manual.deposit.released_unpaid") {
+      status = "released_unpaid";
     } else if (record.status === "no_charge_test") {
       status = "no_charge_test";
     }
@@ -1275,18 +1277,12 @@ function findBookingById(id) {
 function bookedTimesForDate(date) {
   if (!date || !fs.existsSync(bookingsFile)) return new Set();
   const booked = new Set();
-  const lines = fs.readFileSync(bookingsFile, "utf8").split(/\r?\n/).filter(Boolean);
-  for (const line of lines) {
-    try {
-      const record = JSON.parse(line);
-      const status = String(record.status || "");
-      const isBookingRecord = record.client && Array.isArray(record.cart);
-      if (!isBookingRecord || record.client.date !== date || !record.client.time) continue;
-      if (["pending_manual_payment", "pending_payment", "deposit_paid", "no_charge_test"].includes(status)) {
-        booked.add(record.client.time);
-      }
-    } catch {
-      // Ignore malformed historical lines.
+  const records = readBookingRecords();
+  for (const booking of latestBookingRecords(records)) {
+    const status = bookingStatus(booking, records);
+    if (booking.client?.date !== date || !booking.client?.time) continue;
+    if (["pending_manual_payment", "pending_payment", "deposit_paid", "no_charge_test"].includes(status)) {
+      booked.add(booking.client.time);
     }
   }
   return booked;
@@ -2168,6 +2164,67 @@ async function handleManualPaymentConfirm(req, res) {
   }
 }
 
+async function handleManualPaymentRelease(req, res) {
+  try {
+    const raw = await readBody(req);
+    const body = JSON.parse(raw || "{}");
+    if (!tokenIsValid(body.token || "")) {
+      sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
+      return;
+    }
+    const bookingId = String(body.booking || body.bookingId || "").trim();
+    const reason = String(body.reason || "Deposit was not received before the hold release window.").trim();
+    const booking = findBookingById(bookingId);
+    if (!booking) {
+      sendJson(res, 404, { ok: false, error: "No matching Lovely Locs booking was found." });
+      return;
+    }
+    const records = readBookingRecords();
+    const status = bookingStatus(booking, records);
+    if (!["pending_manual_payment", "pending_payment"].includes(status)) {
+      sendJson(res, 409, { ok: false, error: `This booking is ${status || "not pending"} and cannot be released as unpaid.` });
+      return;
+    }
+    const existingRelease = records
+      .reverse()
+      .find(record => bookingRecordId(record) === bookingId && record.type === "manual.deposit.released_unpaid");
+    if (existingRelease) {
+      sendJson(res, 200, {
+        ok: true,
+        bookingId,
+        alreadyReleased: true,
+        status: "released_unpaid",
+        appointment: {
+          date: booking.client?.date || "",
+          time: booking.client?.time || "",
+        },
+      });
+      return;
+    }
+    appendBookingRecord({
+      type: "manual.deposit.released_unpaid",
+      bookingId,
+      receivedAt: new Date().toISOString(),
+      status: "released_unpaid",
+      reason,
+      releasedBy: "owner",
+    });
+    sendJson(res, 200, {
+      ok: true,
+      bookingId,
+      alreadyReleased: false,
+      status: "released_unpaid",
+      appointment: {
+        date: booking.client?.date || "",
+        time: booking.client?.time || "",
+      },
+      message: "Unpaid hold released. The appointment time can be booked again.",
+    });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
+
 function handleAdminBookingLookup(req, res) {
   try {
     const url = new URL(req.url || "/", publicSiteUrl(req));
@@ -2871,6 +2928,11 @@ const server = http.createServer((req, res) => {
 
   if (["GET", "POST"].includes(req.method) && (req.url || "").split("?")[0] === "/api/manual-payment/confirm") {
     handleManualPaymentConfirm(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/manual-payment/release") {
+    handleManualPaymentRelease(req, res);
     return;
   }
 

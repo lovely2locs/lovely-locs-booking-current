@@ -634,6 +634,7 @@ function applyLogoSettings() {
   document.documentElement.style.setProperty("--logo-position", `${settings.x}% ${settings.y}%`);
   document.documentElement.style.setProperty("--logo-offset-x", `${offsetX}%`);
   document.documentElement.style.setProperty("--logo-offset-y", `${offsetY}%`);
+  document.documentElement.style.setProperty("--logo-image-scale", settings.fit === "contain" ? "1" : "1.16");
   document.documentElement.style.setProperty("--hero-logo-margin-inline", settings.heroAlign === "center" ? "auto" : settings.heroAlign === "right" ? "auto 0" : "0 auto");
   document.querySelectorAll("[data-brand-logo], [data-site-logo], [data-admin-logo-preview]").forEach(image => {
     if (image.getAttribute("src") !== activeLogoUrl) image.setAttribute("src", activeLogoUrl);

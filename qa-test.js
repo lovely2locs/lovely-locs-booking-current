@@ -286,7 +286,7 @@ test("admin route offers free no-charge test booking", () => {
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
-  assert(html.includes("Deposit Required to Hold Slot: $0"), "admin test deposit should be zero");
+  assert(html.includes("Deposit Required Before Confirmation: $0"), "admin test deposit should be zero");
   assert(html.includes('name="adminToken"'), "admin no-charge booking should require the owner token");
   assert(html.includes("Submit No-Charge Test Booking"), "admin no-charge submit button missing");
 });
@@ -325,7 +325,8 @@ test("payment options route renders manual deposit instructions", () => {
   assert(html.includes("Venmo"), "Venmo option missing");
   assert(!html.includes("Cash App"), "Cash App should be hidden until re-enabled");
   assert(html.includes("Apple Pay"), "Apple Pay option missing");
-  assert(html.includes("verify the receipt"), "manual verification language missing");
+  assert(html.includes("not finalized yet"), "payment page should clarify appointment is not finalized before deposit");
+  assert(html.includes("official confirmation once the deposit is confirmed as received"), "manual verification confirmation language missing");
   assert(html.includes("LOVELYLOCS/TESTCLIENT"), "payment page should show the client's referral code");
   assert(html.includes("data-copy-personal-referral-code"), "payment page referral code copy button missing");
   assert(html.includes("data-copy-personal-referral-link"), "payment page referral link copy button missing");

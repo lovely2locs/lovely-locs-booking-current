@@ -22,6 +22,7 @@
   --logo-position: 50% 50%;
   --logo-offset-x: 0%;
   --logo-offset-y: 0%;
+  --logo-image-scale: 1.16;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 }
@@ -363,11 +364,11 @@ h1, h2, h3,
 }
 
 .hero-logo img {
-  width: 118%;
-  height: 118%;
+  width: 100%;
+  height: 100%;
   object-fit: var(--logo-fit);
   object-position: var(--logo-position);
-  transform: translate(var(--logo-offset-x), var(--logo-offset-y));
+  transform: translate(var(--logo-offset-x), var(--logo-offset-y)) scale(var(--logo-image-scale));
 }
 
 .hero h1 {

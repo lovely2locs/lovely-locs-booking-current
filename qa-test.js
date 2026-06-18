@@ -936,6 +936,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("async function confirmManualDeposit"), "manual deposit confirmation handler missing");
   assert(script.includes("async function releaseUnpaidHold"), "unpaid hold release handler missing");
   assert(script.includes("async function resendClientConfirmation"), "client confirmation resend handler missing");
+  assert(script.includes("function openPayOptionsRoute"), "payment options in-app route fallback missing");
+  assert(script.includes("window.history?.pushState"), "payment options should not rely only on full-page redirects");
   assert(script.includes("data-confirm-manual-deposit"), "manual deposit confirmation button binding missing");
   assert(script.includes("data-release-unpaid-hold"), "unpaid hold release button binding missing");
   assert(script.includes("completed confirmations will not be duplicated"), "manual deposit interrupted-response guidance missing");
@@ -999,6 +1001,13 @@ test("mobile cart uses one roomy full-height scroll area", () => {
   assert(styles.includes("overscroll-behavior: contain"), "mobile cart should contain its page scroll");
   assert(styles.includes(".cart-items {\n    flex: none;\n    overflow: visible;"), "mobile cart items should not collapse into a short nested scroller");
   assert(styles.includes("min-height: 112px"), "mobile cart item cards should preserve enough room for item details");
+});
+
+test("dark mode primary buttons keep readable contrast", () => {
+  const styles = fs.readFileSync("styles.css", "utf8");
+  assert(styles.includes(".dark .primary-btn"), "dark mode primary button override missing");
+  assert(styles.includes("color: #fffaf7"), "dark mode primary button text should stay light");
+  assert(styles.includes("#3b2821"), "dark mode primary button needs a dark contrast background");
 });
 
 test("redesigned hero is proof-led instead of abstract art-led", () => {

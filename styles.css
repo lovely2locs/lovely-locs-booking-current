@@ -480,9 +480,21 @@ h1, h2, h3,
 .primary-btn {
   background: linear-gradient(135deg, var(--plum), var(--brown));
   color: white;
+  font-weight: 800;
   box-shadow: 0 14px 30px rgba(109, 61, 76, 0.22);
 }
 .primary-btn:hover { background: var(--dark-brown); transform: translateY(-1px); }
+
+.dark .primary-btn {
+  background: linear-gradient(135deg, #7d5770, #3b2821);
+  border-color: #d7acd0;
+  color: #fffaf7;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38);
+}
+.dark .primary-btn:hover {
+  background: #231916;
+  color: #fffaf7;
+}
 
 .outline-btn {
   color: var(--brown);

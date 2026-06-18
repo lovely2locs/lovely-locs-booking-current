@@ -20,6 +20,8 @@
   --hero-logo-margin-inline: 0 auto;
   --logo-fit: cover;
   --logo-position: 50% 50%;
+  --logo-offset-x: 0%;
+  --logo-offset-y: 0%;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 }
@@ -360,7 +362,13 @@ h1, h2, h3,
   overflow: hidden;
 }
 
-.hero-logo img { width: 100%; height: 100%; object-fit: var(--logo-fit); object-position: var(--logo-position); }
+.hero-logo img {
+  width: 118%;
+  height: 118%;
+  object-fit: var(--logo-fit);
+  object-position: var(--logo-position);
+  transform: translate(var(--logo-offset-x), var(--logo-offset-y));
+}
 
 .hero h1 {
   margin: 0 0 24px;
@@ -1260,8 +1268,13 @@ h1, h2, h3,
   padding: 22px;
 }
 
+.brand-preview-track {
+  width: 100%;
+}
+
 .admin-logo-preview {
   margin: 0;
+  margin-inline: var(--hero-logo-margin-inline);
 }
 
 .brand-settings-form {
@@ -1283,10 +1296,12 @@ h1, h2, h3,
 
 .brand-settings-form input[type="password"],
 .brand-settings-form input[type="text"],
+.brand-settings-form input[type="url"],
 .brand-settings-form input[type="email"],
 .brand-settings-form input[type="tel"],
 .brand-settings-form input[type="number"],
 .brand-settings-form input[type="date"],
+.brand-settings-form input[type="file"],
 .brand-settings-form select,
 .brand-settings-form input:not([type]) {
   border: 1px solid var(--border);

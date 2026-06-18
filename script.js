@@ -34,6 +34,7 @@ const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
 const defaultLogoSettings = {
+  url: logoUrl,
   navSize: 40,
   heroSize: 88,
   heroAlign: "left",
@@ -314,7 +315,7 @@ const bookingPrepItems = [
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
   { title: "Choose product preferences", copy: "Maintenance clients can note Oil and Water, Foam, or Gel so the finish matches their scalp and style goals." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
-  { title: "Wait for final confirmation", copy: "The official confirmation is sent after Lovely Locs verifies your deposit receipt. Emergency proposals may need an extra owner follow-up." }
+  { title: "Wait for final confirmation", copy: "Submitting the form does not finalize your appointment. Your official confirmation is sent only after Lovely Locs verifies that your deposit was received. Emergency proposals may need an extra owner follow-up." }
 ];
 
 const visualVersions = [
@@ -534,6 +535,18 @@ function escapeAttr(value) {
     .replace(/>/g, "&gt;");
 }
 
+function cleanLogoUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return logoUrl;
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(url)) return url;
+  if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(url) && url.length <= 1500000) return url;
+  return logoUrl;
+}
+
+function currentLogoUrl(settings = logoSettings) {
+  return cleanLogoUrl(settings?.url || logoUrl);
+}
+
 function loadClientProfile() {
   try {
     const profile = JSON.parse(localStorage.getItem("lovelyLocsClientProfile") || "null");
@@ -611,12 +624,21 @@ function clearClientProfile() {
 
 function applyLogoSettings() {
   const settings = { ...defaultLogoSettings, ...logoSettings };
+  const offsetX = ((Number(settings.x) || 50) - 50) * 0.36;
+  const offsetY = ((Number(settings.y) || 50) - 50) * 0.36;
+  const activeLogoUrl = currentLogoUrl(settings);
   if (!document.documentElement?.style?.setProperty) return;
   document.documentElement.style.setProperty("--nav-logo-size", `${settings.navSize}px`);
   document.documentElement.style.setProperty("--hero-logo-size", `${settings.heroSize}px`);
   document.documentElement.style.setProperty("--logo-fit", settings.fit);
   document.documentElement.style.setProperty("--logo-position", `${settings.x}% ${settings.y}%`);
+  document.documentElement.style.setProperty("--logo-offset-x", `${offsetX}%`);
+  document.documentElement.style.setProperty("--logo-offset-y", `${offsetY}%`);
   document.documentElement.style.setProperty("--hero-logo-margin-inline", settings.heroAlign === "center" ? "auto" : settings.heroAlign === "right" ? "auto 0" : "0 auto");
+  document.querySelectorAll("[data-brand-logo], [data-site-logo], [data-admin-logo-preview]").forEach(image => {
+    if (image.getAttribute("src") !== activeLogoUrl) image.setAttribute("src", activeLogoUrl);
+  });
+  document.querySelector("link[rel='icon']")?.setAttribute("href", activeLogoUrl);
 }
 
 async function fetchLogoSettings() {
@@ -933,7 +955,7 @@ function homePage() {
     <section class="hero">
       <div class="hero-inner">
         <div class="hero-copy">
-          <div class="hero-logo"><img src="${logoUrl}" alt="Lovely Locs Logo"></div>
+          <div class="hero-logo"><img data-site-logo src="${escapeAttr(currentLogoUrl())}" alt="Lovely Locs Logo"></div>
           <h1>Lovely Locs</h1>
           <p class="subtitle">Private loc care with clear prices, honest service guidance, and a calm studio experience.</p>
           <div class="intro-copy">
@@ -1700,7 +1722,7 @@ function paymentOptionsPage() {
   return `
     <section class="hero route-page" id="payment-options-page">
       <h1>Pay Your Lovely Locs Deposit</h1>
-      <p class="subtitle">Use Venmo or Apple Pay, then Lovely Locs will verify the receipt before sending the official confirmation.</p>
+      <p class="subtitle">Your appointment is not finalized yet. Use Venmo or Apple Pay for the required deposit, then Lovely Locs will verify the receipt and send your official confirmation once the deposit is confirmed as received.</p>
     </section>
     <section class="section payment-options-section">
       <div class="container">
@@ -1769,6 +1791,11 @@ function manualDepositConfirmParams() {
 function adminPage() {
   const alreadyAdded = cart.some(item => item.id === adminTestService.id);
   const settings = { ...defaultLogoSettings, ...logoSettings };
+  const activeLogoUrl = currentLogoUrl(settings);
+  const logoUrlInputValue = activeLogoUrl.startsWith("data:image/") ? "" : activeLogoUrl;
+  const uploadedLogoNote = activeLogoUrl.startsWith("data:image/")
+    ? `<span class="field-note" data-logo-upload-note>Uploaded image is selected. Save settings to keep it for the live site.</span>`
+    : `<span class="field-note" data-logo-upload-note>Paste an image URL or choose a PNG, JPG, WebP, or GIF from this device.</span>`;
   const discount = { ...defaultDiscountSettings, ...discountSettings };
   const confirmParams = manualDepositConfirmParams();
   const confirmNotice = confirmParams.active
@@ -1876,16 +1903,20 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Owner Branding</p>
           <h2>Logo size and centering</h2>
-          <p>Use your private manual deposit token to save logo adjustments. Changes apply to the live site after saving, but may reset after a Render restart until we add permanent database storage.</p>
+          <p>Use your private manual deposit token to save logo image, size, and placement adjustments. Changes apply to the live site after saving, but may reset after a Render restart until we add permanent database storage.</p>
           <div class="brand-preview">
-            <div class="hero-logo admin-logo-preview"><img data-admin-logo-preview src="${logoUrl}" alt="Lovely Locs Logo preview"></div>
+            <div class="brand-preview-track">
+              <div class="hero-logo admin-logo-preview"><img data-admin-logo-preview src="${escapeAttr(activeLogoUrl)}" alt="Lovely Locs Logo preview"></div>
+            </div>
           </div>
           <form class="brand-settings-form" id="brandSettingsForm">
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
+            <label class="full">Logo Image URL<input name="url" type="url" value="${escapeAttr(logoUrlInputValue)}" placeholder="https://.../logo.png"><span class="field-note">Use a public image URL for the cleanest saved logo change.</span></label>
+            <label class="full">Upload Logo Image<input name="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">${uploadedLogoNote}</label>
             <label>Top Nav Logo Size <input name="navSize" type="range" min="28" max="72" value="${settings.navSize}"><span data-logo-value="navSize">${settings.navSize}px</span></label>
             <label>Hero Logo Size <input name="heroSize" type="range" min="56" max="180" value="${settings.heroSize}"><span data-logo-value="heroSize">${settings.heroSize}px</span></label>
-            <label>Logo Left/Right Crop <input name="x" type="range" min="0" max="100" value="${settings.x}"><span data-logo-value="x">${settings.x}%</span></label>
-            <label>Logo Up/Down Crop <input name="y" type="range" min="0" max="100" value="${settings.y}"><span data-logo-value="y">${settings.y}%</span></label>
+            <label>Move Image Left/Right <input name="x" type="range" min="0" max="100" value="${settings.x}"><span data-logo-value="x">${settings.x}%</span></label>
+            <label>Move Image Up/Down <input name="y" type="range" min="0" max="100" value="${settings.y}"><span data-logo-value="y">${settings.y}%</span></label>
             <div class="full brand-segment">
               <span>Hero alignment</span>
               <button type="button" class="${settings.heroAlign === "left" ? "active" : ""}" data-logo-align="left">Left</button>
@@ -2097,7 +2128,7 @@ function updateBookingSummaryTotals() {
   const discountNode = document.getElementById("bookingDiscountText");
   if (totalNode) totalNode.textContent = `Estimated Total: ${money(total)}`;
   if (discountNode) discountNode.textContent = discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : "";
-  if (depositNode) depositNode.textContent = `Deposit Required to Hold Slot: ${money(deposit)}`;
+  if (depositNode) depositNode.textContent = `Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.`;
   if (addOnsNode) {
     const addOns = cart.filter(item => item.type !== "service" || item.id === "emergency-fee");
     addOnsNode.textContent = addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : "";
@@ -2223,7 +2254,7 @@ function bookingModal() {
           ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
           <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : ""}</p>
           <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
-          <p id="bookingDepositText">Deposit Required to Hold Slot: ${money(deposit)}</p>
+          <p id="bookingDepositText">Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
         <div class="booking-save-note">
@@ -2529,7 +2560,8 @@ function bindDynamic() {
     loadAvailabilityForDate(event.target.value);
   });
   if (bookingDraft?.date) loadAvailabilityForDate(bookingDraft.date, bookingDraft);
-  document.querySelectorAll("#brandSettingsForm input[type='range']").forEach(input => input.addEventListener("input", previewLogoSettings));
+  document.querySelectorAll("#brandSettingsForm input[type='range'], #brandSettingsForm input[name='url']").forEach(input => input.addEventListener("input", previewLogoSettings));
+  document.querySelector("#brandSettingsForm input[name='logoFile']")?.addEventListener("change", handleLogoFileSelection);
   document.querySelectorAll("[data-logo-align]").forEach(button => {
     button.addEventListener("click", () => {
       logoSettings.heroAlign = button.dataset.logoAlign;
@@ -2975,7 +3007,9 @@ async function copySmsOptInLink() {
 function logoSettingsFromForm() {
   const form = document.getElementById("brandSettingsForm");
   const data = new FormData(form);
+  const manualUrl = String(data.get("url") || "").trim();
   return {
+    url: manualUrl || logoSettings.url || logoUrl,
     navSize: Number(data.get("navSize")),
     heroSize: Number(data.get("heroSize")),
     heroAlign: logoSettings.heroAlign,
@@ -2996,6 +3030,37 @@ function previewLogoSettings() {
   const settings = logoSettingsFromForm();
   saveLogoSettingsLocal(settings);
   updateLogoControlLabels(settings);
+}
+
+function handleLogoFileSelection(event) {
+  const file = event.target?.files?.[0];
+  const form = document.getElementById("brandSettingsForm");
+  const status = document.getElementById("brandSettingsStatus");
+  const note = document.querySelector("[data-logo-upload-note]");
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type || "")) {
+    if (status) status.textContent = "Choose a PNG, JPG, WebP, or GIF logo image.";
+    event.target.value = "";
+    return;
+  }
+  if (file.size > 1100000) {
+    if (status) status.textContent = "Choose a logo image under 1 MB so it can save reliably.";
+    event.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    logoSettings.url = String(reader.result || "");
+    const urlInput = form?.elements?.url;
+    if (urlInput) urlInput.value = "";
+    if (note) note.textContent = `${file.name} is previewing. Save settings to keep it for the live site.`;
+    if (status) status.textContent = "Logo image preview updated. Save settings to keep it for the live site.";
+    previewLogoSettings();
+  };
+  reader.onerror = () => {
+    if (status) status.textContent = "The logo image could not be read. Try a smaller image or paste a public image URL.";
+  };
+  reader.readAsDataURL(file);
 }
 
 async function saveLogoSettings() {
@@ -3489,7 +3554,7 @@ async function submitBooking() {
       paymentOptions: result.paymentOptions || manualPaymentFallbackOptions
     }));
     bookingConfirmation = {
-      message: "Your appointment request was saved. Redirecting to the Lovely Locs pay options page for the required deposit."
+      message: "Your appointment request was saved, but it is not finalized yet. Redirecting to the Lovely Locs pay options page for the required deposit. You will receive the official confirmation once Lovely Locs confirms the deposit was received."
     };
     window.location.href = result.payOptionsUrl;
     return;

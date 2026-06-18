@@ -1822,6 +1822,7 @@ function adminPage() {
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
           <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner Gmail or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
+          <p>If the deposit was not received, use the release button instead. That keeps the booking history but opens the appointment time again.</p>
           ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password" value="${escapeAttr(confirmParams.token)}"></label>
@@ -1833,6 +1834,7 @@ function adminPage() {
             </label>
             <p class="form-error" id="manualDepositConfirmStatus" aria-live="polite"></p>
             <button class="primary-btn" type="button" data-confirm-manual-deposit>Confirm Deposit &amp; Send Client Confirmation</button>
+            <button class="outline-btn" type="button" data-release-unpaid-hold>Deposit Not Received - Release Slot</button>
           </form>
         </div>
         <div class="policy-box brand-settings-box">
@@ -2547,6 +2549,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
+  document.querySelectorAll("[data-release-unpaid-hold]").forEach(button => button.addEventListener("click", releaseUnpaidHold));
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
   document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
@@ -3093,6 +3096,52 @@ async function confirmManualDeposit() {
     if (button) {
       button.disabled = false;
       button.textContent = "Confirm Deposit & Send Client Confirmation";
+    }
+  }
+}
+
+async function releaseUnpaidHold() {
+  const form = document.getElementById("manualDepositConfirmForm");
+  const status = document.getElementById("manualDepositConfirmStatus");
+  const button = form?.querySelector("[data-release-unpaid-hold]");
+  if (!form) return;
+  const data = new FormData(form);
+  const booking = String(data.get("booking") || "").trim();
+  const token = String(data.get("token") || "").trim();
+  if (!booking || !token) {
+    if (status) status.textContent = "Enter the booking ID and admin token.";
+    return;
+  }
+  if (status) status.textContent = `Releasing unpaid hold for ${booking}...`;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Releasing...";
+  }
+  try {
+    const response = await fetch("/api/manual-payment/release", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        booking,
+        token,
+        reason: "Deposit was not received, so the unpaid hold was released by the owner."
+      })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Unpaid hold could not be released.");
+    const appointment = result.appointment?.date && result.appointment?.time
+      ? ` ${result.appointment.date} at ${result.appointment.time} is open for booking again.`
+      : " The appointment time is open for booking again.";
+    const heading = result.alreadyReleased
+      ? `${escapeAttr(booking)} was already released as unpaid.`
+      : `${escapeAttr(booking)} was released as unpaid.`;
+    if (status) status.textContent = `${heading}${appointment}`;
+  } catch (error) {
+    if (status) status.textContent = error.message;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Deposit Not Received - Release Slot";
     }
   }
 }

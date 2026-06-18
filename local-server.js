@@ -46,6 +46,7 @@ let googleJwksCache = { expiresAt: 0, keys: [] };
 
 const defaultSiteSettings = {
   logo: {
+    url: emailLogoUrl,
     navSize: 40,
     heroSize: 88,
     heroAlign: "left",
@@ -861,10 +862,20 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(Math.max(number, min), max);
 }
 
+function sanitizeLogoUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return defaultSiteSettings.logo.url;
+  if (url.length > 1500000) return defaultSiteSettings.logo.url;
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(url)) return url;
+  if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(url)) return url;
+  return defaultSiteSettings.logo.url;
+}
+
 function sanitizeLogoSettings(logo = {}) {
   const align = ["left", "center", "right"].includes(logo.heroAlign) ? logo.heroAlign : defaultSiteSettings.logo.heroAlign;
   const fit = ["cover", "contain"].includes(logo.fit) ? logo.fit : defaultSiteSettings.logo.fit;
   return {
+    url: sanitizeLogoUrl(logo.url),
     navSize: clampNumber(logo.navSize, 28, 72, defaultSiteSettings.logo.navSize),
     heroSize: clampNumber(logo.heroSize, 56, 180, defaultSiteSettings.logo.heroSize),
     heroAlign: align,
@@ -2060,7 +2071,7 @@ async function handleBooking(req, res) {
       referralCode,
       referralShareUrl,
       friendTest: savedBooking.friendTest,
-      message: "Appointment request saved. Pay options are ready; Lovely Locs will send the official confirmation after the deposit receipt is verified in Gmail.",
+      message: "Appointment request saved, but it is not finalized yet. Pay options are ready; Lovely Locs will send the official confirmation once the deposit is confirmed as received.",
     });
   } catch (error) {
     sendJson(res, 400, { ok: false, error: error.message });

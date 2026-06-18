@@ -3494,6 +3494,28 @@ function confirmationLinks(summary) {
   };
 }
 
+function openPayOptionsRoute(payOptionsUrl) {
+  const fallbackUrl = String(payOptionsUrl || "");
+  try {
+    const base = window.location.href || window.location.origin || "http://127.0.0.1:4175/";
+    const target = new URL(fallbackUrl, base);
+    const targetHash = target.hash || "#payment-options";
+    const targetPath = `${target.pathname || "/"}${target.search}${targetHash}`;
+    if (window.history?.pushState) {
+      window.history.pushState(null, "", targetPath);
+      closeBooking();
+      closeCart();
+      render("payment-options");
+      scrollRouteToTop("payment-options");
+      return true;
+    }
+  } catch {
+    // Fall back to normal navigation below.
+  }
+  window.location.href = fallbackUrl;
+  return false;
+}
+
 async function submitBooking() {
   const form = document.getElementById("bookingForm");
   const error = document.getElementById("bookingError");
@@ -3557,7 +3579,7 @@ async function submitBooking() {
     bookingConfirmation = {
       message: "Your appointment request was saved, but it is not finalized yet. Redirecting to the Lovely Locs pay options page for the required deposit. You will receive the official confirmation once Lovely Locs confirms the deposit was received."
     };
-    window.location.href = result.payOptionsUrl;
+    openPayOptionsRoute(result.payOptionsUrl);
     return;
   } catch (bookingError) {
     if (error) error.textContent = bookingError.message;

@@ -811,6 +811,10 @@ function discountExpiryText(discount = appliedDiscount) {
   return discount?.expiresAt ? `Expires ${discount.expiresAt}` : "No expiration date shown";
 }
 
+function appliedDiscountCodeLabel() {
+  return appliedDiscount?.code || discountSettings?.code || "Promo";
+}
+
 function isAdminTestBooking(items = cart) {
   return items.length === 1 && items[0]?.id === adminTestService.id;
 }
@@ -2128,7 +2132,7 @@ function updateBookingSummaryTotals() {
   const addOnsNode = document.getElementById("bookingAddOnsText");
   const discountNode = document.getElementById("bookingDiscountText");
   if (totalNode) totalNode.textContent = `Estimated Total: ${money(total)}`;
-  if (discountNode) discountNode.textContent = discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : "";
+  if (discountNode) discountNode.textContent = discountAmount ? `Promo Discount (${appliedDiscountCodeLabel()}): -${money(discountAmount)}` : "";
   if (depositNode) depositNode.textContent = `Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.`;
   if (addOnsNode) {
     const addOns = cart.filter(item => item.type !== "service" || item.id === "emergency-fee");
@@ -2253,7 +2257,7 @@ function bookingModal() {
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
           <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
           ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
-          <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscount.code}): -${money(discountAmount)}` : ""}</p>
+          <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscountCodeLabel()}): -${money(discountAmount)}` : ""}</p>
           <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
           <p id="bookingDepositText">Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}

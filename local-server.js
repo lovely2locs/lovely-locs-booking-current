@@ -1516,13 +1516,14 @@ function sanitizeClient(client = {}) {
 }
 
 function sanitizeFriendTest(test = {}) {
-  const code = String(test.code || "").trim().toUpperCase();
+  const cleanTest = test && typeof test === "object" ? test : {};
+  const code = String(cleanTest.code || "").trim().toUpperCase();
   if (!/^LL-FRIEND-(0[1-9]|10)$/.test(code)) return null;
   const slot = Number(code.split("-").pop());
-  const visited = [...new Set(Array.isArray(test.visited) ? test.visited : [])]
+  const visited = [...new Set(Array.isArray(cleanTest.visited) ? cleanTest.visited : [])]
     .filter(checkpoint => friendTestCheckpoints.includes(checkpoint));
   const missing = friendTestCheckpoints.filter(checkpoint => !visited.includes(checkpoint));
-  const startedAt = String(test.startedAt || "").trim();
+  const startedAt = String(cleanTest.startedAt || "").trim();
   return {
     code,
     campaign: friendTestCampaign,
@@ -1535,7 +1536,7 @@ function sanitizeFriendTest(test = {}) {
     percentComplete: Math.round((visited.length / friendTestCheckpoints.length) * 100),
     complete: missing.length === 0,
     missing,
-    bookingSubmitted: Boolean(test.bookingSubmitted),
+    bookingSubmitted: Boolean(cleanTest.bookingSubmitted),
   };
 }
 

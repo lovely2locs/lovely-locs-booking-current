@@ -460,6 +460,17 @@ test("promo code can be applied and included in booking payload", async () => {
   context.saveAppliedDiscount(null);
 });
 
+test("active promo settings do not break checkout when no promo is applied", () => {
+  context.saveAppliedDiscount(null);
+  context.saveDiscountSettingsLocal({ code: "LOVELY10", percent: 10, enabled: true, expiresAt: "" });
+  context.clearCart();
+  context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
+  const html = context.bookingModal();
+  assert(html.includes("Submit Request &amp; View Pay Options"), "checkout should render without a saved promo code");
+  assert(!html.includes("Cannot read properties of null"), "checkout should not show a raw null-code error");
+  context.saveDiscountSettingsLocal({ code: "LOVELY10", percent: 10, enabled: false, expiresAt: "" });
+});
+
 test("referral codes use the LOVELYLOCS username format", () => {
   const payload = context.bookingPayloadFromForm(elements.bookingForm);
   assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");
@@ -855,6 +866,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/admin/bookings"), "protected recent bookings endpoint missing");
   assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
   assert(server.includes("sanitizeFriendTest"), "friend-test payload sanitizer missing");
+  assert(server.includes('const cleanTest = test && typeof test === "object" ? test : {};'), "friend-test sanitizer should handle null payloads");
+  assert(server.includes('const code = String(cleanTest.code || "").trim().toUpperCase();'), "friend-test sanitizer should read from the guarded object");
   assert(server.includes("nextAutomaticFriendTest"), "automatic first-ten friend-test assignment missing");
   assert(server.includes("friendTestCampaignLimit = 10"), "friend-test campaign should be limited to ten bookings");
   assert(server.includes("friendTestCheckpoints"), "friend-test checkpoint allowlist missing");

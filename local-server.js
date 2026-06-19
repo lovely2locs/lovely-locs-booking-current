@@ -1033,6 +1033,15 @@ function findReferrerByCode(code, records = readBookingRecords()) {
   return null;
 }
 
+function latestBookingByClientKey(key, records = readBookingRecords()) {
+  if (!key) return null;
+  const bookings = latestBookingRecords(records);
+  for (let index = bookings.length - 1; index >= 0; index -= 1) {
+    if (clientIdentityKey(bookings[index].client) === key) return bookings[index];
+  }
+  return null;
+}
+
 function sanitizeDiscountSettings(discount = {}) {
   const expiresAt = /^\d{4}-\d{2}-\d{2}$/.test(discount.expiresAt || "") ? discount.expiresAt : "";
   return {
@@ -1103,6 +1112,10 @@ function creditIsUnavailable(records, creditId) {
   ));
 }
 
+function creditAmount(record, total) {
+  return Math.min(total, Math.max(0, Math.round(Number(record.amountOff || 0))));
+}
+
 function availableClientCredit(client, total, records = readBookingRecords()) {
   const key = clientIdentityKey(client);
   if (!key) return null;
@@ -1114,14 +1127,40 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
     && !creditIsExpired(record)
   ));
   if (!credits.length) return null;
+  const referralCredits = credits
+    .filter(credit => credit.type === "referral.reward.approved")
+    .sort((left, right) => String(left.approvedAt || "").localeCompare(String(right.approvedAt || "")));
+  if (referralCredits.length) {
+    let remaining = total;
+    const selected = [];
+    for (const credit of referralCredits) {
+      const amountOff = creditAmount(credit, remaining);
+      if (!amountOff) continue;
+      selected.push({ ...credit, redeemAmountOff: amountOff });
+      remaining -= amountOff;
+      if (remaining <= 0) break;
+    }
+    const amountOff = selected.reduce((sum, credit) => sum + credit.redeemAmountOff, 0);
+    if (amountOff) {
+      return {
+        type: "referral",
+        creditId: selected.length === 1 ? selected[0].creditId : `referral-stack:${crypto.createHash("sha1").update(selected.map(credit => credit.creditId).join("|")).digest("hex").slice(0, 12)}`,
+        creditIds: selected.map(credit => credit.creditId),
+        code: selected.length === 1 ? selected[0].discountCode || selected[0].creditId : `REF-STACK-${selected.length}`,
+        amountOff,
+        stackedCreditCount: selected.length,
+      };
+    }
+  }
   const best = credits.reduce((winner, credit) => (
     Number(credit.amountOff || 0) > Number(winner.amountOff || 0) ? credit : winner
   ), credits[0]);
-  const amountOff = Math.min(total, Math.max(0, Math.round(Number(best.amountOff || 0))));
+  const amountOff = creditAmount(best, total);
   if (!amountOff) return null;
   return {
     type: best.type === "birthday.reward.approved" ? "birthday" : "referral",
     creditId: best.creditId,
+    creditIds: [best.creditId],
     code: best.discountCode || best.creditId,
     amountOff,
   };
@@ -1166,6 +1205,8 @@ function chooseBookingDiscount(subtotal, saleDiscount, clientCredit, referredCli
       percent: 0,
       amountOff: creditAmount,
       creditId: clientCredit.creditId,
+      creditIds: Array.isArray(clientCredit.creditIds) ? clientCredit.creditIds : [clientCredit.creditId],
+      stackedCreditCount: clientCredit.stackedCreditCount || 1,
       source: "earned_client_credit",
     };
   }
@@ -1195,36 +1236,54 @@ function reserveBookingCredit(booking) {
   const credit = booking.automaticDiscountCredit;
   if (!credit?.creditId) return null;
   const records = readBookingRecords();
-  if (creditIsUnavailable(records, credit.creditId)) return null;
-  const event = {
-    type: "discount.credit.reserved",
-    bookingId: booking.id,
-    clientKey: clientIdentityKey(booking.client),
-    creditId: credit.creditId,
-    creditType: credit.type,
-    amountOff: credit.amountOff,
-    reservedAt: new Date().toISOString(),
-  };
-  appendBookingRecord(event);
-  return event;
+  const creditIds = Array.isArray(credit.creditIds) && credit.creditIds.length ? credit.creditIds : [credit.creditId];
+  const availableCreditIds = creditIds.filter(creditId => creditId && !creditIsUnavailable(records, creditId));
+  if (!availableCreditIds.length) return null;
+  const amountPerCredit = Math.round(Number(credit.amountOff || 0) / availableCreditIds.length);
+  const events = availableCreditIds.map((creditId, index) => {
+    const event = {
+      type: "discount.credit.reserved",
+      bookingId: booking.id,
+      clientKey: clientIdentityKey(booking.client),
+      creditId,
+      creditType: credit.type,
+      amountOff: index === availableCreditIds.length - 1
+        ? Math.max(0, Number(credit.amountOff || 0) - amountPerCredit * (availableCreditIds.length - 1))
+        : amountPerCredit,
+      reservedAt: new Date().toISOString(),
+    };
+    appendBookingRecord(event);
+    return event;
+  });
+  return events.length === 1 ? events[0] : { type: "discount.credit.reserved.batch", bookingId: booking.id, creditType: credit.type, events };
 }
 
 function redeemBookingCredit(booking) {
   const credit = booking.automaticDiscountCredit;
   if (!credit?.creditId) return null;
   const records = readBookingRecords();
-  if (records.some(record => record.type === "discount.credit.redeemed" && record.creditId === credit.creditId)) return null;
-  const event = {
-    type: "discount.credit.redeemed",
-    bookingId: booking.id,
-    clientKey: clientIdentityKey(booking.client),
-    creditId: credit.creditId,
-    creditType: credit.type,
-    amountOff: credit.amountOff,
-    redeemedAt: new Date().toISOString(),
-  };
-  appendBookingRecord(event);
-  return event;
+  const creditIds = Array.isArray(credit.creditIds) && credit.creditIds.length ? credit.creditIds : [credit.creditId];
+  const unredeemedCreditIds = creditIds.filter(creditId => (
+    creditId && !records.some(record => record.type === "discount.credit.redeemed" && record.creditId === creditId)
+  ));
+  if (!unredeemedCreditIds.length) return null;
+  const amountPerCredit = Math.round(Number(credit.amountOff || 0) / unredeemedCreditIds.length);
+  const events = unredeemedCreditIds.map((creditId, index) => {
+    const event = {
+      type: "discount.credit.redeemed",
+      bookingId: booking.id,
+      clientKey: clientIdentityKey(booking.client),
+      creditId,
+      creditType: credit.type,
+      amountOff: index === unredeemedCreditIds.length - 1
+        ? Math.max(0, Number(credit.amountOff || 0) - amountPerCredit * (unredeemedCreditIds.length - 1))
+        : amountPerCredit,
+      redeemedAt: new Date().toISOString(),
+    };
+    appendBookingRecord(event);
+    return event;
+  });
+  return events.length === 1 ? events[0] : { type: "discount.credit.redeemed.batch", bookingId: booking.id, creditType: credit.type, events };
 }
 
 function recordReferralPending(booking) {
@@ -1266,6 +1325,42 @@ function approveReferralReward(booking) {
     discountCode: `REF-${code}`,
     amountOff: referralCreditAmount,
     approvedAt: new Date().toISOString(),
+  };
+  appendBookingRecord(event);
+  return event;
+}
+
+async function notifyReferralRewardApproved(reward, referredBooking) {
+  if (!reward?.creditId || !reward.clientKey || !referredBooking?.id) return null;
+  const records = readBookingRecords();
+  if (records.some(record => record.type === "referral.reward.notification.sent" && record.creditId === reward.creditId)) return null;
+  const referrer = latestBookingByClientKey(reward.clientKey, records);
+  const email = String(referrer?.client?.email || "").trim();
+  if (!email) return null;
+  const siteUrl = (process.env.PUBLIC_SITE_URL || `http://127.0.0.1:${port}`).replace(/\/+$/, "");
+  const text = [
+    `Hi ${clientFirstName(referrer)},`,
+    "",
+    `${referredBooking.client?.fullName || "Your referral"} booked with your Lovely Locs referral code.`,
+    `Your $${reward.amountOff || referralCreditAmount} referral reward is now available for your next service.`,
+    `Referral code used: ${reward.referralCode}`,
+    `Credit code: ${reward.discountCode}`,
+    "",
+    `You can check pending and approved referral rewards here: ${siteUrl}/#client-settings`,
+    "",
+    "Referral credits can stack when you have more than one available reward.",
+  ].join("\n");
+  const notificationResults = await runNotificationTasks([
+    ["referrerEmail", () => sendEmail(email, "Your Lovely Locs referral reward is ready", text)],
+  ]);
+  const event = {
+    type: "referral.reward.notification.sent",
+    bookingId: referredBooking.id,
+    referralCode: reward.referralCode,
+    creditId: reward.creditId,
+    recipientEmail: email,
+    sentAt: new Date().toISOString(),
+    notificationResults,
   };
   appendBookingRecord(event);
   return event;
@@ -1548,8 +1643,10 @@ function priceBooking(booking) {
     automaticDiscountCredit: discount?.creditId ? {
       type: discount.type,
       creditId: discount.creditId,
+      creditIds: Array.isArray(discount.creditIds) ? discount.creditIds : [discount.creditId],
       code: discount.code,
       amountOff: discount.amountOff,
+      stackedCreditCount: discount.stackedCreditCount || 1,
     } : null,
     total,
     deposit,
@@ -2140,6 +2237,9 @@ async function handleManualPaymentConfirm(req, res) {
 
     const notificationResults = await notifyManualDepositPaid(booking, method);
     const referralReward = approveReferralReward(booking);
+    const referralRewardNotification = referralReward
+      ? await notifyReferralRewardApproved(referralReward, booking)
+      : null;
     const redeemedCredit = redeemBookingCredit(booking);
     appendBookingRecord({
       type: "manual.deposit.confirmed",
@@ -2149,11 +2249,12 @@ async function handleManualPaymentConfirm(req, res) {
       manualPayment: { method },
       notificationResults,
       referralReward,
+      referralRewardNotification,
       redeemedCredit,
     });
 
     if (wantsJson) {
-      sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: false, notificationResults, referralReward, redeemedCredit });
+      sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: false, notificationResults, referralReward, referralRewardNotification, redeemedCredit });
       return;
     }
     sendHtml(res, 200, ownerConfirmPageHtml({
@@ -2467,6 +2568,9 @@ async function handleStripeWebhook(req, res) {
       const booking = findBookingById(bookingId);
       const notificationResults = booking ? await notifyDepositPaid(booking, session) : [];
       const referralReward = booking ? approveReferralReward(booking) : null;
+      const referralRewardNotification = referralReward
+        ? await notifyReferralRewardApproved(referralReward, booking)
+        : null;
       const redeemedCredit = booking ? redeemBookingCredit(booking) : null;
       appendBookingRecord({
         type: "stripe.checkout.session.completed",
@@ -2482,6 +2586,7 @@ async function handleStripeWebhook(req, res) {
         },
         notificationResults,
         referralReward,
+        referralRewardNotification,
         redeemedCredit,
       });
     }

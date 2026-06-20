@@ -504,7 +504,7 @@ function saveDiscountSettingsLocal(settings) {
   localStorage.setItem("lovelyLocsDiscountSettings", JSON.stringify(discountSettings));
   if (typeof appliedDiscount !== "undefined" && appliedDiscount) {
     const expires = discountSettings.expiresAt ? new Date(`${discountSettings.expiresAt}T23:59:59`).getTime() < Date.now() : false;
-    if (!discountSettings.enabled || expires || appliedDiscount.code !== discountSettings.code) {
+    if (!discountSettings.enabled || expires || appliedDiscount?.code !== discountSettings.code) {
       saveAppliedDiscount(null);
     }
   }

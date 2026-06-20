@@ -471,6 +471,15 @@ test("active promo settings do not break checkout when no promo is applied", () 
   context.saveDiscountSettingsLocal({ code: "LOVELY10", percent: 10, enabled: false, expiresAt: "" });
 });
 
+test("admin promo updates clear stale applied discounts with a null-safe guard", () => {
+  context.saveAppliedDiscount({ code: "LOVELY10", percent: 10, expiresAt: "" });
+  context.saveDiscountSettingsLocal({ code: "SUMMER15", percent: 15, enabled: true, expiresAt: "" });
+  assert(!localStore.get("lovelyLocsAppliedDiscount"), "stale applied promo should be cleared when admin promo settings change");
+  const script = fs.readFileSync("script.js", "utf8");
+  assert(script.includes("appliedDiscount?.code !== discountSettings.code"), "promo settings should compare the applied code with a null-safe guard");
+  context.saveDiscountSettingsLocal({ code: "LOVELY10", percent: 10, enabled: false, expiresAt: "" });
+});
+
 test("referral codes use the LOVELYLOCS username format", () => {
   const payload = context.bookingPayloadFromForm(elements.bookingForm);
   assert(payload.client.referredByCode === "LOVELYLOCS/TESTCLIENT", "referral code should preserve the LOVELYLOCS/USERNAME format");

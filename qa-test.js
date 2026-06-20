@@ -115,7 +115,7 @@ const context = {
         payOptionsUrl: "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options",
         paymentOptions: [
           { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
-          { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
+          { id: "apple-pay", label: "Apple Pay", handle: "lvlc.support@lovelylocsnc.com", note: "Include your booking ID." }
         ],
         total: 100,
         deposit: 30,
@@ -325,6 +325,8 @@ test("payment options route renders manual deposit instructions", () => {
   assert(html.includes("Venmo"), "Venmo option missing");
   assert(!html.includes("Cash App"), "Cash App should be hidden until re-enabled");
   assert(html.includes("Apple Pay"), "Apple Pay option missing");
+  assert(!html.includes("lovely2locs@gmail.com"), "payment page should not render non-official email handles");
+  assert(html.includes("Confirm current Apple Pay contact with Lovely Locs before sending."), "payment page should replace non-official email handles");
   assert(html.includes("not finalized yet"), "payment page should clarify appointment is not finalized before deposit");
   assert(html.includes("official confirmation once the deposit is confirmed as received"), "manual verification confirmation language missing");
   assert(html.includes("LOVELYLOCS/TESTCLIENT"), "payment page should show the client's referral code");
@@ -866,8 +868,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("Your personal referral code:"), "confirmation email referral code text missing");
   assert(server.includes("Take a breath"), "warm confirmation email intro missing");
   assert(server.includes("html: options.html"), "Resend HTML email payload missing");
-  assert(server.includes("gmailComposeUrl"), "Gmail compose fallback missing");
-  assert(server.includes("gmailDraftUrl"), "client confirmation Gmail draft link missing");
+  assert(server.includes("gmailComposeUrl"), "email compose fallback missing");
+  assert(server.includes("gmailDraftUrl"), "client confirmation email draft link missing");
   assert(server.includes("/api/manual-payment/confirm"), "manual confirmation endpoint missing");
   assert(server.includes("/api/manual-payment/release"), "manual unpaid hold release endpoint missing");
   assert(server.includes("/api/admin/booking"), "protected owner booking lookup endpoint missing");
@@ -964,7 +966,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("data-release-unpaid-hold"), "unpaid hold release button binding missing");
   assert(script.includes("completed confirmations will not be duplicated"), "manual deposit interrupted-response guidance missing");
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
-  assert(script.includes("Open Gmail draft for client confirmation"), "admin Gmail draft fallback link missing");
+  assert(script.includes("Open email draft for client confirmation"), "admin email draft fallback link missing");
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");

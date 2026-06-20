@@ -421,7 +421,7 @@ function emailReadiness() {
       configured: true,
       clientReady: false,
       from,
-      reason: "CONFIRMATION_FROM_EMAIL is still a placeholder. Use a verified domain sender such as bookings@yourdomain.com.",
+      reason: "CONFIRMATION_FROM_EMAIL is still a placeholder. Use the verified Lovely Locs domain sender, such as lvlc.support@lovelylocsnc.com.",
     };
   }
   if (["gmail.com", "googlemail.com", "resend.dev"].includes(domain)) {
@@ -788,7 +788,7 @@ function notificationResultsMarkup(results = []) {
     if (result.failed) {
       const fallback = result.fallback ? `<p>${escapeHtml(result.fallback)}</p>` : "";
       const draft = result.gmailDraftUrl
-        ? `<p><a class="secondary" href="${escapeHtml(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open Gmail draft for client confirmation</a></p>`
+        ? `<p><a class="secondary" href="${escapeHtml(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open email draft for client confirmation</a></p>`
         : "";
       return `<li><strong>${label}</strong><span class="failed">Failed - ${escapeHtml(result.error || "Unknown error")}</span>${fallback}${draft}</li>`;
     }
@@ -1465,8 +1465,17 @@ function manualPaymentOptions() {
 function publicManualPaymentOptions() {
   return manualPaymentOptions().map(option => ({
     ...option,
-    handle: option.handle || "Confirm current payment tag with Lovely Locs before sending.",
+    handle: publicPaymentHandle(option),
   }));
+}
+
+function publicPaymentHandle(option) {
+  const handle = option.handle || "";
+  if (handle && !/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(handle)) return handle;
+  if (handle && handle.toLowerCase().includes("lvlc.support@lovelylocsnc.com")) return handle;
+  return option.id === "apple-pay"
+    ? "Confirm current Apple Pay contact with Lovely Locs before sending."
+    : "Confirm current payment tag with Lovely Locs before sending.";
 }
 
 function paymentOptionsText(booking) {
@@ -1744,7 +1753,7 @@ async function notifyManualPaymentPending(booking, req) {
     "Payment options shown to the client:",
     paymentOptionsText(booking),
     "",
-    "After you see the matching Venmo or Apple Pay receipt in Gmail, approve the deposit here:",
+    "After you see the matching Venmo or Apple Pay receipt, approve the deposit here:",
     confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN in Render to enable one-click approval links.",
     "",
     details,
@@ -1758,7 +1767,7 @@ async function notifyManualPaymentPending(booking, req) {
   const results = [];
 
   for (const task of [
-    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting Gmail receipt: ${booking.client.fullName}`, ownerText, { html: ownerHtml })],
+    ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting receipt: ${booking.client.fullName}`, ownerText, { html: ownerHtml })],
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. ${booking.client.date} ${timeLabel(booking.client.time)}. Confirm link: ${confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN."}`)],
   ]) {
     try {
@@ -1810,7 +1819,7 @@ async function notifyManualDepositPaid(booking, method) {
       "Your Lovely Locs appointment is confirmed",
       clientEmail.text
     );
-    clientEmailResult.fallback = "Client email was blocked by the provider. Open the Gmail draft link to send the confirmation from the owner Gmail.";
+    clientEmailResult.fallback = "Client email was blocked by the provider. Open the email draft link to send the confirmation from the owner email.";
   }
 
   return results;
@@ -2260,7 +2269,7 @@ async function handleManualPaymentConfirm(req, res) {
     }
     sendHtml(res, 200, ownerConfirmPageHtml({
       title: "Deposit confirmed",
-      intro: "Lovely Locs marked this deposit paid. Review the provider results below; if the client email was blocked, use the Gmail draft link shown here.",
+      intro: "Lovely Locs marked this deposit paid. Review the provider results below; if the client email was blocked, use the email draft link shown here.",
       bookingId,
       adminUrl,
       notificationResults,

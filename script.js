@@ -30,6 +30,20 @@ const manualPaymentFallbackOptions = [
   }
 ];
 
+function publicPaymentHandle(option = {}) {
+  const handle = option.handle || "";
+  if (handle && !/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(handle)) return handle;
+  if (handle && handle.toLowerCase().includes(business.email)) return handle;
+  return option.id === "apple-pay"
+    ? "Confirm current Apple Pay contact with Lovely Locs before sending."
+    : "Confirm current payment tag with Lovely Locs before sending.";
+}
+
+function publicPaymentOptions(options) {
+  const source = Array.isArray(options) && options.length ? options : manualPaymentFallbackOptions;
+  return source.map(option => ({ ...option, handle: publicPaymentHandle(option) }));
+}
+
 const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
@@ -334,7 +348,7 @@ const policies = {
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
   emergency_fee: "A $45 Emergency Fee is added when a client selects a brown emergency proposal slot outside regular business hours, on Sundays, or on holidays/key dates.",
-  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt in Gmail."
+  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt."
 };
 
 const faq = [
@@ -1718,7 +1732,7 @@ function pendingPaymentDetails() {
     referralCode: stored.referralCode || "",
     referralShareUrl: stored.referralShareUrl || "",
     friendTest: stored.friendTest || null,
-    paymentOptions: Array.isArray(stored.paymentOptions) && stored.paymentOptions.length ? stored.paymentOptions : manualPaymentFallbackOptions
+    paymentOptions: publicPaymentOptions(stored.paymentOptions)
   };
 }
 
@@ -1738,7 +1752,7 @@ function paymentOptionsPage() {
             <h2>${details.deposit ? money(details.deposit) : "Deposit amount shown after booking"}</h2>
             <p>Booking ID: <strong>${details.bookingId}</strong></p>
           </div>
-          <p>Put the booking ID in the payment note when your payment app allows it. Lovely Locs will check the matching receipt in Gmail before sending the official client confirmation.</p>
+          <p>Put the booking ID in the payment note when your payment app allows it. Lovely Locs will check the matching receipt before sending the official client confirmation.</p>
         </div>
         <div class="payment-options-grid">
           ${details.paymentOptions.map(option => `
@@ -1853,7 +1867,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
-          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner Gmail or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
+          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner email or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
           <p>If the deposit was not received, use the release button instead. That keeps the booking history but opens the appointment time again.</p>
           ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">
@@ -1876,7 +1890,7 @@ function adminPage() {
           <form class="brand-settings-form" id="confirmationResendForm">
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password"></label>
             <label>Booking ID<input name="bookingId" placeholder="LL-1781219564994"></label>
-            <label>Client Email<input name="email" type="email" placeholder="client@gmail.com" required></label>
+            <label>Client Email<input name="email" type="email" placeholder="client@example.com" required></label>
             <label>Client Name<input name="fullName" placeholder="Client name" required></label>
             <label>Appointment Date<input name="date" type="date" required></label>
             <label>Appointment Time<input name="time" type="time" required></label>
@@ -2295,7 +2309,7 @@ function bookingModal() {
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
-            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>Purple time slots are regular open appointment times. Brown time slots are emergency proposals outside business hours, on Sundays, or on holiday/key dates and include the $45 emergency fee.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt in Gmail. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>`}
+            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>Purple time slots are regular open appointment times. Brown time slots are emergency proposals outside business hours, on Sundays, or on holiday/key dates and include the $45 emergency fee.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
@@ -3263,7 +3277,7 @@ function notificationResultsHtml(results = []) {
     if (result.failed) {
       const deliveryLabel = result.channel === "clientEmail" ? "clientEmail: not delivered automatically" : `${label}: failed`;
       const fallback = result.fallback ? `<br><span>${escapeAttr(result.fallback)}</span>` : "";
-      const draft = result.gmailDraftUrl ? `<br><a href="${escapeAttr(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open Gmail draft for client confirmation</a>` : "";
+      const draft = result.gmailDraftUrl ? `<br><a href="${escapeAttr(result.gmailDraftUrl)}" target="_blank" rel="noopener">Open email draft for client confirmation</a>` : "";
       return `<span>${deliveryLabel} - ${escapeAttr(result.error || "Unknown error")}${fallback}${draft}</span>`;
     }
     if (result.skipped) return `<span>${label}: skipped - ${escapeAttr(result.reason || "Provider not ready")}</span>`;
@@ -3578,7 +3592,7 @@ async function submitBooking() {
       referralCode: result.referralCode || referralCodeForName(bookingPayload.client.fullName),
       referralShareUrl: result.referralShareUrl || referralShareUrlForCode(result.referralCode || referralCodeForName(bookingPayload.client.fullName)),
       friendTest: result.friendTest || bookingPayload.friendTest,
-      paymentOptions: result.paymentOptions || manualPaymentFallbackOptions
+      paymentOptions: publicPaymentOptions(result.paymentOptions)
     }));
     bookingConfirmation = {
       message: "Your appointment request was saved, but it is not finalized yet. Redirecting to the Lovely Locs pay options page for the required deposit. You will receive the official confirmation once Lovely Locs confirms the deposit was received."

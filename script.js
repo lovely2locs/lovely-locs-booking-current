@@ -1108,13 +1108,47 @@ function googleSignupFormMarkup() {
   `;
 }
 
+function clientCreditLabel(type) {
+  if (type === "birthday") return "Birthday";
+  if (type === "returning") return "Returning Client";
+  return "Referral";
+}
+
+function clientSettingsPastVisitsMarkup(result) {
+  if (!result) return '<p>Sign in to see Past Visits, Book Again, Leave a Google Review, and Send Private Feedback.</p>';
+  if (!result.pastVisits?.length) return '<p>No completed visits yet. Your first completed visit unlocks the returning client credit.</p>';
+  return `
+    <div class="past-visit-list">
+      ${result.pastVisits.map(visit => {
+        const services = visit.services?.length ? visit.services.join(", ") : "Lovely Locs service";
+        const feedbackUrl = `mailto:${result.feedbackEmail || "lvlc.support@lovelylocsnc.com"}?subject=${encodeURIComponent(`Lovely Locs Private Feedback ${visit.bookingId}`)}`;
+        return `
+          <article class="past-visit-card">
+            <div>
+              <p class="eyebrow">Past Visit</p>
+              <h3>${escapeAttr(visit.date || "Completed service")}</h3>
+              <p>${escapeAttr(services)}</p>
+              <p class="past-visit-meta">${escapeAttr(timeLabel(visit.time || "") || "")}${visit.total ? ` - Total ${money(visit.total)}` : ""}</p>
+            </div>
+            <div class="past-visit-actions">
+              <a class="outline-btn" href="${escapeAttr(result.rebookUrl || "#services")}" data-route="services">Book Again</a>
+              ${result.reviewUrl ? `<a class="outline-btn" href="${escapeAttr(result.reviewUrl)}" target="_blank" rel="noopener noreferrer">Leave a Google Review</a>` : ""}
+              <a class="outline-btn" href="${escapeAttr(feedbackUrl)}">Send Private Feedback</a>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function clientSettingsPage() {
   const result = clientSettingsResult;
   const profile = savedClientProfile || result?.client || {};
   const creditRows = result?.credits?.length
     ? result.credits.map(credit => {
       const dates = credit.type === "birthday" && credit.validFrom && credit.expiresAt ? ` (${credit.validFrom} - ${credit.expiresAt})` : "";
-      return `<li><strong>${credit.type === "birthday" ? "Birthday" : "Referral"} credit:</strong> ${money(credit.amountOff)} ${credit.status}${dates}</li>`;
+      return `<li><strong>${clientCreditLabel(credit.type)} credit:</strong> ${money(credit.amountOff)} ${credit.status}${dates}</li>`;
     }).join("")
     : "<li>No earned credits yet.</li>";
   const pendingRows = result?.referrals?.pending?.length
@@ -1123,13 +1157,14 @@ function clientSettingsPage() {
   const approvedRows = result?.referrals?.approved?.length
     ? result.referrals.approved.map(item => `<li>Referral approved for ${money(item.amountOff)} off.</li>`).join("")
     : "<li>No approved referrals yet.</li>";
+  const returningCreditCopy = result?.incentives?.returningClientCopy || "Returning Client Credit: Get $5 off your next completed service after your first visit. No review required.";
 
   return `
     <section class="page-hero" id="client-settings-page">
       <div class="container">
         <p class="eyebrow">Client Settings</p>
-        <h1>Referral code and reward status</h1>
-        <p class="subtitle">Use the same email and phone number from your booking to see your referral code, pending referrals, and earned birthday or referral credits.</p>
+        <h1>Review & Rebook Hub</h1>
+        <p class="subtitle">Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.</p>
       </div>
     </section>
     <section class="section">
@@ -1171,6 +1206,11 @@ function clientSettingsPage() {
           </div>
         ` : ""}
         <div class="policy-box">
+          <h2>Returning Client Credit</h2>
+          <p>${returningCreditCopy}</p>
+          <p class="past-visit-meta">Reviews stay separate from this credit. Use the hub below to Book Again, Leave a Google Review, or Send Private Feedback.</p>
+        </div>
+        <div class="policy-box">
           <h2>Your Referral Code</h2>
           ${result ? `
             <p class="promo-status success">Code: <strong>${result.referralCode}</strong></p>
@@ -1189,12 +1229,17 @@ function clientSettingsPage() {
           <h2>Credits</h2>
           <ul>${creditRows}</ul>
         </div>
+        <div class="policy-box past-visits-box">
+          <h2>Past Visits</h2>
+          ${clientSettingsPastVisitsMarkup(result)}
+        </div>
       </div>
     </section>
   `;
 }
 
 function serviceGuideSection() {
+
   const activeGuide = serviceGuide.find(item => item.id === activeGuideId) || serviceGuide[0];
   const quizMatches = serviceQuizQuestions.map(question => {
     const selectedValue = serviceQuizAnswers[question.id];

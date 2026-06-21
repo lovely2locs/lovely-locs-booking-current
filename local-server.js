@@ -41,6 +41,7 @@ const dayMs = 24 * 60 * 60 * 1000;
 const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
 const referredNewClientCreditAmount = Number(process.env.REFERRED_NEW_CLIENT_CREDIT_AMOUNT || 15);
 const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
+const returningClientCreditAmount = Number(process.env.RETURNING_CLIENT_CREDIT_AMOUNT || 5);
 let stripeClient = null;
 let googleJwksCache = { expiresAt: 0, keys: [] };
 
@@ -1010,6 +1011,18 @@ function latestClientProfileByEmail(email, records = readBookingRecords()) {
   return null;
 }
 
+function completedClientBookings(client, records = readBookingRecords()) {
+  const key = clientIdentityKey(client);
+  if (!key) return [];
+  return latestBookingRecords(records)
+    .filter(booking => clientIdentityKey(booking.client) === key)
+    .filter(booking => ["deposit_paid", "no_charge_test"].includes(bookingStatus(booking, records)))
+    .sort((left, right) => (
+      String(left.client?.date || "").localeCompare(String(right.client?.date || ""))
+      || String(left.createdAt || left.id || "").localeCompare(String(right.createdAt || right.id || ""))
+    ));
+}
+
 function latestClientProfileByGoogleSubject(subject, records = readBookingRecords()) {
   const cleanSubject = String(subject || "").trim();
   if (!cleanSubject) return null;
@@ -1120,7 +1133,7 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   const key = clientIdentityKey(client);
   if (!key) return null;
   const credits = records.filter(record => (
-    ["referral.reward.approved", "birthday.reward.approved"].includes(record.type)
+    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved"].includes(record.type)
     && record.clientKey === key
     && record.creditId
     && !creditIsUnavailable(records, record.creditId)
@@ -1158,7 +1171,7 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   const amountOff = creditAmount(best, total);
   if (!amountOff) return null;
   return {
-    type: best.type === "birthday.reward.approved" ? "birthday" : "referral",
+    type: best.type === "birthday.reward.approved" ? "birthday" : best.type === "returning_client.reward.approved" ? "returning" : "referral",
     creditId: best.creditId,
     creditIds: [best.creditId],
     code: best.discountCode || best.creditId,
@@ -1959,6 +1972,38 @@ async function runBirthdayCreditAutomation(booking, records, now) {
   return sendClientAutomation(booking, "birthday_credit", window.cycleYear, "Your annual Lovely Locs birthday credit", text, text, { emailOnly: true });
 }
 
+async function runReturningClientCreditAutomation(booking, records, now) {
+  const status = bookingStatus(booking, records);
+  if (!["deposit_paid", "no_charge_test"].includes(status)) return null;
+  if (daysUntilDate(booking.client?.date, now) !== -1) return null;
+  const key = clientIdentityKey(booking.client);
+  if (!key) return null;
+  if (!returningClientCreditAmount) return null;
+  if (records.some(record => record.type === "returning_client.reward.approved" && record.clientKey === key)) return null;
+  const completedVisits = completedClientBookings(booking.client, records);
+  if (!completedVisits.length || completedVisits[0].id !== booking.id) return null;
+  const referralUsername = String(referralCodeForClient(booking.client)).split("/").pop() || "CLIENT";
+  const discountCode = `RETURN5-${referralUsername}`.slice(0, 24);
+  appendBookingRecord({
+    type: "returning_client.reward.approved",
+    clientKey: key,
+    creditId: `returning:first:${key}`,
+    discountCode,
+    amountOff: returningClientCreditAmount,
+    approvedAt: new Date().toISOString(),
+    sourceBookingId: booking.id,
+  });
+  const siteUrl = (process.env.PUBLIC_SITE_URL || "https://lovely-locs-booking.onrender.com").replace(/\/+$/, "");
+  const text = [
+    `Hi ${clientFirstName(booking)},`,
+    "",
+    `Returning Client Credit: Get ${returningClientCreditAmount} off your next completed service after your first visit. No review required.`,
+    `Open your Review & Rebook Hub: ${siteUrl}/#client-settings`,
+    `Book again: ${siteUrl}/#services`,
+  ].join("\n");
+  return sendClientAutomation(booking, "returning_client_credit", "first_visit", "Your Lovely Locs returning client credit", text, text, { emailOnly: true });
+}
+
 async function runMonthlyReferralCampaignAutomation(bookings, records, now) {
   const cycleKey = monthKey(now);
   const subject = process.env.REFERRAL_CAMPAIGN_SUBJECT || "Good People Know Good People";
@@ -2007,7 +2052,7 @@ async function runAutomations(options = {}) {
   const records = readBookingRecords();
   const bookings = latestBookingRecords(records);
   const results = [];
-  const dailyTypes = new Set(["all", "daily", "deposit", "appointment", "review", "referral", "birthday"]);
+  const dailyTypes = new Set(["all", "daily", "deposit", "appointment", "review", "referral", "birthday", "returning"]);
 
   if (dailyTypes.has(type)) {
     for (const booking of bookings) {
@@ -2028,6 +2073,10 @@ async function runAutomations(options = {}) {
       }
       if (type === "all" || type === "daily" || type === "birthday") {
         const result = await runBirthdayCreditAutomation(booking, records, now);
+        if (result) results.push(result);
+      }
+      if (type === "all" || type === "daily" || type === "returning") {
+        const result = await runReturningClientCreditAutomation(booking, records, now);
         if (result) results.push(result);
       }
     }
@@ -2622,17 +2671,29 @@ function clientSettingsFor(client, req) {
   const referralCode = normalizeReferralCode(referralCodeForClient(profile) || profile.referralCode);
   const siteUrl = publicSiteUrl(req);
   const shareUrl = `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
+  const reviewUrl = String(process.env.REVIEW_REQUEST_URL || "").trim();
   const pendingReferrals = records.filter(record => record.type === "referral.reward.pending" && record.referrerKey === key);
   const approvedReferrals = records.filter(record => record.type === "referral.reward.approved" && record.clientKey === key);
+  const completedVisits = completedClientBookings(profile, records).slice().reverse().map(booking => ({
+    bookingId: booking.id,
+    date: booking.client?.date || "",
+    time: booking.client?.time || "",
+    total: booking.total || 0,
+    services: (booking.selectedServices?.length ? booking.selectedServices : booking.cart || []).map(item => item.name).filter(Boolean),
+  }));
   const credits = records.filter(record => (
-    ["referral.reward.approved", "birthday.reward.approved"].includes(record.type)
+    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved"].includes(record.type)
     && record.clientKey === key
   )).map(record => {
     const reserved = records.some(item => item.type === "discount.credit.reserved" && item.creditId === record.creditId);
     const redeemed = records.some(item => item.type === "discount.credit.redeemed" && item.creditId === record.creditId);
     const expired = creditIsExpired(record);
     return {
-      type: record.type === "birthday.reward.approved" ? "birthday" : "referral",
+      type: record.type === "birthday.reward.approved"
+        ? "birthday"
+        : record.type === "returning_client.reward.approved"
+          ? "returning"
+          : "referral",
       status: redeemed ? "redeemed" : reserved ? "reserved" : expired ? "expired" : "available",
       creditId: record.creditId,
       discountCode: record.discountCode,
@@ -2661,6 +2722,14 @@ function clientSettingsFor(client, req) {
     },
     referralCode,
     shareUrl,
+    reviewUrl,
+    rebookUrl: `${siteUrl}/#services`,
+    feedbackEmail: ownerEmail,
+    pastVisits: completedVisits,
+    incentives: {
+      returningClientCreditAmount,
+      returningClientCopy: `Returning Client Credit: Get ${returningClientCreditAmount} off your next completed service after your first visit. No review required.`,
+    },
     referrals: {
       pending: pendingReferrals.map(record => ({
         referredClientName: record.referredClientName || "Pending client",
@@ -2891,12 +2960,18 @@ async function handleAutomationRun(req, res) {
       return;
     }
     const type = String(body.type || url.searchParams.get("type") || "daily").trim().toLowerCase();
-    const validTypes = new Set(["all", "daily", "monthly", "referral-campaign", "deposit", "appointment", "review", "referral", "birthday"]);
+    const validTypes = new Set(["all", "daily", "monthly", "referral-campaign", "deposit", "appointment", "review", "referral", "birthday", "returning"]);
     if (!validTypes.has(type)) {
       sendJson(res, 400, { ok: false, error: "Unknown automation type." });
       return;
     }
-    sendJson(res, 200, await runAutomations({ type }));
+    const nowValue = body.now || url.searchParams.get("now") || "";
+    const now = nowValue ? new Date(nowValue) : new Date();
+    if (Number.isNaN(now.getTime())) {
+      sendJson(res, 400, { ok: false, error: "Automation now must be a valid date." });
+      return;
+    }
+    sendJson(res, 200, await runAutomations({ type, now }));
   } catch (error) {
     sendJson(res, 400, { ok: false, error: error.message });
   }
@@ -2914,7 +2989,7 @@ function automationProviderStatus() {
     smsConfigured: configuredForSms,
     smsReady: configuredForSms && !blockedReason,
     smsBlockedReason: blockedReason,
-    dailyTypes: ["deposit", "appointment", "review", "referral", "birthday"],
+    dailyTypes: ["deposit", "appointment", "review", "referral", "birthday", "returning"],
     monthlyTypes: ["referral-campaign"],
   };
 }

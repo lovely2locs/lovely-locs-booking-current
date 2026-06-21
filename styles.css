@@ -2849,7 +2849,41 @@ textarea { min-height: 92px; resize: vertical; }
   opacity: 0.7;
 }
 
-.optional-label {
+.past-visits-box {
+  grid-column: 1 / -1;
+}
+
+.past-visit-list {
+  display: grid;
+  gap: 16px;
+}
+
+.past-visit-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(113, 85, 68, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 250, 245, 0.76);
+}
+
+.past-visit-card h3 {
+  margin: 4px 0 6px;
+  color: var(--dark-brown);
+}
+
+.past-visit-meta {
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.past-visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+optional-label {
   font-size: 0.8em;
   font-weight: 500;
   opacity: 0.72;

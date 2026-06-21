@@ -762,16 +762,17 @@ test("anchor route maps to home for section navigation", () => {
   assert(elements.services.scrolled, "services anchor did not scroll after render");
 });
 
-test("dark mode toggle stores and applies client preference", () => {
-  assert(elements.themeToggle.textContent === String.fromCharCode(9790), "light mode moon icon missing");
-  elements.themeToggle.listeners.click();
-  assert(document.documentElement.classList.contains("dark"), "dark class not applied");
-  assert(localStore.get("darkMode") === "true", "dark preference not stored");
+test("dark mode defaults on first load and toggle stores client preference", () => {
+  assert(document.documentElement.classList.contains("dark"), "dark mode should be the default first-load experience");
   assert(elements.themeToggle.textContent === String.fromCharCode(9728), "dark mode sun icon missing");
   elements.themeToggle.listeners.click();
   assert(!document.documentElement.classList.contains("dark"), "dark class not removed");
   assert(localStore.get("darkMode") === "false", "light preference not stored");
   assert(elements.themeToggle.textContent === String.fromCharCode(9790), "light mode moon icon not restored");
+  elements.themeToggle.listeners.click();
+  assert(document.documentElement.classList.contains("dark"), "dark class not reapplied");
+  assert(localStore.get("darkMode") === "true", "dark preference not stored");
+  assert(elements.themeToggle.textContent === String.fromCharCode(9728), "dark mode sun icon not restored");
 });
 
 test("drawer menu opens, closes, and closes on backdrop", () => {

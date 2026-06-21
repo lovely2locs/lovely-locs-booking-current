@@ -3708,7 +3708,7 @@ themeToggle.addEventListener("click", () => {
   syncThemeToggle();
 });
 
-if (localStorage.getItem("darkMode") === "true") document.documentElement.classList.add("dark");
+if (localStorage.getItem("darkMode") !== "false") document.documentElement.classList.add("dark");
 syncThemeToggle();
 applyLogoSettings();
 syncOwnerAdminAccess();

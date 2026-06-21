@@ -626,16 +626,18 @@ test("booking form has required client fields", () => {
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });
 
-test("client settings route shows referral tracking surface", () => {
+test("client settings route shows review and rebook hub", () => {
   context.window.location.hash = "#client-settings";
   context.render(context.currentRoute());
   const html = appHtml();
-  assert(html.includes("Referral code and reward status"), "client settings heading missing");
+  assert(html.includes("Review & Rebook Hub"), "client settings heading missing");
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
   assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
   assert(html.includes("data-switch-google-account"), "Google account switch control missing");
-  assert(html.includes("pending referrals"), "client settings pending referral copy missing");
+  assert(html.includes("Past Visits"), "past visits section missing");
+  assert(html.includes("Book Again"), "rebook action copy missing");
+  assert(html.includes("Send Private Feedback"), "private feedback action copy missing");
 });
 
 test("new Google clients receive one-time profile onboarding", async () => {
@@ -670,7 +672,12 @@ test("new Google clients receive one-time profile onboarding", async () => {
           },
           referralCode: "LOVELYLOCS/NEWCLIENT",
           referrals: { pending: [], approved: [] },
-          credits: []
+          credits: [],
+          pastVisits: [],
+          incentives: {
+            returningClientCreditAmount: 5,
+            returningClientCopy: "Returning Client Credit: Get $5 off your next completed service after your first visit. No review required."
+          }
         })
       };
     }
@@ -938,6 +945,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("appointment_reminder_3_day"), "3-day appointment reminder automation missing");
   assert(server.includes("appointment_reminder_1_day"), "1-day appointment reminder automation missing");
   assert(server.includes("review_request"), "review request automation missing");
+  assert(server.includes("returning_client_credit"), "returning client credit automation missing");
   assert(server.includes("monthly_referral_campaign"), "monthly referral campaign automation missing");
   assert(!server.includes("birthday_offer"), "birthday offer automation should not be active");
   assert(server.includes("birthday_credit"), "annual birthday credit automation missing");
@@ -948,8 +956,12 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("expiresAt"), "birthday credit expiration date missing");
   assert(server.includes("referral_reminder"), "referral reminder automation missing");
   assert(server.includes("automation.notification.sent"), "automation duplicate guard event missing");
+  assert(server.includes("RETURNING_CLIENT_CREDIT_AMOUNT"), "returning client credit env hook missing");
   const script = fs.readFileSync("script.js", "utf8");
   const styles = fs.readFileSync("styles.css", "utf8");
+  assert(script.includes("Review & Rebook Hub"), "review and rebook hub heading missing");
+  assert(script.includes("Returning Client Credit: Get $5 off your next completed service after your first visit. No review required."), "returning credit copy missing");
+  assert(script.includes("Send Private Feedback"), "private feedback action missing");
   assert(script.includes('setAttribute("aria-pressed", "true")'), "selected time should update aria-pressed");
   assert(script.includes("Selected: ${timeLabel(time)}"), "selected time confirmation text missing");
   assert(styles.includes('content: "Selected \\2713"'), "visible selected time badge missing");

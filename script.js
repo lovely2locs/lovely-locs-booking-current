@@ -3389,7 +3389,7 @@ async function loadAdminNotificationStatus() {
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || "Notification status could not load.");
     target.innerHTML = [
-      readinessLine("Owner Email", Boolean(result.emailConfigured), result.emailConfigured ? `Owner email target: ${result.ownerEmail}` : result.emailReadinessReason),
+      readinessLine("Owner Email", Boolean(result.emailConfigured), result.emailConfigured ? "Owner delivery target is configured." : result.emailReadinessReason),
       readinessLine("Client Confirmation Email", Boolean(result.emailReadyForClients), result.emailReadinessReason),
       readinessLine("Email Delivery Tracking", Boolean(result.emailDeliveryTrackingConfigured), result.emailDeliveryTrackingReason),
       readinessLine("SMS", Boolean(result.smsReady), result.smsBlockedReason || (result.smsConfigured ? "SMS provider is configured." : "Twilio env vars are not configured.")),

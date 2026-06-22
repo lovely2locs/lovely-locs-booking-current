@@ -333,6 +333,7 @@ test("payment options route renders manual deposit instructions", () => {
   assert(html.includes("data-copy-personal-referral-code"), "payment page referral code copy button missing");
   assert(html.includes("data-copy-personal-referral-link"), "payment page referral link copy button missing");
   assert(html.includes("data-share-personal-referral"), "payment page referral share button missing");
+  assert(html.includes("stays active for future bookings"), "payment page should explain that personal referral codes stay active");
   assert(!html.includes("Friends Website Test"), "regular clients should not see the friend-test thank-you");
   context.window.location.search = "";
 });
@@ -490,6 +491,7 @@ test("referral codes use the LOVELYLOCS username format", () => {
   const card = context.personalReferralCard({ fullName: "Fatima Diallo", preview: true });
   assert(card.includes("LOVELYLOCS/FATIMADIALLO"), "personal referral preview should plug in the supplied client name");
   assert(card.includes("Copy Code") && card.includes("Copy Link") && card.includes("Share"), "personal referral preview should offer one-click sharing controls");
+  assert(card.includes("stays active for future bookings"), "personal referral card should explain that referral codes do not expire");
 });
 
 test("service selection opens cart before client details", () => {
@@ -1072,3 +1074,5 @@ test("redesigned hero is proof-led instead of abstract art-led", () => {
   }
   console.log(`${passed}/${tests.length} tests passed`);
 })();
+
+

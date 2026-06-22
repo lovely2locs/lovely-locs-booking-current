@@ -185,8 +185,10 @@ test("home renders core client sections", () => {
   assert(html.includes("Lovely Locs"), "brand missing");
   assert(html.includes("Which Service Should I Book?"), "service guide missing");
   assert(html.includes("Service Menu"), "service menu missing");
-  assert(html.includes("Portfolio Preview"), "portfolio missing");
-  assert(html.includes("Client Notes"), "testimonials missing");
+  assert(html.includes("Service Focus"), "service focus section missing");
+  assert(html.includes("What To Expect"), "visit expectations section missing");
+  assert(!html.includes("Replace these draft reviews with real testimonials"), "draft testimonial placeholder copy should not be public");
+  assert(!html.includes("Replace these polished placeholders with real client photos"), "draft portfolio placeholder copy should not be public");
   assert(html.includes("How Booking Works"), "booking process missing");
   assert(html.includes("Booking Prep Checklist"), "prep checklist missing");
   assert(html.includes("Mini Service Quiz"), "service quiz missing");

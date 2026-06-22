@@ -258,21 +258,21 @@ const stockShortlist = [
   }
 ];
 
-const testimonials = [
+const visitStandards = [
   {
-    name: "Starter loc client",
-    service: "Starter Locs",
-    quote: "The appointment felt calm and personal. I left understanding how to care for my new locs and what to expect next."
+    title: "Starter loc planning",
+    focus: "Consultation support",
+    copy: "Starter loc services are framed around size, parting, and maintenance expectations so clients know what they are booking before appointment day."
   },
   {
-    name: "Maintenance client",
-    service: "Adult Retwist",
-    quote: "My retwist looked neat without feeling tight. The private studio setup made the whole appointment comfortable."
+    title: "Comfort-first maintenance",
+    focus: "Retwist experience",
+    copy: "Retwist appointments are described around neat roots, hydration, and a private studio setting instead of promising exaggerated results."
   },
   {
-    name: "Style add-on client",
-    service: "Retwist + Style",
-    quote: "I loved being able to explain the style I wanted and get a clean finish that still felt like me."
+    title: "Accessory and style clarity",
+    focus: "Add-on expectations",
+    copy: "Style and loc accessory add-ons are discussed as optional finishing details, with product and color preferences collected in the booking notes."
   }
 ];
 
@@ -333,7 +333,7 @@ const bookingPrepItems = [
 ];
 
 const visualVersions = [
-  { id: "v0", label: "Today", note: "Polished conversion layout with featured services, client guide, portfolio preview, and testimonials." },
+  { id: "v0", label: "Today", note: "Polished conversion layout with featured services, client guide, service focus, and visit expectations." },
   { id: "v1", label: "1 Day Ago", note: "Clean business site with booking process, service menu, and stronger brand copy." },
   { id: "v2", label: "2 Days Ago", note: "Original warm Lovely Locs layout with simple services, policies, products, and contact pages." },
   { id: "v3", label: "3 Days Ago", note: "Softer classic look with less shadow and a quieter service menu." },
@@ -1377,8 +1377,8 @@ function portfolioSection() {
   return `
     <section class="section white" id="gallery">
       <div class="container">
-        <h2 class="section-title">Portfolio Preview</h2>
-        <p class="section-subtitle">Replace these polished placeholders with real client photos as you build your gallery. This section is built to show retwists, starter locs, crochet work, and accessories clearly.</p>
+        <h2 class="section-title">Service Focus</h2>
+        <p class="section-subtitle">A quick look at the appointment types Lovely Locs currently books, from maintenance and starter locs to crochet work and accessories.</p>
         <div class="portfolio-grid">
           ${portfolioItems.map(item => `
             <article class="portfolio-tile ${item.tone}">
@@ -1398,15 +1398,15 @@ function testimonialsSection() {
   return `
     <section class="section">
       <div class="container">
-        <h2 class="section-title">Client Notes</h2>
-        <p class="section-subtitle">A review section gives new clients reassurance before they book. Replace these draft reviews with real testimonials when you have them.</p>
+        <h2 class="section-title">What To Expect</h2>
+        <p class="section-subtitle">Helpful booking guidance should stay factual. This section explains the current Lovely Locs experience without inventing client reviews.</p>
         <div class="testimonial-grid">
-          ${testimonials.map(item => `
+          ${visitStandards.map(item => `
             <article class="testimonial-card">
-              <p>"${item.quote}"</p>
+              <p>${item.copy}</p>
               <div>
-                <strong>${item.name}</strong>
-                <span>${item.service}</span>
+                <strong>${item.title}</strong>
+                <span>${item.focus}</span>
               </div>
             </article>
           `).join("")}

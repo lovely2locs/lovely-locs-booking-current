@@ -985,6 +985,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
   assert(script.includes("Open email draft for client confirmation"), "admin email draft fallback link missing");
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
+  assert(script.includes("Owner delivery target is configured."), "admin readiness should confirm owner email without exposing the raw address");
+  assert(!script.includes("Owner email target:"), "admin readiness should not expose the raw owner email target");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");

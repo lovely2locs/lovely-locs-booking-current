@@ -484,7 +484,7 @@ function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview
       <div>
         <p class="eyebrow">Good People Know Good People</p>
         <h3>Your Personal Referral</h3>
-        <p>Share your code or link in seconds. Your referral reward becomes available after the new client's deposit is confirmed.</p>
+        <p>Share your code or link in seconds. Your personal referral code stays active for future bookings, and your referral reward becomes available after the new client's deposit is confirmed.</p>
       </div>
       ${codeMarkup}
       ${referralCode ? `
@@ -3721,3 +3721,4 @@ function applyVisualVersion(versionId) {
 applyVisualVersion(localStorage.getItem("visualVersion") || "v0");
 window.addEventListener("hashchange", () => render(currentRoute()));
 render();
+

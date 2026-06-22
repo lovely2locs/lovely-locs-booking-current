@@ -2595,7 +2595,6 @@ async function handleResendWebhook(req, res) {
       ].filter(Boolean).join("\n");
       try {
         deliveryRecord.ownerAlert = await sendEmail(
-          ownerEmail,
           `Lovely Locs email delivery problem: ${linked.bookingId || clientName}`,
           alertText
         );
@@ -3025,7 +3024,6 @@ const server = http.createServer((req, res) => {
         ? "Signed Resend delivery webhooks are configured."
         : "Set RESEND_WEBHOOK_SECRET after registering the production webhook.",
       confirmationFromEmail: email.from || configuredEmailAddress(process.env.CONFIRMATION_FROM_EMAIL || ""),
-      ownerEmail,
       smsConfigured: configuredForSms,
       smsReady: configuredForSms && !blockedReason,
       smsBlockedReason: blockedReason,

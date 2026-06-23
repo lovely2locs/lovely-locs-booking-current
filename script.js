@@ -591,6 +591,7 @@ function saveClientProfile(profile = {}) {
   savedClientProfile = clean;
   if (isOwnerAccount(clean)) ownerAdminAccessNotice = "";
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   return clean;
 }
 
@@ -632,7 +633,10 @@ function clearClientProfile() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
+  googleSignupCredential = "";
+  googleSignupState = null;
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   render(currentRoute());
 }
 
@@ -702,6 +706,38 @@ let googleAuthLoadAttempts = 0;
 let googleSignupCredential = "";
 let googleSignupState = null;
 let ownerAdminAccessNotice = "";
+let clientSettingsActionNotice = "";
+
+function currentRouteMode() {
+  const hash = String(window.location.hash || "").replace(/^#/, "");
+  const query = hash.includes("?") ? hash.split("?")[1] : "";
+  return new URLSearchParams(query).get("mode") || "";
+}
+
+function clientSettingsRoute(mode = "login") {
+  return `client-settings?mode=${mode}`;
+}
+
+function clientSettingsMode() {
+  if (savedClientProfile) return "account";
+  return currentRouteMode() === "signup" ? "signup" : "login";
+}
+
+function syncAuthNavigation() {
+  const signedIn = Boolean(savedClientProfile);
+  document.querySelectorAll("[data-auth-nav='signup']").forEach(link => {
+    link.hidden = signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "true" : "false");
+  });
+  document.querySelectorAll("[data-auth-nav='login']").forEach(link => {
+    link.hidden = signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "true" : "false");
+  });
+  document.querySelectorAll("[data-auth-nav='logout']").forEach(link => {
+    link.hidden = !signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "false" : "true");
+  });
+}
 
 const app = document.getElementById("app");
 const drawer = document.getElementById("drawer");
@@ -1145,6 +1181,13 @@ function clientSettingsPastVisitsMarkup(result) {
 function clientSettingsPage() {
   const result = clientSettingsResult;
   const profile = savedClientProfile || result?.client || {};
+  const authMode = clientSettingsMode();
+  const authHeading = authMode === "signup" ? "Sign Up" : authMode === "account" ? "Account" : "Login";
+  const authSubtitle = authMode === "signup"
+    ? "Create your Lovely Locs profile with Google, or use your booking email and phone after your first appointment."
+    : authMode === "account"
+      ? "Manage your referral code, Past Visits, earned credits, and saved sign-in details."
+      : "Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.";
   const creditRows = result?.credits?.length
     ? result.credits.map(credit => {
       const dates = credit.type === "birthday" && credit.validFrom && credit.expiresAt ? ` (${credit.validFrom} - ${credit.expiresAt})` : "";
@@ -1162,28 +1205,39 @@ function clientSettingsPage() {
   return `
     <section class="page-hero" id="client-settings-page">
       <div class="container">
-        <p class="eyebrow">Client Settings</p>
+        <p class="eyebrow">${authHeading}</p>
         <h1>Review & Rebook Hub</h1>
-        <p class="subtitle">Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.</p>
+        <p class="subtitle">${authSubtitle}</p>
       </div>
     </section>
     <section class="section">
       <div class="container admin-grid">
         ${ownerAdminAccessNotice ? `<div class="policy-box"><p class="promo-status">${ownerAdminAccessNotice}</p></div>` : ""}
+        ${clientSettingsActionNotice ? `<div class="policy-box"><p class="promo-status success">${clientSettingsActionNotice}</p></div>` : ""}
         ${googleSignupFormMarkup()}
         <div class="policy-box">
-          <h2>Look Up Your Settings</h2>
+          <h2>${savedClientProfile ? "Account Access" : "Choose How To Continue"}</h2>
+          <div class="client-auth-switch">
+            ${savedClientProfile
+              ? `<button class="outline-btn" type="button" data-client-settings-logout>Log Out</button>`
+              : `<a class="${authMode === "signup" ? "primary-btn" : "outline-btn"}" href="#${clientSettingsRoute("signup")}" data-route="client-settings">Sign Up</a>
+                 <a class="${authMode === "login" ? "primary-btn" : "outline-btn"}" href="#${clientSettingsRoute("login")}" data-route="client-settings">Login</a>`
+            }
+          </div>
+          <p class="past-visit-meta">${savedClientProfile ? "Log out when you are done on a shared device." : "New clients can sign up with Google. Returning clients can log in with Google or the same booking email and phone number."}</p>
+        </div>
+        <div class="policy-box">
+          <h2>${authMode === "signup" ? "Already Booked? Log In Here" : "Look Up Your Settings"}</h2>
           ${savedClientProfile ? `<p class="promo-status success">Saved profile: ${escapeAttr(savedClientProfile.email || savedClientProfile.phone)}</p>` : ""}
           <form class="form-grid" id="clientSettingsForm">
             <label>Booking Email<input name="email" type="email" required placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
             <label>Booking Phone<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
             <p class="form-error" id="clientSettingsStatus" aria-live="polite"></p>
-            <button class="primary-btn" type="button" data-client-settings-login>View Settings</button>
-            ${savedClientProfile ? `<button class="outline-btn" type="button" data-clear-client-profile>Sign Out / Clear Saved Details</button>` : ""}
+            <button class="primary-btn" type="button" data-client-settings-login>${savedClientProfile ? "Refresh My Settings" : "Log In"}</button>
           </form>
         </div>
         <div class="policy-box">
-          <h2>Easy Sign In</h2>
+          <h2>${authMode === "signup" ? "Sign Up With Google" : "Login With Google"}</h2>
           ${savedClientProfile?.googleLinked ? `
             <div class="connected-google-account">
               <span>Connected Google Account</span>
@@ -1233,6 +1287,13 @@ function clientSettingsPage() {
           <h2>Past Visits</h2>
           ${clientSettingsPastVisitsMarkup(result)}
         </div>
+        ${savedClientProfile ? `
+          <div class="policy-box danger-zone">
+            <h2>Delete Your Account</h2>
+            <p>This removes your saved Lovely Locs profile from this device. Existing booking records stay with Lovely Locs.</p>
+            <button class="danger-btn" type="button" data-delete-client-account>Delete Your Account</button>
+          </div>
+        ` : ""}
       </div>
     </section>
   `;
@@ -2689,7 +2750,8 @@ function bindDynamic() {
 
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
-  document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
+  document.querySelectorAll("[data-client-settings-logout]").forEach(button => button.addEventListener("click", logOutClient));
+  document.querySelectorAll("[data-delete-client-account]").forEach(button => button.addEventListener("click", deleteClientAccount));
   document.querySelectorAll("[data-google-signup]").forEach(button => button.addEventListener("click", submitGoogleSignup));
   document.querySelectorAll("[data-switch-google-account]").forEach(button => button.addEventListener("click", switchGoogleAccount));
   document.querySelectorAll("[data-resume-saved-cart]").forEach(button => button.addEventListener("click", () => {
@@ -2726,8 +2788,28 @@ function goToServices() {
 function openClientSettings() {
   closeBooking();
   closeCart();
-  window.location.hash = "client-settings";
+  window.location.hash = `#${clientSettingsRoute(savedClientProfile ? "account" : "login")}`;
   render("client-settings");
+}
+
+function logOutClient() {
+  clientSettingsActionNotice = "You are logged out on this device.";
+  window.location.hash = `#${clientSettingsRoute("login")}`;
+  clearClientProfile();
+}
+
+function deleteClientAccount() {
+  const firstConfirmation = window.confirm
+    ? window.confirm("Delete your account on this device?")
+    : true;
+  if (!firstConfirmation) return;
+  const secondConfirmation = window.confirm
+    ? window.confirm("Are you sure? This removes your saved Lovely Locs profile on this device. Existing booking records stay with Lovely Locs.")
+    : true;
+  if (!secondConfirmation) return;
+  clientSettingsActionNotice = "Your saved Lovely Locs profile was deleted from this device.";
+  window.location.hash = `#${clientSettingsRoute("signup")}`;
+  clearClientProfile();
 }
 function openBooking() {
   if (!cart.length) {
@@ -2792,10 +2874,12 @@ async function lookupClientSettings() {
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Client settings could not be loaded.");
     clientSettingsResult = result;
+    clientSettingsActionNotice = "";
     saveClientProfile({
       ...(result.client || {}),
       referralCode: result.referralCode || result.client?.referralCode || ""
     });
+    window.location.hash = `#${clientSettingsRoute("account")}`;
     render("client-settings");
   } catch (error) {
     if (status) status.textContent = error.message;
@@ -2864,8 +2948,11 @@ function switchGoogleAccount() {
   savedClientProfile = null;
   clientSettingsResult = null;
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   googleSignupCredential = "";
   googleSignupState = null;
+  clientSettingsActionNotice = "";
+  window.location.hash = `#${clientSettingsRoute("login")}`;
   render("client-settings");
 }
 
@@ -2901,12 +2988,14 @@ async function handleGoogleCredential(response) {
     googleSignupState = null;
     googleSignupCredential = "";
     clientSettingsResult = result;
+    clientSettingsActionNotice = "";
     saveClientProfile({
       ...(result.client || {}),
       referralCode: result.referralCode || result.client?.referralCode || "",
       onboardingCompleted: true,
       googleLinked: true
     });
+    window.location.hash = `#${clientSettingsRoute("account")}`;
     render("client-settings");
   } catch (error) {
     if (status) status.textContent = error.message;
@@ -2932,12 +3021,14 @@ async function saveGoogleSignupProfile(profile, options = {}) {
   googleSignupState = null;
   googleSignupCredential = "";
   clientSettingsResult = result;
+  clientSettingsActionNotice = "";
   saveClientProfile({
     ...(result.client || {}),
     referralCode: result.referralCode || result.client?.referralCode || "",
     onboardingCompleted: true,
     googleLinked: true
   });
+  window.location.hash = `#${clientSettingsRoute("account")}`;
   render("client-settings");
 }
 
@@ -3712,6 +3803,7 @@ if (localStorage.getItem("darkMode") !== "false") document.documentElement.class
 syncThemeToggle();
 applyLogoSettings();
 syncOwnerAdminAccess();
+syncAuthNavigation();
 fetchLogoSettings();
 function applyVisualVersion(versionId) {
   visualVersions.forEach(version => document.documentElement.classList.remove(`visual-${version.id}`));
@@ -3719,6 +3811,12 @@ function applyVisualVersion(versionId) {
 }
 
 applyVisualVersion(localStorage.getItem("visualVersion") || "v0");
+document.querySelectorAll("[data-auth-nav='logout']").forEach(link => {
+  link.addEventListener("click", event => {
+    event.preventDefault();
+    logOutClient();
+  });
+});
 window.addEventListener("hashchange", () => render(currentRoute()));
 render();
 

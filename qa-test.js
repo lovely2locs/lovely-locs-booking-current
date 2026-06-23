@@ -214,7 +214,9 @@ test("site shell keeps public policy links in the left menu and hides owner admi
   const nav = html.slice(html.indexOf('<div class="nav-actions">'), html.indexOf("</nav>"));
   const drawerMarkup = html.slice(html.indexOf('<aside class="drawer"'), html.indexOf("</aside>"));
   assert(html.includes('href="#products" data-route="products">Products'), "products link missing from site shell");
-  assert(html.includes('href="#client-settings" data-route="client-settings">Client Login'), "client login link missing from site shell");
+  assert(html.includes('href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up'), "sign up link missing from site shell");
+  assert(html.includes('href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login'), "login link missing from site shell");
+  assert(html.includes('data-auth-nav="logout" hidden>Log Out'), "logout link should stay hidden by default");
   for (const route of ["policies", "contact", "privacy", "sms-opt-in"]) {
     assert(!nav.includes(`data-route="${route}"`), `${route} should not remain in the top navigation`);
     assert(drawerMarkup.includes(`data-route="${route}"`), `${route} should remain in the left menu`);
@@ -635,6 +637,8 @@ test("client settings route shows review and rebook hub", () => {
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes("Review & Rebook Hub"), "client settings heading missing");
+  assert(html.includes('href="#client-settings?mode=signup"'), "sign up switch missing");
+  assert(html.includes('href="#client-settings?mode=login"'), "login switch missing");
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
   assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
@@ -642,6 +646,23 @@ test("client settings route shows review and rebook hub", () => {
   assert(html.includes("Past Visits"), "past visits section missing");
   assert(html.includes("Book Again"), "rebook action copy missing");
   assert(html.includes("Send Private Feedback"), "private feedback action copy missing");
+});
+
+test("saved client settings route collapses to logout and delete account controls", () => {
+  context.saveClientProfile({
+    fullName: "Saved Client",
+    email: "saved@example.com",
+    phone: "(336) 555-1212",
+    referralCode: "LOVELYLOCS/SAVEDCLIENT"
+  });
+  context.window.location.hash = "#client-settings?mode=account";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes("data-client-settings-logout"), "saved account should show logout control");
+  assert(!html.includes("Sign Out / Clear Saved Details"), "old combined clear action should be removed");
+  assert(html.includes("Delete Your Account"), "delete account action missing");
+  assert(html.includes("Existing booking records stay with Lovely Locs."), "delete account scope note missing");
+  context.clearClientProfile();
 });
 
 test("new Google clients receive one-time profile onboarding", async () => {

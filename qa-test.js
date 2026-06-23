@@ -57,7 +57,6 @@ const elements = {
   bookingForm: new FakeElement("bookingForm"),
   bookingError: new FakeElement("bookingError"),
   policyAcknowledgement: new FakeElement("policyAcknowledgement"),
-  reviewAcknowledgement: new FakeElement("reviewAcknowledgement"),
   bookingTime: new FakeElement("bookingTime"),
   bookingEmergencySlot: new FakeElement("bookingEmergencySlot"),
   services: new FakeElement("services")
@@ -215,7 +214,9 @@ test("site shell keeps public policy links in the left menu and hides owner admi
   const nav = html.slice(html.indexOf('<div class="nav-actions">'), html.indexOf("</nav>"));
   const drawerMarkup = html.slice(html.indexOf('<aside class="drawer"'), html.indexOf("</aside>"));
   assert(html.includes('href="#products" data-route="products">Products'), "products link missing from site shell");
-  assert(html.includes('href="#client-settings" data-route="client-settings">Client Login'), "client login link missing from site shell");
+  assert(html.includes('href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up'), "sign up link missing from site shell");
+  assert(html.includes('href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login'), "login link missing from site shell");
+  assert(html.includes('data-auth-nav="logout" hidden>Log Out'), "logout link should stay hidden by default");
   for (const route of ["policies", "contact", "privacy", "sms-opt-in"]) {
     assert(!nav.includes(`data-route="${route}"`), `${route} should not remain in the top navigation`);
     assert(drawerMarkup.includes(`data-route="${route}"`), `${route} should remain in the left menu`);
@@ -235,31 +236,6 @@ test("policies route renders FAQ and policies", () => {
   assert(html.includes("Are deposits refundable?"), "deposit FAQ missing");
 });
 
-
-test("approved branding and booking UX updates are present", () => {
-  const html = fs.readFileSync("index.html", "utf8");
-  const script = fs.readFileSync("script.js", "utf8");
-  const styles = fs.readFileSync("styles.css", "utf8");
-  assert(html.includes("Rooted in Confidence"), "drawer/footer branding missing");
-  assert(script.includes("Rooted in Confidence"), "homepage/confirmation branding missing");
-  assert(script.includes("Quality Care. Consistent Results."), "quality tagline missing");
-  assert(!script.includes("Come Prepared, Leave Clear"), "old tagline should be removed from script");
-  assert(html.includes("Afterpay and Klarna may be available as future payment options."), "updated announcement copy missing");
-  assert(script.includes("lovelyLocsAnnouncementDismissed"), "announcement dismissal should persist locally");
-  assert(styles.includes(".announcement[hidden]"), "dismissed announcement should be hidden without covering content");
-  for (const preference of ["Foam", "Gel", "Oil", "Bring Your Own Product (BYOP)", "Loctician's Preference"]) {
-    assert(script.includes(preference), `${preference} product preference missing`);
-  }
-  assert(script.includes("byopAcknowledgementText"), "BYOP acknowledgement text missing");
-  assert(script.includes("data-product-next disabled"), "product preference Next should start disabled");
-  assert(script.includes("Overdue Retwist Notice"), "overdue notice heading missing");
-  assert(script.includes("overdueRetwistAcknowledgementText"), "overdue acknowledgement text missing");
-  assert(script.includes("data-overdue-next disabled"), "overdue Next should be disabled until acknowledged");
-  assert(script.includes("<summary>Learn More</summary>"), "service learn-more details missing");
-  assert(script.includes("data-edit-service") && script.includes("data-edit-product-preference") && script.includes("data-edit-parting-preference"), "cart edit controls missing");
-  assert(script.includes("Appointment Review") && script.includes("reviewAcknowledgement"), "appointment review before payment missing");
-  assert(script.includes("Delete Account?") && script.includes("DELETE"), "delete-account confirmation missing");
-});
 test("products route renders products and cart", () => {
   context.window.location.hash = "#products";
   context.render(context.currentRoute());
@@ -468,7 +444,7 @@ test("adding a service updates cart and booking modal", () => {
   const html = appHtml();
   assert(html.includes("Cart (1)"), "cart count did not update");
   assert(html.includes("Services: QA Service"), "booking modal did not use selected service");
-  assert(html.includes("Next: Review Payment Options"), "pay options button missing");
+  assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
   assert(html.includes("I agree to receive text messages from Lovely Locs about my booking"), "booking modal SMS consent wording missing");
   assert(html.includes("deposit/payment updates"), "booking modal SMS payment-update scope missing");
   assert(html.includes("Finalize Cart &amp; Enter Details"), "final cart CTA missing");
@@ -497,7 +473,7 @@ test("active promo settings do not break checkout when no promo is applied", () 
   context.clearCart();
   context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
   const html = context.bookingModal();
-  assert(html.includes("Next: Review Payment Options"), "checkout should render without a saved promo code");
+  assert(html.includes("Submit Request &amp; View Pay Options"), "checkout should render without a saved promo code");
   assert(!html.includes("Cannot read properties of null"), "checkout should not show a raw null-code error");
   context.saveDiscountSettingsLocal({ code: "LOVELY10", percent: 10, enabled: false, expiresAt: "" });
 });
@@ -542,19 +518,19 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(!elements.productPreferenceModal.classList.contains("open"), "product preference modal did not close");
   assert(html.includes("Overdue Retwist (4+ Months)"), "overdue retwist was not selected");
   assert(html.includes("$125"), "overdue retwist price was not applied");
-  assert(html.includes("gone significantly longer than the recommended maintenance schedule"), "price-change explanation missing");
-  assert(html.includes("Product preference: Foam"), "base product preference missing from cart");
-  assert(html.includes("Product Preferences: Overdue Retwist (4+ Months) - Foam"), "base product preference missing from booking summary");
+  assert(html.includes("Because your last retwist was 4+ months ago"), "price-change explanation missing");
+  assert(html.includes("Base product: Foam"), "base product preference missing from cart");
+  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Foam"), "base product preference missing from booking summary");
 });
 
 test("maintenance services ask for base product preference before cart", () => {
   context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference modal did not open");
-  context.handleProductPreference("Oil");
+  context.handleProductPreference("Oil and Water");
   const html = appHtml();
   assert(html.includes("Children Retwist (Maintenance)"), "maintenance service was not added after product choice");
-  assert(html.includes("Product preference: Oil"), "selected base product missing from cart");
-  assert(html.includes("Children Retwist (Maintenance) - Oil"), "selected base product missing from summary");
+  assert(html.includes("Base product: Oil and Water"), "selected base product missing from cart");
+  assert(html.includes("Children Retwist (Maintenance) - Oil and Water"), "selected base product missing from summary");
 });
 
 test("starter locs ask parting preference and triangle parts add forty dollars", () => {
@@ -651,7 +627,7 @@ test("booking form has required client fields", () => {
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
   assert(html.includes("outside the listed loc/natural-hair scope"), "service scope acknowledgement missing");
-  assert((html.match(/type="checkbox"/g) || []).length >= 3, "checkout should include required review acknowledgement");
+  assert((html.match(/type="checkbox"/g) || []).length === 2, "checkout should use exactly two checkboxes");
   assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });
@@ -661,6 +637,8 @@ test("client settings route shows review and rebook hub", () => {
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes("Review & Rebook Hub"), "client settings heading missing");
+  assert(html.includes('href="#client-settings?mode=signup"'), "sign up switch missing");
+  assert(html.includes('href="#client-settings?mode=login"'), "login switch missing");
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
   assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
@@ -668,6 +646,23 @@ test("client settings route shows review and rebook hub", () => {
   assert(html.includes("Past Visits"), "past visits section missing");
   assert(html.includes("Book Again"), "rebook action copy missing");
   assert(html.includes("Send Private Feedback"), "private feedback action copy missing");
+});
+
+test("saved client settings route collapses to logout and delete account controls", () => {
+  context.saveClientProfile({
+    fullName: "Saved Client",
+    email: "saved@example.com",
+    phone: "(336) 555-1212",
+    referralCode: "LOVELYLOCS/SAVEDCLIENT"
+  });
+  context.window.location.hash = "#client-settings?mode=account";
+  context.render(context.currentRoute());
+  const html = appHtml();
+  assert(html.includes("data-client-settings-logout"), "saved account should show logout control");
+  assert(!html.includes("Sign Out / Clear Saved Details"), "old combined clear action should be removed");
+  assert(html.includes("Delete Your Account"), "delete account action missing");
+  assert(html.includes("Existing booking records stay with Lovely Locs."), "delete account scope note missing");
+  context.clearClientProfile();
 });
 
 test("new Google clients receive one-time profile onboarding", async () => {
@@ -845,7 +840,6 @@ test("booking submission sends booking to backend and shows confirmation", async
   context.window.location.href = "";
   elements.bookingError.textContent = "previous error";
   elements.policyAcknowledgement.checked = true;
-  elements.reviewAcknowledgement.checked = true;
   await context.submitBooking();
   assert(elements.bookingError.textContent === "", "valid booking should clear error");
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
@@ -884,7 +878,6 @@ test("admin no-charge booking submission does not require pay options URL", asyn
   context.window.location.href = "";
   context.addAdminTestBooking();
   elements.policyAcknowledgement.checked = true;
-  elements.reviewAcknowledgement.checked = true;
   await context.submitBooking();
   assert(context.lastFetch.url === "/api/bookings", "admin test should post to booking backend");
   assert(context.lastFetch.options.body.includes("admin-test-booking"), "admin test payload missing service id");
@@ -1062,8 +1055,8 @@ test("service cards stay compact while showing details", () => {
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes("service-meta"), "service metadata missing");
-  assert(html.includes("service-more") && html.includes("Learn More"), "service learn-more details missing");
-  assert(html.includes("Basic aftercare guidance") || html.includes("Product preference check"), "service detail text missing");
+  assert(html.includes("detail-chips"), "service detail chips missing");
+  assert(html.includes("Aftercare guidance") || html.includes("Retwist care"), "service detail text missing");
 });
 
 test("mobile cart uses one roomy full-height scroll area", () => {

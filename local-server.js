@@ -89,7 +89,7 @@ const productCatalog = [
   { id: "product-Custom Color Sprinkles", price: 15, name: "Custom Color Sprinkles" },
 ];
 
-const allowedBaseProducts = new Set(["Foam", "Gel", "Oil", "Bring Your Own Product (BYOP)", "Loctician's Preference"]);
+const allowedBaseProducts = new Set(["Oil and Water", "Foam", "Gel"]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
@@ -1599,7 +1599,6 @@ function pricedCartItem(item = {}) {
       ...exactService,
       type: "service",
       baseProduct: allowedBaseProducts.has(item.baseProduct) ? item.baseProduct : undefined,
-      byopAcknowledged: item.baseProduct === "Bring Your Own Product (BYOP)" ? Boolean(item.byopAcknowledged) : undefined,
     };
   }
 
@@ -1622,10 +1621,7 @@ function pricedCartItem(item = {}) {
   }
 
   const product = productCatalog.find(productItem => productItem.id === item.id);
-  if (product) {
-    const quantity = Math.max(1, Math.min(20, Number(item.quantity || 1)));
-    return { ...product, type: "product", quantity, unitPrice: product.price, price: product.price * quantity };
-  }
+  if (product) return { ...product, type: "product" };
 
   throw new Error(`Unknown cart item: ${item.id || "missing id"}.`);
 }

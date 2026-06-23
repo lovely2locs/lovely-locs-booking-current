@@ -98,16 +98,6 @@ const products = [
   { name: "Custom Color Sprinkles", price: 15, description: "Choose your custom color to match your unique style." }
 ];
 
-const productPreferenceOptions = [
-  { value: "Foam", label: "Foam", description: "A lightweight foam finish for retwist and maintenance services." },
-  { value: "Gel", label: "Gel", description: "A firmer hold option when a cleaner, longer-lasting finish is preferred." },
-  { value: "Oil", label: "Oil", description: "A light oil-based finish for clients who prefer a softer maintenance approach." },
-  { value: "Bring Your Own Product (BYOP)", label: "Bring Your Own Product (BYOP)", description: "You may bring the products you would like used during your appointment. Lovely Locs is not responsible for product performance, buildup, hold, or results from client-provided products.", requiresAcknowledgement: true },
-  { value: "Loctician's Preference", label: "Loctician's Preference", description: "Not sure what works best for your hair? Select this option and Lovely Locs will choose the most appropriate products based on your service and hair needs." }
-];
-
-const byopAcknowledgementText = "I understand Lovely Locs is not responsible for product performance, buildup, hold, or results from client-provided products.";
-const overdueRetwistAcknowledgementText = "I understand that overdue maintenance may require additional service time and additional fees.";
 const recommendedHairProducts = [
   {
     name: "Made For Locs Vegan Apple Cider Vinegar Shampoo",
@@ -253,7 +243,7 @@ const stockShortlist = [
   {
     name: "Dr Locs Imani Locking Spray",
     role: "Professional retwist support",
-    quality: "A lighter hold option that fits your current booking flow because clients now choose Foam, Gel, Oil, BYOP, or Loctician's Preference.",
+    quality: "A lighter hold option that fits your current booking flow because clients already choose Oil and Water, Foam, or Gel.",
     proof: "Shop App and Dr Locs buyer reviews mention hold, scent, sensitive-scalp use, and loctician use.",
     margin: "Worth testing in limited quantity because professional hold products can sell after maintenance services.",
     action: "Test small"
@@ -337,7 +327,7 @@ const serviceQuizQuestions = [
 const bookingPrepItems = [
   { title: "Send recent hair photos", copy: "Clear front, side, back, and root photos help Lovely Locs prepare for your current loc stage." },
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
-  { title: "Choose product preferences", copy: "Maintenance clients can choose Foam, Gel, Oil, BYOP, or Loctician's Preference so the finish matches their scalp, hair needs, and service goals." },
+  { title: "Choose product preferences", copy: "Maintenance clients can note Oil and Water, Foam, or Gel so the finish matches their scalp and style goals." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
   { title: "Wait for final confirmation", copy: "Submitting the form does not finalize your appointment. Your official confirmation is sent only after Lovely Locs verifies that your deposit was received. Emergency proposals may need an extra owner follow-up." }
 ];
@@ -601,6 +591,7 @@ function saveClientProfile(profile = {}) {
   savedClientProfile = clean;
   if (isOwnerAccount(clean)) ownerAdminAccessNotice = "";
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   return clean;
 }
 
@@ -642,7 +633,10 @@ function clearClientProfile() {
   else localStorage.setItem("lovelyLocsClientProfile", "");
   savedClientProfile = null;
   clientSettingsResult = null;
+  googleSignupCredential = "";
+  googleSignupState = null;
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   render(currentRoute());
 }
 
@@ -687,7 +681,6 @@ let pendingAnchor = null;
 let pendingAdvisoryService = null;
 let pendingProductService = null;
 let pendingPartingService = null;
-let editingCartItemId = null;
 let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
@@ -713,6 +706,38 @@ let googleAuthLoadAttempts = 0;
 let googleSignupCredential = "";
 let googleSignupState = null;
 let ownerAdminAccessNotice = "";
+let clientSettingsActionNotice = "";
+
+function currentRouteMode() {
+  const hash = String(window.location.hash || "").replace(/^#/, "");
+  const query = hash.includes("?") ? hash.split("?")[1] : "";
+  return new URLSearchParams(query).get("mode") || "";
+}
+
+function clientSettingsRoute(mode = "login") {
+  return `client-settings?mode=${mode}`;
+}
+
+function clientSettingsMode() {
+  if (savedClientProfile) return "account";
+  return currentRouteMode() === "signup" ? "signup" : "login";
+}
+
+function syncAuthNavigation() {
+  const signedIn = Boolean(savedClientProfile);
+  document.querySelectorAll("[data-auth-nav='signup']").forEach(link => {
+    link.hidden = signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "true" : "false");
+  });
+  document.querySelectorAll("[data-auth-nav='login']").forEach(link => {
+    link.hidden = signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "true" : "false");
+  });
+  document.querySelectorAll("[data-auth-nav='logout']").forEach(link => {
+    link.hidden = !signedIn;
+    link.setAttribute?.("aria-hidden", signedIn ? "false" : "true");
+  });
+}
 
 const app = document.getElementById("app");
 const drawer = document.getElementById("drawer");
@@ -819,7 +844,7 @@ function money(value) {
 }
 
 function cartSubtotal(items = cart) {
-  return items.reduce((sum, item) => sum + Number(item.price || 0) * Math.max(1, Number(item.quantity || 1)), 0);
+  return items.reduce((sum, item) => sum + item.price, 0);
 }
 
 function discountAmountForTotal(total, discount = appliedDiscount) {
@@ -850,37 +875,14 @@ function bookingDeposit(total, items = cart) {
 }
 
 function serviceDetails(service) {
-  const schedules = {
-    "loc-maintenance": "Every 6 to 8 weeks for most clients; book Overdue Retwist if maintenance has gone significantly longer.",
-    "starter-locs": "Starter loc follow-up timing varies by hair and method; plan maintenance every 4 to 8 weeks after install.",
-    "instant-crochet": "Maintenance timing depends on density, maturity, and crochet work needed; discuss follow-up timing during service.",
-    "add-ons": "Add-ons should be booked with a main service unless Lovely Locs confirms otherwise."
-  };
-  const included = {
-    "loc-maintenance": ["Root maintenance", "Product preference check", "Complimentary two-strand twist style when noted"],
-    "starter-locs": ["Parting preference selection", "Starter method setup", "Basic aftercare guidance"],
-    "instant-crochet": ["Crochet needle work", "Loc shaping", "Basic aftercare guidance"],
-    "add-ons": ["Selected add-on service", "Preference notes reviewed", "Main-service compatibility check"]
-  };
-  const requirements = {
-    "loc-maintenance": "Arrive with hair ready for maintenance and disclose buildup, scalp irritation, or long gaps since your last retwist.",
-    "starter-locs": "Choose a parting preference before checkout. Consultation may be required for small starter locs or special requests.",
-    "instant-crochet": "Disclose weak spots, thinning, prior repairs, or scalp concerns before service begins.",
-    "add-ons": "Must be compatible with the selected main service and appointment time."
-  };
-  const category = service.category || "add-ons";
-  return {
-    overview: service.description,
-    duration: service.duration || "Varies by service",
-    schedule: schedules[category] || schedules["add-ons"],
-    included: included[category] || included["add-ons"],
-    requirements: requirements[category] || requirements["add-ons"]
-  };
+  if (service.category === "loc-maintenance") return ["Wash prep encouraged", "Retwist care", "Style included when noted"];
+  if (service.category === "starter-locs") return ["Parting plan", "Starter method", "Aftercare guidance"];
+  if (service.category === "instant-crochet") return ["Crochet needle work", "Longer appointment", "Loc shaping"];
+  return ["Add-on service", "Book with main service", "Custom notes welcome"];
 }
 
 function serviceCard(service) {
-  const added = cart.some(item => item.id === service.id || item.originalServiceId === service.id);
-  const details = serviceDetails(service);
+  const added = cart.some(item => item.id === service.id);
   return `
     <article class="service-card card">
       <div class="service-top">
@@ -889,83 +891,67 @@ function serviceCard(service) {
       </div>
       <div class="service-meta"><span>${service.duration}</span><span>${service.category.replace(/-/g, " ")}</span></div>
       <p class="description">${service.description}</p>
-      <details class="service-more">
-        <summary>Learn More</summary>
-        <div class="service-more-body">
-          <p><strong>Service overview:</strong> ${details.overview}</p>
-          <p><strong>Approximate duration:</strong> ${details.duration}</p>
-          <p><strong>Recommended maintenance schedule:</strong> ${details.schedule}</p>
-          <p><strong>What's included:</strong> ${details.included.join(", ")}</p>
-          <p><strong>Requirements:</strong> ${details.requirements}</p>
-        </div>
-      </details>
+      <div class="detail-chips">
+        ${serviceDetails(service).map(detail => `<span>${detail}</span>`).join("")}
+      </div>
       <button class="book-small ${added ? "added" : ""}" data-add-service="${service.id}">
         ${added ? "Selected" : "Add Service"}
       </button>
     </article>
   `;
 }
+
 function advisoryModal() {
   return `
     <div class="modal advisory-modal" id="advisoryModal">
       <div class="modal-panel advisory-panel">
         <div class="modal-head">
           <div>
-            <p class="booking-progress-label">Step 1 of 3</p>
-            <h2>Overdue Retwist Notice</h2>
+            <h2>Quick Service Check</h2>
             <p class="duration">This helps reserve the right amount of time for your hair.</p>
           </div>
           <button class="modal-close" data-close-advisory>x</button>
         </div>
-        <div class="booking-progress"><span style="width: 33%"></span></div>
         <div class="advisory-box">
-          <p>Regular maintenance helps prevent excessive matting, breakage, lint buildup, and longer appointment times.</p>
-          <p>If your locs have gone significantly longer than the recommended maintenance schedule, additional time and labor may be required to restore and maintain them properly.</p>
-          <p>Because of this, an Overdue Retwist Fee may be added to your service.</p>
-          <label class="policy-ack overdue-ack"><input id="overdueAcknowledgement" type="checkbox"><span>${overdueRetwistAcknowledgementText}</span></label>
+          <p class="eyebrow">Before selecting Adult Retwist</p>
+          <h3>When was your last retwist?</h3>
+          <p>If it has been longer than 3 months, your appointment usually needs more time for separation, cleanup, and a full maintenance finish.</p>
           <div class="advisory-actions">
-            <button class="outline-btn" data-retwist-answer="standard">Back to Standard Retwist</button>
-            <button class="primary-btn" data-retwist-answer="overdue" data-overdue-next disabled>Next</button>
+            <button class="primary-btn" data-retwist-answer="standard">2-3 months</button>
+            <button class="outline-btn" data-retwist-answer="overdue">4+ months</button>
           </div>
         </div>
       </div>
     </div>
   `;
 }
+
 function productPreferenceModal() {
   return `
     <div class="modal advisory-modal" id="productPreferenceModal">
       <div class="modal-panel advisory-panel">
         <div class="modal-head">
           <div>
-            <p class="booking-progress-label">Step 2 of 3</p>
-            <h2>Product Preference</h2>
-            <p class="duration">Choose one option before continuing.</p>
+            <h2>Base Product Preference</h2>
+            <p class="duration">Choose what you prefer for your maintenance service.</p>
           </div>
           <button class="modal-close" data-close-product-preference>x</button>
         </div>
-        <div class="booking-progress"><span style="width: 66%"></span></div>
         <div class="advisory-box">
-          <p class="eyebrow">Single Product Preference Step</p>
-          <h3>What product direction should Lovely Locs use?</h3>
-          <div class="preference-options">
-            ${productPreferenceOptions.map((option, index) => `
-              <label class="preference-option">
-                <input type="radio" name="productPreferenceChoice" value="${escapeAttr(option.value)}" >
-                <span><strong>${option.label}</strong><small>${option.description}</small></span>
-              </label>
-            `).join("")}
-          </div>
-          <label class="policy-ack byop-ack" id="byopAcknowledgementWrap" hidden><input id="byopAcknowledgement" type="checkbox"><span>${byopAcknowledgementText}</span></label>
-          <div class="advisory-actions modal-step-actions">
-            <button class="outline-btn" data-product-back>Back</button>
-            <button class="primary-btn" data-product-next disabled>Next</button>
+          <p class="eyebrow">Maintenance Service Prep</p>
+          <h3>Which base product would you prefer?</h3>
+          <p>Your preference helps Lovely Locs prepare the right finish for your scalp, hair texture, and style goals.</p>
+          <div class="advisory-actions product-actions">
+            <button class="primary-btn" data-product-preference="Oil and Water">Oil and Water</button>
+            <button class="outline-btn" data-product-preference="Foam">Foam</button>
+            <button class="outline-btn" data-product-preference="Gel">Gel</button>
           </div>
         </div>
       </div>
     </div>
   `;
 }
+
 function partingPreferenceModal() {
   return `
     <div class="modal advisory-modal" id="partingPreferenceModal">
@@ -1195,6 +1181,13 @@ function clientSettingsPastVisitsMarkup(result) {
 function clientSettingsPage() {
   const result = clientSettingsResult;
   const profile = savedClientProfile || result?.client || {};
+  const authMode = clientSettingsMode();
+  const authHeading = authMode === "signup" ? "Sign Up" : authMode === "account" ? "Account" : "Login";
+  const authSubtitle = authMode === "signup"
+    ? "Create your Lovely Locs profile with Google, or use your booking email and phone after your first appointment."
+    : authMode === "account"
+      ? "Manage your referral code, Past Visits, earned credits, and saved sign-in details."
+      : "Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.";
   const creditRows = result?.credits?.length
     ? result.credits.map(credit => {
       const dates = credit.type === "birthday" && credit.validFrom && credit.expiresAt ? ` (${credit.validFrom} - ${credit.expiresAt})` : "";
@@ -1212,28 +1205,39 @@ function clientSettingsPage() {
   return `
     <section class="page-hero" id="client-settings-page">
       <div class="container">
-        <p class="eyebrow">Client Settings</p>
+        <p class="eyebrow">${authHeading}</p>
         <h1>Review & Rebook Hub</h1>
-        <p class="subtitle">Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.</p>
+        <p class="subtitle">${authSubtitle}</p>
       </div>
     </section>
     <section class="section">
       <div class="container admin-grid">
         ${ownerAdminAccessNotice ? `<div class="policy-box"><p class="promo-status">${ownerAdminAccessNotice}</p></div>` : ""}
+        ${clientSettingsActionNotice ? `<div class="policy-box"><p class="promo-status success">${clientSettingsActionNotice}</p></div>` : ""}
         ${googleSignupFormMarkup()}
         <div class="policy-box">
-          <h2>Look Up Your Settings</h2>
+          <h2>${savedClientProfile ? "Account Access" : "Choose How To Continue"}</h2>
+          <div class="client-auth-switch">
+            ${savedClientProfile
+              ? `<button class="outline-btn" type="button" data-client-settings-logout>Log Out</button>`
+              : `<a class="${authMode === "signup" ? "primary-btn" : "outline-btn"}" href="#${clientSettingsRoute("signup")}" data-route="client-settings">Sign Up</a>
+                 <a class="${authMode === "login" ? "primary-btn" : "outline-btn"}" href="#${clientSettingsRoute("login")}" data-route="client-settings">Login</a>`
+            }
+          </div>
+          <p class="past-visit-meta">${savedClientProfile ? "Log out when you are done on a shared device." : "New clients can sign up with Google. Returning clients can log in with Google or the same booking email and phone number."}</p>
+        </div>
+        <div class="policy-box">
+          <h2>${authMode === "signup" ? "Already Booked? Log In Here" : "Look Up Your Settings"}</h2>
           ${savedClientProfile ? `<p class="promo-status success">Saved profile: ${escapeAttr(savedClientProfile.email || savedClientProfile.phone)}</p>` : ""}
           <form class="form-grid" id="clientSettingsForm">
             <label>Booking Email<input name="email" type="email" required placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
             <label>Booking Phone<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
             <p class="form-error" id="clientSettingsStatus" aria-live="polite"></p>
-            <button class="primary-btn" type="button" data-client-settings-login>View Settings</button>
-            ${savedClientProfile ? `<button class="outline-btn" type="button" data-clear-client-profile>Sign Out / Clear Saved Details</button>` : ""}
+            <button class="primary-btn" type="button" data-client-settings-login>${savedClientProfile ? "Refresh My Settings" : "Log In"}</button>
           </form>
         </div>
         <div class="policy-box">
-          <h2>Easy Sign In</h2>
+          <h2>${authMode === "signup" ? "Sign Up With Google" : "Login With Google"}</h2>
           ${savedClientProfile?.googleLinked ? `
             <div class="connected-google-account">
               <span>Connected Google Account</span>
@@ -1255,30 +1259,7 @@ function clientSettingsPage() {
             <button class="primary-btn" type="button" data-resume-saved-cart>Return to My Cart</button>
           </div>
         ` : ""}
-        ${savedClientProfile ? `
-          <div class="policy-box delete-account-box">
-            <h2>Delete Account</h2>
-            <p>This removes the saved Lovely Locs profile from this device and logs you out. Business booking records may remain where needed for appointment history, deposits, and operational records.</p>
-            <button class="danger-btn" type="button" data-open-delete-account>Delete Account</button>
-          </div>
-        ` : ""}
-        <div class="modal delete-account-modal" id="deleteAccountModal">
-          <div class="modal-panel advisory-panel">
-            <div class="modal-head">
-              <div><h2>Delete Account?</h2><p class="duration">This action cannot be undone.</p></div>
-              <button class="modal-close" data-close-delete-account>x</button>
-            </div>
-            <div class="advisory-box">
-              <p>This action cannot be undone. Your appointment history, preferences, and saved information will be permanently removed.</p>
-              <label class="full">Type DELETE to confirm<input id="deleteAccountConfirmInput" autocomplete="off" placeholder="DELETE"></label>
-              <p class="form-error" id="deleteAccountStatus" aria-live="polite"></p>
-              <div class="advisory-actions">
-                <button class="outline-btn" type="button" data-close-delete-account>Cancel</button>
-                <button class="danger-btn" type="button" data-confirm-delete-account disabled>Delete Account</button>
-              </div>
-            </div>
-          </div>
-        </div>        <div class="policy-box">
+        <div class="policy-box">
           <h2>Returning Client Credit</h2>
           <p>${returningCreditCopy}</p>
           <p class="past-visit-meta">Reviews stay separate from this credit. Use the hub below to Book Again, Leave a Google Review, or Send Private Feedback.</p>
@@ -1306,6 +1287,13 @@ function clientSettingsPage() {
           <h2>Past Visits</h2>
           ${clientSettingsPastVisitsMarkup(result)}
         </div>
+        ${savedClientProfile ? `
+          <div class="policy-box danger-zone">
+            <h2>Delete Your Account</h2>
+            <p>This removes your saved Lovely Locs profile from this device. Existing booking records stay with Lovely Locs.</p>
+            <button class="danger-btn" type="button" data-delete-client-account>Delete Your Account</button>
+          </div>
+        ` : ""}
       </div>
     </section>
   `;
@@ -1432,9 +1420,7 @@ function firstTimeClientSection() {
       <div class="container client-guide">
         <div class="guide-copy">
           <p class="eyebrow">First-Time Clients</p>
-          <h2>Rooted in Confidence</h2>
-          <p class="brand-line">Starter Locs. Maintenance. Made Simple.</p>
-          <p class="brand-line strong">Quality Care. Consistent Results.</p>
+          <h2>Come Prepared, Leave Clear</h2>
           <p>If this is your first visit, send notes about your current loc stage, last retwist date, desired style, scalp sensitivities, and any inspiration photos you have. The more context you share, the easier it is to match the right service to your hair.</p>
           <button class="primary-btn" data-view-services>Start Booking</button>
         </div>
@@ -2125,26 +2111,6 @@ function versionsPage() {
   `;
 }
 
-function cartItemTotal(item) {
-  return Number(item.price || 0) * Math.max(1, Number(item.quantity || 1));
-}
-
-function feeInfoForItem(item = {}) {
-  if (item.autoEmergencyFee || item.id === "emergency-fee") return `<span class="fee-info" title="Emergency fees apply to same-day, within 24 hours, Sunday, holiday, or outside-hours appointment requests.">i</span>`;
-  if (item.id === "overdue-retwist") return `<span class="fee-info" title="Overdue retwists may require additional service time and labor because of matting, breakage risk, lint buildup, or longer maintenance gaps.">i</span>`;
-  if (item.partingFee) return `<span class="fee-info" title="Triangle parts require extra sectioning detail and appointment time.">i</span>`;
-  return "";
-}
-
-function cartEditActions(item = {}) {
-  if (item.type === "product") {
-    return `<div class="cart-edit-actions"><button type="button" data-quantity-minus="${escapeAttr(item.id)}">-</button><span>Qty ${Math.max(1, Number(item.quantity || 1))}</span><button type="button" data-quantity-plus="${escapeAttr(item.id)}">+</button></div>`;
-  }
-  const actions = [`<button type="button" data-edit-service="${escapeAttr(item.id)}">Edit Service</button>`];
-  if (item.baseProduct) actions.push(`<button type="button" data-edit-product-preference="${escapeAttr(item.id)}">Edit Product Preference</button>`);
-  if (item.partingPreference) actions.push(`<button type="button" data-edit-parting-preference="${escapeAttr(item.id)}">Edit Parting Preference</button>`);
-  return `<div class="cart-edit-actions">${actions.join("")}</div>`;
-}
 function cartMarkup() {
   const count = cart.length;
   const subtotal = cartSubtotal();
@@ -2163,17 +2129,8 @@ function cartMarkup() {
           ${partingMessage ? `<div class="cart-advisory"><strong>Parting preference saved</strong><p>${partingMessage}</p></div>` : ""}
           ${cart.length ? cart.map(item => `
             <div class="cart-item">
-              <div>
-                <strong>${item.name} ${feeInfoForItem(item)}</strong>
-                <p class="duration">${item.duration || "Accessory"}</p>
-                ${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}
-                ${item.baseProduct ? `<p class="duration">Product preference: ${item.baseProduct}</p>` : ""}
-                ${item.byopAcknowledged ? `<p class="duration">BYOP acknowledgement saved</p>` : ""}
-                ${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}
-                <p>${money(cartItemTotal(item))}</p>
-                ${cartEditActions(item)}
-              </div>
-              <button class="modal-close" data-remove="${item.id}" aria-label="Remove ${escapeAttr(item.name)}">x</button>
+              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${money(item.price)}</p></div>
+              <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
         </div>
@@ -2405,10 +2362,10 @@ function bookingModal() {
     <div class="modal" id="bookingModal">
       <div class="modal-panel">
         <div class="modal-head">
-          <div><p class="booking-progress-label">Step 3 of 3</p><h2>Appointment Review</h2><p class="duration">Review your service, duration, fees, and details before payment.</p></div>
+          <div><h2>Appointment Request</h2><p class="duration">Review your service and send your details</p></div>
           <button class="modal-close" data-close-booking>x</button>
         </div>
-        <div class="booking-progress"><span style="width: 100%"></span></div>
+        <div class="progress"><div></div></div>
         <div class="modal-summary">
           <strong>Booking Summary</strong>
           ${advisoryMessage ? `<p class="advisory-copy">${advisoryMessage}</p>` : ""}
@@ -2416,13 +2373,13 @@ function bookingModal() {
           ${partingMessage ? `<p class="advisory-copy">${partingMessage}</p>` : ""}
           ${selectedServices.length ? `<p>Services: ${selectedServices.map(item => item.name).join(", ")}</p>` : `<p>No service selected yet. Please choose from the service menu before submitting.</p>`}
           ${selectedServices.length ? `<p>Estimated Service Time: ${selectedServices.map(item => item.duration).join(" + ")}</p>` : ""}
-          ${selectedServices.some(item => item.baseProduct) ? `<p>Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
+          ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
           <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
           ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
           <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscountCodeLabel()}): -${money(discountAmount)}` : ""}</p>
           <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
-          <p id="bookingDepositText">Deposit Required Before Confirmation: ${money(deposit)} <span class="fee-info" title="Deposits hold the requested appointment time and are calculated from the current estimated total.">i</span>. Your appointment is not finalized until Lovely Locs confirms the deposit was received.</p>
+          <p id="bookingDepositText">Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.</p>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
         <div class="booking-save-note">
@@ -2455,14 +2412,14 @@ function bookingModal() {
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
         <div class="modal-summary">
-          <strong>Appointment Review Before Payment</strong>
+          <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
             : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>Purple time slots are regular open appointment times. Brown time slots are emergency proposals outside business hours, on Sundays, or on holiday/key dates and include the $45 emergency fee.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>
-          <button class="primary-btn" type="button" data-submit-booking>${adminTest ? "Submit No-Charge Test Booking" : `Next: Review Payment Options`}</button>
+          <button class="primary-btn" type="button" data-submit-booking>${adminTest ? "Submit No-Charge Test Booking" : `Submit Request &amp; View Pay Options`}</button>
         </div>
       </div>
     </div>
@@ -2517,21 +2474,9 @@ function currentRoute() {
   return route;
 }
 
-function replaceCartItem(previousId, item) {
-  const index = cart.findIndex(existing => existing.id === previousId);
-  if (index >= 0) cart[index] = item;
-  else if (!cart.some(existing => existing.id === item.id)) cart.push(item);
-}
-
 function addToCart(item) {
   bookingConfirmation = null;
-  const cleanItem = { ...item, quantity: item.type === "product" ? Math.max(1, Number(item.quantity || 1)) : undefined };
-  if (editingCartItemId) {
-    replaceCartItem(editingCartItemId, cleanItem);
-    editingCartItemId = null;
-  } else if (!cart.some(existing => existing.id === cleanItem.id)) {
-    cart.push(cleanItem);
-  }
+  if (!cart.some(existing => existing.id === item.id)) cart.push(item);
   saveCart();
   render(currentRoute());
 }
@@ -2539,11 +2484,11 @@ function addToCart(item) {
 function clearCart() {
   cart = [];
   selectedService = null;
-  editingCartItemId = null;
   bookingConfirmation = null;
   saveCart();
   render(currentRoute());
 }
+
 function addAdminTestBooking() {
   if (!isOwnerAccount()) {
     ownerAdminAccessNotice = "Owner Admin is available only when the LOVELY2LOCS account is signed in.";
@@ -2566,10 +2511,10 @@ function addServiceFromAdvisory(service) {
   openCart();
 }
 
-function addServiceWithProductPreference(service, productPreference, byopAcknowledged = false) {
+function addServiceWithProductPreference(service, productPreference) {
   selectedService = service;
-  baseProductMessage = `${service.name} product preference saved: ${productPreference}.`;
-  addToCart({ ...service, type: "service", baseProduct: productPreference, byopAcknowledged: productPreference === "Bring Your Own Product (BYOP)" ? Boolean(byopAcknowledged) : undefined });
+  baseProductMessage = `${service.name} will be prepared with ${productPreference}.`;
+  addToCart({ ...service, type: "service", baseProduct: productPreference });
   openCart();
 }
 
@@ -2581,7 +2526,6 @@ function addServiceWithPartingPreference(service, partingPreference, partingFee)
     : `${service.name} includes ${partingPreference}.`;
   addToCart({
     ...service,
-    originalServiceId: service.originalServiceId || service.id,
     id: fee ? `${service.id}-triangle-parts` : `${service.id}-${partingPreference.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     name: fee ? `${service.name} + Triangle Parts` : service.name,
     price: service.price + fee,
@@ -2602,20 +2546,9 @@ function closeAdvisory() {
   document.getElementById("advisoryModal")?.classList.remove("open");
 }
 
-function syncProductPreferenceControls() {
-  const selected = document.querySelector('input[name="productPreferenceChoice"]:checked')?.value || "";
-  const byop = selected === "Bring Your Own Product (BYOP)";
-  const wrap = document.getElementById("byopAcknowledgementWrap");
-  const ack = document.getElementById("byopAcknowledgement");
-  const next = document.querySelector("[data-product-next]");
-  if (wrap) wrap.hidden = !byop;
-  if (next) next.disabled = !selected || (byop && !ack?.checked);
-}
-
 function openProductPreference(service) {
   pendingProductService = service;
   document.getElementById("productPreferenceModal")?.classList.add("open");
-  syncProductPreferenceControls();
 }
 
 function closeProductPreference() {
@@ -2640,19 +2573,11 @@ function handlePartingPreference(partingPreference, partingFee) {
   addServiceWithPartingPreference(service, partingPreference, partingFee);
 }
 
-function handleProductPreference(preference, byopAcknowledged = false) {
+function handleProductPreference(preference) {
   const service = pendingProductService;
   closeProductPreference();
   if (!service) return;
-  addServiceWithProductPreference(service, preference, byopAcknowledged);
-}
-
-function handleProductPreferenceNext() {
-  const selected = document.querySelector('input[name="productPreferenceChoice"]:checked')?.value || "";
-  const byop = selected === "Bring Your Own Product (BYOP)";
-  const acknowledged = Boolean(document.getElementById("byopAcknowledgement")?.checked);
-  if (!selected || (byop && !acknowledged)) return;
-  handleProductPreference(selected, acknowledged);
+  addServiceWithProductPreference(service, preference);
 }
 
 function handleRetwistAnswer(answer) {
@@ -2662,7 +2587,7 @@ function handleRetwistAnswer(answer) {
 
   if (answer === "overdue" && overdue) {
     cart = cart.filter(item => item.id !== standard.id && item.id !== overdue.id);
-    advisoryMessage = "Because your locs have gone significantly longer than the recommended maintenance schedule, the Overdue Retwist service reserves additional time and may include the listed Overdue Retwist Fee.";
+    advisoryMessage = "Because your last retwist was 4+ months ago, Adult Retwist was changed to Overdue Retwist. This reserves more time for separation, cleanup, and full maintenance, so the price updates to the listed Overdue Retwist price.";
     openProductPreference(overdue);
     return;
   }
@@ -2670,38 +2595,7 @@ function handleRetwistAnswer(answer) {
   advisoryMessage = "";
   openProductPreference(standard);
 }
-function serviceFromCartItem(item = {}) {
-  const serviceId = item.originalServiceId || String(item.id || "").replace(/-(triangle-parts|brick-layered-parts|natural-c-parts)$/i, "");
-  const service = services.find(option => option.id === serviceId) || services.find(option => option.name === item.name) || item;
-  return { ...service, id: service.id || serviceId, type: "service" };
-}
 
-function editCartItem(itemId, mode) {
-  const item = cart.find(entry => entry.id === itemId);
-  if (!item) return;
-  editingCartItemId = item.id;
-  closeCart();
-  if (mode === "product") {
-    openProductPreference(serviceFromCartItem(item));
-    return;
-  }
-  if (mode === "parting") {
-    openPartingPreference(serviceFromCartItem(item));
-    return;
-  }
-  goToServices();
-}
-
-function adjustCartQuantity(itemId, delta) {
-  cart = cart.map(item => {
-    if (item.id !== itemId || item.type !== "product") return item;
-    return { ...item, quantity: Math.max(1, Number(item.quantity || 1) + delta) };
-  });
-  bookingConfirmation = null;
-  saveCart();
-  render(currentRoute());
-  openCart();
-}
 function bindDynamic() {
   document.querySelectorAll("[data-scroll]").forEach(button => {
     button.addEventListener("click", () => {
@@ -2764,23 +2658,10 @@ function bindDynamic() {
 
   document.querySelectorAll("[data-open-booking]").forEach(button => button.addEventListener("click", openBooking));
   document.querySelectorAll("[data-close-advisory]").forEach(button => button.addEventListener("click", closeAdvisory));
-  document.querySelectorAll("[data-edit-service]").forEach(button => button.addEventListener("click", () => editCartItem(button.dataset.editService, "service")));
-  document.querySelectorAll("[data-edit-product-preference]").forEach(button => button.addEventListener("click", () => editCartItem(button.dataset.editProductPreference, "product")));
-  document.querySelectorAll("[data-edit-parting-preference]").forEach(button => button.addEventListener("click", () => editCartItem(button.dataset.editPartingPreference, "parting")));
-  document.querySelectorAll("[data-quantity-minus]").forEach(button => button.addEventListener("click", () => adjustCartQuantity(button.dataset.quantityMinus, -1)));
-  document.querySelectorAll("[data-quantity-plus]").forEach(button => button.addEventListener("click", () => adjustCartQuantity(button.dataset.quantityPlus, 1)));
   document.querySelectorAll("[data-close-product-preference]").forEach(button => button.addEventListener("click", closeProductPreference));
   document.querySelectorAll("[data-close-parting-preference]").forEach(button => button.addEventListener("click", closePartingPreference));
-  document.getElementById("overdueAcknowledgement")?.addEventListener("change", event => {
-    const next = document.querySelector("[data-overdue-next]");
-    if (next) next.disabled = !event.target.checked;
-  });
   document.querySelectorAll("[data-retwist-answer]").forEach(button => button.addEventListener("click", () => handleRetwistAnswer(button.dataset.retwistAnswer)));
-  document.querySelectorAll('input[name="productPreferenceChoice"]').forEach(input => input.addEventListener("change", syncProductPreferenceControls));
-  document.getElementById("byopAcknowledgement")?.addEventListener("change", syncProductPreferenceControls);
-  document.querySelectorAll("[data-product-next]").forEach(button => button.addEventListener("click", handleProductPreferenceNext));
-  document.querySelectorAll("[data-product-back]").forEach(button => button.addEventListener("click", closeProductPreference));
-  document.querySelectorAll("[data-parting-back]").forEach(button => button.addEventListener("click", closePartingPreference));
+  document.querySelectorAll("[data-product-preference]").forEach(button => button.addEventListener("click", () => handleProductPreference(button.dataset.productPreference)));
   document.querySelectorAll("[data-parting-preference]").forEach(button => button.addEventListener("click", () => handlePartingPreference(button.dataset.partingPreference, button.dataset.partingFee)));
   document.querySelectorAll("[data-view-services]").forEach(button => button.addEventListener("click", goToServices));
   document.querySelectorAll("[data-close-booking]").forEach(button => button.addEventListener("click", closeBooking));
@@ -2869,11 +2750,8 @@ function bindDynamic() {
 
   document.querySelectorAll("[data-client-settings-login]").forEach(button => button.addEventListener("click", lookupClientSettings));
   document.querySelectorAll("[data-copy-client-referral]").forEach(button => button.addEventListener("click", copyClientReferralLink));
-  document.querySelectorAll("[data-clear-client-profile]").forEach(button => button.addEventListener("click", clearClientProfile));
-  document.querySelectorAll("[data-open-delete-account]").forEach(button => button.addEventListener("click", openDeleteAccountModal));
-  document.querySelectorAll("[data-close-delete-account]").forEach(button => button.addEventListener("click", closeDeleteAccountModal));
-  document.getElementById("deleteAccountConfirmInput")?.addEventListener("input", syncDeleteAccountConfirm);
-  document.querySelectorAll("[data-confirm-delete-account]").forEach(button => button.addEventListener("click", confirmDeleteAccount));
+  document.querySelectorAll("[data-client-settings-logout]").forEach(button => button.addEventListener("click", logOutClient));
+  document.querySelectorAll("[data-delete-client-account]").forEach(button => button.addEventListener("click", deleteClientAccount));
   document.querySelectorAll("[data-google-signup]").forEach(button => button.addEventListener("click", submitGoogleSignup));
   document.querySelectorAll("[data-switch-google-account]").forEach(button => button.addEventListener("click", switchGoogleAccount));
   document.querySelectorAll("[data-resume-saved-cart]").forEach(button => button.addEventListener("click", () => {
@@ -2910,8 +2788,28 @@ function goToServices() {
 function openClientSettings() {
   closeBooking();
   closeCart();
-  window.location.hash = "client-settings";
+  window.location.hash = `#${clientSettingsRoute(savedClientProfile ? "account" : "login")}`;
   render("client-settings");
+}
+
+function logOutClient() {
+  clientSettingsActionNotice = "You are logged out on this device.";
+  window.location.hash = `#${clientSettingsRoute("login")}`;
+  clearClientProfile();
+}
+
+function deleteClientAccount() {
+  const firstConfirmation = window.confirm
+    ? window.confirm("Delete your account on this device?")
+    : true;
+  if (!firstConfirmation) return;
+  const secondConfirmation = window.confirm
+    ? window.confirm("Are you sure? This removes your saved Lovely Locs profile on this device. Existing booking records stay with Lovely Locs.")
+    : true;
+  if (!secondConfirmation) return;
+  clientSettingsActionNotice = "Your saved Lovely Locs profile was deleted from this device.";
+  window.location.hash = `#${clientSettingsRoute("signup")}`;
+  clearClientProfile();
 }
 function openBooking() {
   if (!cart.length) {
@@ -2954,47 +2852,6 @@ function setShareStatus(message) {
   if (status) status.textContent = message;
 }
 
-function openDeleteAccountModal() {
-  const modal = document.getElementById("deleteAccountModal");
-  const input = document.getElementById("deleteAccountConfirmInput");
-  const confirm = document.querySelector("[data-confirm-delete-account]");
-  if (input) input.value = "";
-  if (confirm) confirm.disabled = true;
-  modal?.classList.add("open");
-}
-
-function closeDeleteAccountModal() {
-  document.getElementById("deleteAccountModal")?.classList.remove("open");
-}
-
-function syncDeleteAccountConfirm() {
-  const input = document.getElementById("deleteAccountConfirmInput");
-  const confirm = document.querySelector("[data-confirm-delete-account]");
-  if (confirm) confirm.disabled = String(input?.value || "").trim() !== "DELETE";
-}
-
-function confirmDeleteAccount() {
-  const input = document.getElementById("deleteAccountConfirmInput");
-  const status = document.getElementById("deleteAccountStatus");
-  if (String(input?.value || "").trim() !== "DELETE") {
-    if (status) status.textContent = "Type DELETE to confirm account removal.";
-    return;
-  }
-  window.google?.accounts?.id?.disableAutoSelect();
-  ["lovelyLocsClientProfile", "lovelyLocsBookingDraft", "lovelyLocsCart", "lovelyLocsPendingPayment"].forEach(key => {
-    if (localStorage.removeItem) localStorage.removeItem(key);
-    else localStorage.setItem(key, "");
-  });
-  cart = [];
-  bookingDraft = null;
-  savedClientProfile = null;
-  clientSettingsResult = null;
-  googleSignupCredential = "";
-  googleSignupState = null;
-  closeDeleteAccountModal();
-  syncOwnerAdminAccess();
-  render("client-settings");
-}
 async function lookupClientSettings() {
   const form = document.getElementById("clientSettingsForm");
   const status = document.getElementById("clientSettingsStatus");
@@ -3017,10 +2874,12 @@ async function lookupClientSettings() {
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Client settings could not be loaded.");
     clientSettingsResult = result;
+    clientSettingsActionNotice = "";
     saveClientProfile({
       ...(result.client || {}),
       referralCode: result.referralCode || result.client?.referralCode || ""
     });
+    window.location.hash = `#${clientSettingsRoute("account")}`;
     render("client-settings");
   } catch (error) {
     if (status) status.textContent = error.message;
@@ -3089,8 +2948,11 @@ function switchGoogleAccount() {
   savedClientProfile = null;
   clientSettingsResult = null;
   syncOwnerAdminAccess();
+  syncAuthNavigation();
   googleSignupCredential = "";
   googleSignupState = null;
+  clientSettingsActionNotice = "";
+  window.location.hash = `#${clientSettingsRoute("login")}`;
   render("client-settings");
 }
 
@@ -3126,12 +2988,14 @@ async function handleGoogleCredential(response) {
     googleSignupState = null;
     googleSignupCredential = "";
     clientSettingsResult = result;
+    clientSettingsActionNotice = "";
     saveClientProfile({
       ...(result.client || {}),
       referralCode: result.referralCode || result.client?.referralCode || "",
       onboardingCompleted: true,
       googleLinked: true
     });
+    window.location.hash = `#${clientSettingsRoute("account")}`;
     render("client-settings");
   } catch (error) {
     if (status) status.textContent = error.message;
@@ -3157,12 +3021,14 @@ async function saveGoogleSignupProfile(profile, options = {}) {
   googleSignupState = null;
   googleSignupCredential = "";
   clientSettingsResult = result;
+  clientSettingsActionNotice = "";
   saveClientProfile({
     ...(result.client || {}),
     referralCode: result.referralCode || result.client?.referralCode || "",
     onboardingCompleted: true,
     googleLinked: true
   });
+  window.location.hash = `#${clientSettingsRoute("account")}`;
   render("client-settings");
 }
 
@@ -3808,7 +3674,6 @@ async function submitBooking() {
   const form = document.getElementById("bookingForm");
   const error = document.getElementById("bookingError");
   const policyAcknowledgement = document.getElementById("policyAcknowledgement");
-  const reviewAcknowledgement = document.getElementById("reviewAcknowledgement");
   const submitButton = document.querySelector("[data-submit-booking]");
   if (!form) return;
   if (!form.reportValidity()) {
@@ -3817,10 +3682,6 @@ async function submitBooking() {
   }
   if (policyAcknowledgement && !policyAcknowledgement.checked) {
     if (error) error.textContent = "Please confirm that you have read the Lovely Locs policies before submitting your appointment request.";
-    return;
-  }
-  if (reviewAcknowledgement && !reviewAcknowledgement.checked) {
-    if (error) error.textContent = "Please confirm that you reviewed your appointment details before payment.";
     return;
   }
   const timeInput = document.getElementById("bookingTime");
@@ -3870,7 +3731,7 @@ async function submitBooking() {
       paymentOptions: publicPaymentOptions(result.paymentOptions)
     }));
     bookingConfirmation = {
-      message: "Rooted in Confidence. Starter Locs. Maintenance. Made Simple. Quality Care. Consistent Results. Your appointment request was saved, but it is not finalized yet. Redirecting to the Lovely Locs pay options page for the required deposit. You will receive the official confirmation once Lovely Locs confirms the deposit was received."
+      message: "Your appointment request was saved, but it is not finalized yet. Redirecting to the Lovely Locs pay options page for the required deposit. You will receive the official confirmation once Lovely Locs confirms the deposit was received."
     };
     openPayOptionsRoute(result.payOptionsUrl);
     return;
@@ -3942,6 +3803,7 @@ if (localStorage.getItem("darkMode") !== "false") document.documentElement.class
 syncThemeToggle();
 applyLogoSettings();
 syncOwnerAdminAccess();
+syncAuthNavigation();
 fetchLogoSettings();
 function applyVisualVersion(versionId) {
   visualVersions.forEach(version => document.documentElement.classList.remove(`visual-${version.id}`));
@@ -3949,22 +3811,12 @@ function applyVisualVersion(versionId) {
 }
 
 applyVisualVersion(localStorage.getItem("visualVersion") || "v0");
+document.querySelectorAll("[data-auth-nav='logout']").forEach(link => {
+  link.addEventListener("click", event => {
+    event.preventDefault();
+    logOutClient();
+  });
+});
 window.addEventListener("hashchange", () => render(currentRoute()));
 render();
 
-
-function initializeAnnouncementBanner() {
-  const banner = document.getElementById("announcementBanner");
-  const dismiss = document.getElementById("dismissAnnouncement");
-  if (!banner || !dismiss) return;
-  if (localStorage.getItem("lovelyLocsAnnouncementDismissed") === "afterpay-klarna-future-options") {
-    banner.hidden = true;
-    return;
-  }
-  dismiss.addEventListener("click", () => {
-    localStorage.setItem("lovelyLocsAnnouncementDismissed", "afterpay-klarna-future-options");
-    banner.hidden = true;
-  });
-}
-
-initializeAnnouncementBanner();

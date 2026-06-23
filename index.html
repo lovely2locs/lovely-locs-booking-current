@@ -12,7 +12,10 @@
     <link rel="stylesheet" href="styles.css?v=20260618-logo-admin" />
   </head>
   <body>
-    <div class="announcement">Deposits accepted through Venmo or Apple Pay</div>
+    <div class="announcement" id="announcementBanner">
+      <span>Coming Soon: Afterpay and Klarna may be available as future payment options.</span>
+      <button type="button" id="dismissAnnouncement" aria-label="Dismiss announcement">x</button>
+    </div>
     <header class="site-header">
       <nav class="nav">
         <div class="brand-wrap">
@@ -27,9 +30,7 @@
         <div class="nav-actions">
           <a class="nav-link" href="#services">Services</a>
           <a class="nav-link" href="#products" data-route="products">Products</a>
-          <a class="nav-link" href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up</a>
-          <a class="nav-link" href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login</a>
-          <a class="nav-link" href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="logout" hidden>Log Out</a>
+          <a class="nav-link" href="#client-settings" data-route="client-settings">Client Login</a>
           <button class="theme-toggle" id="themeToggle" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790;</button>
           <button class="text-button" data-header-booking>Book</button>
         </div>
@@ -42,23 +43,22 @@
           <span>Lovely Locs</span>
           <button id="closeDrawer" aria-label="Close menu">x</button>
         </div>
-        <p class="drawer-label">Browse Services</p>
-        <a href="#services" data-anchor="loc-maintenance">Loc Maintenance</a>
-        <a href="#services" data-anchor="starter-locs">Starter Locs</a>
-        <a href="#services" data-anchor="instant-crochet">Instant / Crochet</a>
-        <a href="#services" data-anchor="add-ons">Add-Ons &amp; More</a>
-        <p class="drawer-label top-gap">Pages</p>
-        <a href="#policies" data-route="policies">Policies</a>
+        <p class="drawer-tagline">Rooted in Confidence<br><span>Starter Locs. Maintenance. Made Simple.</span></p>
+        <p class="drawer-label">Menu</p>
+        <a href="#home" data-route="home">Home</a>
+        <a href="#services" data-route="home" data-anchor="services">Services</a>
         <a href="#products" data-route="products">Products</a>
+        <button class="drawer-login" data-drawer-booking>Book Appointment</button>
+        <a href="#client-settings" data-route="client-settings">My Appointments</a>
+        <a href="#client-settings" data-route="client-settings">Settings</a>
         <a href="#contact" data-route="contact">Contact</a>
+        <p class="drawer-label top-gap">Policies</p>
+        <a href="#policies" data-route="policies">Policies</a>
         <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>
-        <a href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up</a>
-        <a href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login</a>
-        <a href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="logout" hidden>Log Out</a>
         <a href="#admin" data-route="admin" data-owner-admin hidden>Owner Admin</a>
         <a href="#privacy" data-route="privacy">Privacy Policy</a>
         <a href="#terms" data-route="terms">Terms &amp; Conditions</a>
-        <button class="drawer-login" data-drawer-booking>Book Appointment</button>
+        <button class="drawer-login drawer-logout" data-clear-client-profile>Logout</button>
       </div>
     </aside>
 
@@ -66,10 +66,13 @@
 
     <footer class="footer">
       <h3>Lovely Locs</h3>
+      <p>Rooted in Confidence</p>
+      <p>Starter Locs. Maintenance. Made Simple.</p>
+      <p>Quality Care. Consistent Results.</p>
       <p>In-Home Studio | Loctician Services</p>
       <p>Piedmont Triad, North Carolina</p>
       <p class="small">lvlc.support@lovelylocsnc.com</p>
-      <p class="legal-links"><a href="#products" data-route="products">Products</a> <span>|</span> <a href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up</a> <span>|</span> <a href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login</a> <span>|</span> <a href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="logout" hidden>Log Out</a> <span>|</span> <a href="#terms" data-route="terms">Terms &amp; Conditions</a></p>
+      <p class="legal-links"><a href="#products" data-route="products">Products</a> <span>|</span> <a href="#client-settings" data-route="client-settings">Client Login</a> <span>|</span> <a href="#terms" data-route="terms">Terms &amp; Conditions</a></p>
     </footer>
 
     <script src="https://accounts.google.com/gsi/client" async></script>

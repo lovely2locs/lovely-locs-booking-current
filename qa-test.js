@@ -526,11 +526,35 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
 test("maintenance services ask for base product preference before cart", () => {
   context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference modal did not open");
+  assert(appHtml().includes("BYOP (Bring Your Own Product)"), "BYOP product preference missing from modal");
+  assert(appHtml().includes("Loctician Recommendation"), "loctician recommendation preference missing from modal");
   context.handleProductPreference("Oil and Water");
   const html = appHtml();
   assert(html.includes("Children Retwist (Maintenance)"), "maintenance service was not added after product choice");
   assert(html.includes("Base product: Oil and Water"), "selected base product missing from cart");
   assert(html.includes("Children Retwist (Maintenance) - Oil and Water"), "selected base product missing from summary");
+});
+
+test("maintenance services can use BYOP or loctician recommendation preference", () => {
+  const originalCart = localStore.get("lovelyLocsCart") || "[]";
+  try {
+    context.clearCart();
+    context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
+    context.handleProductPreference("BYOP (Bring Your Own Product)");
+    let html = appHtml();
+    assert(html.includes("Base product: BYOP (Bring Your Own Product)"), "BYOP preference missing from cart");
+    assert(html.includes("Children Retwist (Maintenance) - BYOP (Bring Your Own Product)"), "BYOP preference missing from summary");
+
+    context.clearCart();
+    context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
+    context.handleProductPreference("Loctician Recommendation");
+    html = appHtml();
+    assert(html.includes("Base product: Loctician Recommendation"), "loctician recommendation missing from cart");
+    assert(html.includes("Children Retwist (Maintenance) - Loctician Recommendation"), "loctician recommendation missing from summary");
+  } finally {
+    localStore.set("lovelyLocsCart", originalCart);
+    vm.runInContext("cart = loadCart(); render(currentRoute());", context);
+  }
 });
 
 test("starter locs ask parting preference and triangle parts add forty dollars", () => {
@@ -620,6 +644,8 @@ test("booking form has required client fields", () => {
   assert(html.includes('value="text"'), "text contact option missing");
   assert(html.includes('value="email"'), "email contact option missing");
   assert(html.includes('Text + Email'), "text plus email contact option missing");
+  assert(html.includes('class="contact-option-text">Text + Email'), "contact option text wrapper missing");
+  assert(fs.readFileSync("styles.css", "utf8").includes('.contact-preference { grid-template-columns: 1fr; }'), "mobile contact options should stack to avoid coming soon badge overlap");
   assert(html.includes("Text messaging is coming soon while carrier approval is completed"), "checkout should explain that text messaging is coming soon");
   assert((html.match(/Coming Soon/g) || []).length >= 2, "checkout should mark both text contact choices as coming soon");
   assert(html.includes('value="email" checked'), "new bookings should default to the active email contact option");
@@ -1099,5 +1125,11 @@ test("redesigned hero is proof-led instead of abstract art-led", () => {
   }
   console.log(`${passed}/${tests.length} tests passed`);
 })();
+
+
+
+
+
+
 
 

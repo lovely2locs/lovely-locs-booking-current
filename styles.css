@@ -2467,7 +2467,7 @@ textarea { min-height: 92px; resize: vertical; }
   background: color-mix(in srgb, var(--lilac) 46%, var(--white));
   padding: 14px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
 }
 
@@ -2480,10 +2480,11 @@ textarea { min-height: 92px; resize: vertical; }
 .contact-preference label {
   min-height: 44px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 14px;
   background: var(--white);
   color: var(--brown);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -2493,6 +2494,11 @@ textarea { min-height: 92px; resize: vertical; }
   width: 16px;
   margin: 0;
   accent-color: var(--plum);
+}
+
+.contact-option-text {
+  min-width: 0;
+  line-height: 1.2;
 }
 
 .contact-preference p {
@@ -2520,6 +2526,7 @@ textarea { min-height: 92px; resize: vertical; }
 
 .coming-soon-label {
   margin-left: auto;
+  white-space: nowrap;
 }
 
 .coming-soon-badge {
@@ -2830,6 +2837,7 @@ textarea { min-height: 92px; resize: vertical; }
   .advisory-box h3 { font-size: 1.8rem; }
   .guide-result p { font-size: 1.25rem; }
   .service-grid, .hours-grid, .products-grid, .recommended-products-grid, .stock-grid, .form-grid, .process-grid, .featured-grid, .portfolio-grid, .testimonial-grid, .payment-options-grid, .prep-grid, .time-slot-grid { grid-template-columns: 1fr; }
+  .contact-preference { grid-template-columns: 1fr; }
   .sms-optin-proof .sms-optin-form { grid-template-columns: 1fr; }
   .version-card { display: block; }
   .version-card button { margin-top: 14px; width: 100%; }

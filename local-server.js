@@ -89,7 +89,7 @@ const productCatalog = [
   { id: "product-Custom Color Sprinkles", price: 15, name: "Custom Color Sprinkles" },
 ];
 
-const allowedBaseProducts = new Set(["Oil and Water", "Foam", "Gel"]);
+const allowedBaseProducts = new Set(["Oil and Water", "Foam", "Gel", "BYOP (Bring Your Own Product)", "Loctician Recommendation"]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
@@ -3178,3 +3178,4 @@ server.listen(port, host, () => {
   console.log(`Lovely Locs site running at http://${shownHost}:${port}/`);
   startAutomationLoop();
 });
+

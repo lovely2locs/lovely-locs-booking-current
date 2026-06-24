@@ -1012,7 +1012,7 @@ function homePage() {
         <div class="hero-copy">
           <div class="hero-logo"><img data-site-logo src="${escapeAttr(currentLogoUrl())}" alt="Lovely Locs Logo"></div>
           <h1>Lovely Locs</h1>
-          <p class="subtitle">Private loc care with clear prices, honest service guidance, and a calm studio experience.</p>
+          <p class="subtitle">Starter locs. Maintenance. Loc sprinkles. Clear guidance before you book.</p>
           <div class="intro-copy">
             <p>Lovely Locs helps you choose the service your hair actually needs before you book, so your appointment has the right time, price, and care plan.</p>
             <p class="strong">Healthy locs first. Pretty finish always.</p>

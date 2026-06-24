@@ -97,7 +97,28 @@ const allowedPartingFees = new Map([
   ["Triangle Parts", 40],
 ]);
 
-const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
+const regularAppointmentTimes = ["11:00", "16:00"];
+const scheduledWorkAppointmentTimes = ["19:00", "20:00"];
+const scheduledWorkDates = new Set([
+  "2026-06-08",
+  "2026-06-09",
+  "2026-06-11",
+  "2026-06-12",
+  "2026-06-13",
+  "2026-06-16",
+  "2026-06-22",
+  "2026-06-23",
+  "2026-06-24",
+  "2026-06-26",
+  "2026-06-27",
+  "2026-06-30",
+  "2026-07-01",
+  "2026-07-06",
+  "2026-07-07",
+  "2026-07-08",
+  "2026-07-09",
+  "2026-07-10",
+]);
 const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"];
 const friendTestCampaign = "friends-booking-test-2026-06";
 const friendTestCampaignLimit = 10;
@@ -1416,15 +1437,23 @@ function dayOfWeek(date) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
 }
 
+function appointmentTimesForDate(date) {
+  return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
+}
+
+function regularHoursLabelForDate(date) {
+  return scheduledWorkDates.has(date) ? "7:00 PM - 11:00 PM" : "11:00 AM - 3:00 PM or 4:00 PM - 7:00 PM";
+}
+
 function classifyAppointmentTime(date, time) {
   const weekday = dayOfWeek(date);
   const holiday = isHoliday(date);
   const isSunday = weekday === 0;
-  const regular = !holiday && !isSunday && regularAppointmentTimes.includes(time);
+  const regular = !holiday && !isSunday && appointmentTimesForDate(date).includes(time);
   return {
     type: regular ? "standard" : "emergency",
     emergency: !regular,
-    reason: regular ? "Within regular Lovely Locs evening hours." : holiday ? "Holiday/key date appointment proposal." : isSunday ? "Sunday appointment proposal." : "Outside regular Lovely Locs evening hours.",
+    reason: regular ? "Within regular Lovely Locs appointment hours." : holiday ? "Holiday/key date appointment proposal." : isSunday ? "Sunday appointment proposal." : "Outside regular Lovely Locs appointment hours.",
   };
 }
 
@@ -1432,24 +1461,20 @@ function availabilityForDate(date) {
   const booked = bookedTimesForDate(date);
   const holiday = isHoliday(date);
   const isSunday = dayOfWeek(date) === 0;
-  const regularSlots = holiday || isSunday ? [] : regularAppointmentTimes.map(time => ({
+  const scheduledWorkDate = scheduledWorkDates.has(date);
+  const appointmentTimes = appointmentTimesForDate(date);
+  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
     type: "standard",
     status: booked.has(time) ? "booked" : "open",
-    note: "Open appointment time.",
+    note: scheduledWorkDate ? "Scheduled workday opening between 7:00 PM and 11:00 PM." : "Open appointment time.",
   }));
-  const emergencySlots = emergencyProposalTimes.map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "emergency",
-    status: booked.has(time) ? "booked" : "open",
-    note: holiday ? "Holiday emergency proposal. $45 emergency fee applies." : isSunday ? "Sunday emergency proposal. $45 emergency fee applies." : "Outside business hours. $45 emergency fee applies.",
-  }));
+  const emergencySlots = [];
   return {
     date,
     holiday,
-    regularHours: holiday || isSunday ? "Emergency proposals only" : "6:30 PM - 10:30 PM",
+    regularHours: holiday || isSunday ? "Emergency proposals only" : regularHoursLabelForDate(date),
     slots: [...regularSlots, ...emergencySlots],
   };
 }
@@ -2760,7 +2785,7 @@ async function handleClientSettings(req, res) {
       email: body.email || "",
       phone: body.phone || "",
       date: "2099-01-01",
-      time: "18:30",
+      time: "11:00",
     });
     if (!client.email || !client.phone) {
       sendJson(res, 400, { ok: false, error: "Enter the email and phone number used for booking." });
@@ -2884,7 +2909,7 @@ async function handleGoogleSignup(req, res) {
       locJourneyLength: body.locJourneyLength || "",
       onboardingCompleted: true,
       date: "2099-01-01",
-      time: "18:30",
+      time: "11:00",
     });
     if (!client.fullName || phoneDigits(client.phone).length < 10) {
       sendJson(res, 400, { ok: false, error: "Enter your full name and a valid phone number." });

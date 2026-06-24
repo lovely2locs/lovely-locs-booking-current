@@ -44,7 +44,28 @@ function publicPaymentOptions(options) {
   return source.map(option => ({ ...option, handle: publicPaymentHandle(option) }));
 }
 
-const regularAppointmentTimes = ["18:30", "19:30", "20:30"];
+const regularAppointmentTimes = ["11:00", "16:00"];
+const scheduledWorkAppointmentTimes = ["19:00", "20:00"];
+const scheduledWorkDates = new Set([
+  "2026-06-08",
+  "2026-06-09",
+  "2026-06-11",
+  "2026-06-12",
+  "2026-06-13",
+  "2026-06-16",
+  "2026-06-22",
+  "2026-06-23",
+  "2026-06-24",
+  "2026-06-26",
+  "2026-06-27",
+  "2026-06-30",
+  "2026-07-01",
+  "2026-07-06",
+  "2026-07-07",
+  "2026-07-08",
+  "2026-07-09",
+  "2026-07-10",
+]);
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
 const defaultLogoSettings = {
@@ -2186,24 +2207,24 @@ function dayOfWeek(date) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
 }
 
+function appointmentTimesForDate(date) {
+  return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
+}
+
 function localAvailability(date, bookedTimes = []) {
   const booked = new Set(bookedTimes);
   const holiday = isHolidayDate(date);
   const isSunday = dayOfWeek(date) === 0;
-  const regularSlots = holiday || isSunday ? [] : regularAppointmentTimes.map(time => ({
+  const scheduledWorkDate = scheduledWorkDates.has(date);
+  const appointmentTimes = appointmentTimesForDate(date);
+  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
     type: "standard",
     status: booked.has(time) ? "booked" : "open",
-    note: "Open appointment time."
+    note: scheduledWorkDate ? "Scheduled workday opening between 7:00 PM and 11:00 PM." : "Open appointment time."
   }));
-  const emergencySlots = emergencyProposalTimes.map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "emergency",
-    status: booked.has(time) ? "booked" : "open",
-    note: holiday ? "Holiday emergency proposal. $45 emergency fee applies." : isSunday ? "Sunday emergency proposal. $45 emergency fee applies." : "Outside business hours. $45 emergency fee applies."
-  }));
+  const emergencySlots = [];
   return { date, slots: [...regularSlots, ...emergencySlots] };
 }
 

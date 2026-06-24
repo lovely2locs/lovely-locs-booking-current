@@ -327,7 +327,7 @@ const serviceQuizQuestions = [
 const bookingPrepItems = [
   { title: "Send recent hair photos", copy: "Clear front, side, back, and root photos help Lovely Locs prepare for your current loc stage." },
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
-  { title: "Choose product preferences", copy: "Maintenance clients can note Oil and Water, Foam, or Gel so the finish matches their scalp and style goals." },
+  { title: "Choose product preferences", copy: "Maintenance clients can choose Oil and Water, Foam, Gel, BYOP, or ask the loctician to decide so the finish matches their scalp and style goals." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
   { title: "Wait for final confirmation", copy: "Submitting the form does not finalize your appointment. Your official confirmation is sent only after Lovely Locs verifies that your deposit was received. Emergency proposals may need an extra owner follow-up." }
 ];
@@ -945,6 +945,8 @@ function productPreferenceModal() {
             <button class="primary-btn" data-product-preference="Oil and Water">Oil and Water</button>
             <button class="outline-btn" data-product-preference="Foam">Foam</button>
             <button class="outline-btn" data-product-preference="Gel">Gel</button>
+            <button class="outline-btn" data-product-preference="BYOP (Bring Your Own Product)">BYOP (Bring Your Own Product)</button>
+            <button class="outline-btn" data-product-preference="Loctician Recommendation">Loctician Recommendation</button>
           </div>
         </div>
       </div>
@@ -2397,9 +2399,9 @@ function bookingModal() {
           ${slotPickerMarkup(profile)}
           <fieldset class="full contact-preference">
             <legend>Preferred Point of Contact</legend>
-            <label><input name="preferredContact" type="radio" value="text_email" ${profile.preferredContact === "text_email" ? "checked" : ""}> Text + Email <span class="coming-soon-label">Coming Soon</span></label>
-            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}> Text <span class="coming-soon-label">Coming Soon</span></label>
-            <label><input name="preferredContact" type="radio" value="email" ${!profile.preferredContact || profile.preferredContact === "email" ? "checked" : ""}> Email</label>
+            <label><input name="preferredContact" type="radio" value="text_email" ${profile.preferredContact === "text_email" ? "checked" : ""}><span class="contact-option-text">Text + Email</span><span class="coming-soon-label">Coming Soon</span></label>
+            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}><span class="contact-option-text">Text</span><span class="coming-soon-label">Coming Soon</span></label>
+            <label><input name="preferredContact" type="radio" value="email" ${!profile.preferredContact || profile.preferredContact === "email" ? "checked" : ""}><span class="contact-option-text">Email</span></label>
             <p>Text messaging is coming soon while carrier approval is completed. Choose Email for active confirmations. You may still provide optional text-message consent now.</p>
           </fieldset>
           <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
@@ -3819,4 +3821,6 @@ document.querySelectorAll("[data-auth-nav='logout']").forEach(link => {
 });
 window.addEventListener("hashchange", () => render(currentRoute()));
 render();
+
+
 

@@ -62,7 +62,7 @@ const elements = {
   services: new FakeElement("services")
 };
 elements.bookingForm.reportValidity = () => true;
-elements.bookingTime.value = "18:30";
+elements.bookingTime.value = "11:00";
 
 const document = {
   documentElement: new FakeElement("html"),
@@ -148,7 +148,7 @@ context.FormData = class {
       ["email", "client@example.com"],
       ["phone", "(555) 123-4567"],
       ["date", "2026-06-01"],
-      ["time", "18:30"],
+      ["time", "11:00"],
       ["birthday", "1998-07-31"],
       ["adminToken", "OWNER-TEST-TOKEN"],
       ["referredByCode", "lovelylocs/Test Client"],
@@ -798,7 +798,7 @@ test("unfinished booking details persist for refresh and cart changes", () => {
   assert(storedDraft.fullName === "Test Client", "unfinished client name was not saved");
   assert(storedDraft.birthday === "1998-07-31", "unfinished birthday was not saved");
   assert(storedDraft.date === "2026-06-01", "unfinished booking date was not saved");
-  assert(storedDraft.time === "18:30", "unfinished booking time was not saved");
+  assert(storedDraft.time === "11:00", "unfinished booking time was not saved");
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes('value="Test Client"'), "saved draft name did not restore");
@@ -870,7 +870,7 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(elements.bookingError.textContent === "", "valid booking should clear error");
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
   assert(context.lastFetch.options.body.includes("Test Client"), "booking backend payload should include client details");
-  assert(context.lastFetch.options.body.includes('"time":"18:30"'), "booking backend payload should include selected time");
+  assert(context.lastFetch.options.body.includes('"time":"11:00"'), "booking backend payload should include selected time");
   assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
   assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
   assert(context.lastFetch.options.body.includes("marketingEmailOptIn"), "booking backend payload should include monthly referral campaign opt-in status");
@@ -956,6 +956,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("smsBlockedReason"), "SMS blocked reason helper missing");
   assert(server.includes("smsReady"), "SMS readiness status missing");
   assert(server.includes("/api/availability"), "availability endpoint missing");
+  assert(server.includes('const regularAppointmentTimes = ["11:00", "16:00"];'), "usual availability should allow two regular starts");
+  assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00", "20:00"];'), "scheduled workdays should be evening-only");
+  assert(server.includes('"2026-06-24"'), "green scheduled June 24 date missing from availability override");
+  assert(server.includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
+  assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
   assert(server.includes("emailReadyForClients"), "client email readiness status missing");

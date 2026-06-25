@@ -621,6 +621,11 @@ test("booking form has required client fields", () => {
   assert(html.includes('name="phone" required'), "phone not required");
   assert(html.includes('name="date" required'), "date not required");
   assert(html.includes("Appointment Date"), "appointment date label missing");
+  assert(html.includes('class="appointment-date-field"'), "appointment date should use the calendar picker wrapper");
+  assert(html.includes('data-toggle-appointment-calendar'), "appointment date calendar toggle missing");
+  assert(html.includes('id="appointmentCalendar"'), "appointment calendar popover missing");
+  assert(html.includes('data-calendar-date='), "appointment calendar days missing");
+  assert(fs.readFileSync("styles.css", "utf8").includes(".appointment-calendar-grid"), "appointment calendar grid styles missing");
   assert(!html.includes("Preferred Date"), "checkout should not show a preferred date label");
   assert(html.includes('name="birthday" type="date"'), "optional guest birthday field missing");
   assert(html.includes("Guest clients can enter only their birthday"), "guest birthday guidance missing");

@@ -2211,6 +2211,65 @@ function appointmentTimesForDate(date) {
   return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
 }
 
+function validAppointmentDateValue(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  return !Number.isNaN(new Date(`${value}T12:00:00`).getTime());
+}
+
+function calendarDateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function appointmentCalendarMonth(value = "") {
+  const source = validAppointmentDateValue(value) ? new Date(`${value}T12:00:00`) : new Date();
+  return new Date(source.getFullYear(), source.getMonth(), 1);
+}
+
+function appointmentCalendarMarkup(value = "", monthValue = "") {
+  const selectedDate = validAppointmentDateValue(value) ? value : "";
+  const viewMonth = validAppointmentDateValue(monthValue) ? appointmentCalendarMonth(monthValue) : appointmentCalendarMonth(selectedDate);
+  const todayKey = calendarDateKey(new Date());
+  const start = new Date(viewMonth);
+  start.setDate(1 - start.getDay());
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    const key = calendarDateKey(day);
+    const classes = [
+      "appointment-calendar-day",
+      day.getMonth() === viewMonth.getMonth() ? "" : "muted",
+      key === selectedDate ? "selected" : "",
+      key === todayKey ? "today" : "",
+      isHolidayDate(key) ? "holiday" : ""
+    ].filter(Boolean).join(" ");
+    return `
+      <button type="button" class="${classes}" data-calendar-date="${key}" aria-pressed="${key === selectedDate ? "true" : "false"}" aria-label="${escapeAttr(day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }))}">
+        <span>${day.getDate()}</span>
+      </button>
+    `;
+  }).join("");
+  return `
+    <div class="appointment-calendar" id="appointmentCalendar" data-calendar-month="${calendarDateKey(viewMonth)}" hidden>
+      <div class="appointment-calendar-head">
+        <button type="button" data-calendar-month-step="-1" aria-label="Previous month">&lt;</button>
+        <strong id="appointmentCalendarHeading">${viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+        <button type="button" data-calendar-month-step="1" aria-label="Next month">&gt;</button>
+      </div>
+      <div class="appointment-calendar-weekdays" aria-hidden="true">
+        ${weekdays.map(day => `<span>${day}</span>`).join("")}
+      </div>
+      <div class="appointment-calendar-grid" role="grid" aria-labelledby="appointmentCalendarHeading">
+        ${days}
+      </div>
+    </div>
+  `;
+}
+
 function localAvailability(date, bookedTimes = []) {
   const booked = new Set(bookedTimes);
   const holiday = isHolidayDate(date);
@@ -2337,6 +2396,67 @@ async function loadAvailabilityForDate(date, preferredSlot = null) {
   }
 }
 
+function setAppointmentCalendarOpen(open) {
+  const calendar = document.getElementById("appointmentCalendar");
+  const toggle = document.querySelector("[data-toggle-appointment-calendar]");
+  if (!calendar) return;
+  calendar.hidden = !open;
+  if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function handleAppointmentDateChange(date) {
+  if (!validAppointmentDateValue(date)) return;
+  const bookingForm = document.getElementById("bookingForm");
+  const timeInput = document.getElementById("bookingTime");
+  const emergencyInput = document.getElementById("bookingEmergencySlot");
+  if (timeInput) timeInput.value = "";
+  if (emergencyInput) emergencyInput.value = "";
+  bookingSlotState = { date, time: "", type: "", reason: "" };
+  setEmergencyFeeForSlot(false);
+  saveBookingDraft(bookingForm);
+  loadAvailabilityForDate(date);
+}
+
+function replaceAppointmentCalendar(monthValue) {
+  const calendar = document.getElementById("appointmentCalendar");
+  const input = document.getElementById("bookingDate");
+  if (!calendar) return;
+  calendar.outerHTML = appointmentCalendarMarkup(input?.value || "", monthValue);
+  setAppointmentCalendarOpen(true);
+}
+
+function bindAppointmentCalendar() {
+  const picker = document.querySelector(".appointment-date-picker");
+  if (!picker || picker.dataset.bound === "true") return;
+  picker.dataset.bound = "true";
+  picker.addEventListener("click", event => {
+    const target = event.target;
+    if (target?.closest("[data-toggle-appointment-calendar]") || target?.id === "bookingDate") {
+      const calendar = document.getElementById("appointmentCalendar");
+      setAppointmentCalendarOpen(Boolean(calendar?.hidden));
+      return;
+    }
+    const stepButton = target?.closest("[data-calendar-month-step]");
+    if (stepButton) {
+      const calendar = document.getElementById("appointmentCalendar");
+      const currentMonth = calendar?.dataset.calendarMonth || "";
+      const viewMonth = validAppointmentDateValue(currentMonth) ? appointmentCalendarMonth(currentMonth) : appointmentCalendarMonth();
+      viewMonth.setMonth(viewMonth.getMonth() + Number(stepButton.dataset.calendarMonthStep || 0));
+      replaceAppointmentCalendar(calendarDateKey(viewMonth));
+      return;
+    }
+    const dateButton = target?.closest("[data-calendar-date]");
+    if (dateButton) {
+      const input = document.getElementById("bookingDate");
+      const date = dateButton.dataset.calendarDate || "";
+      if (input) input.value = date;
+      replaceAppointmentCalendar(date);
+      setAppointmentCalendarOpen(false);
+      handleAppointmentDateChange(date);
+    }
+  });
+}
+
 function bindTimeSlotButtons() {
   document.querySelectorAll("[data-time-slot]").forEach(button => {
     button.addEventListener("click", () => {
@@ -2413,7 +2533,15 @@ function bookingModal() {
           <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
           <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
-          <label>Appointment Date<input id="bookingDate" name="date" required type="date" value="${escapeAttr(profile.date)}"><span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span></label>
+          <div class="appointment-date-field">
+            <span class="appointment-date-label">Appointment Date</span>
+            <div class="appointment-date-picker">
+              <input id="bookingDate" name="date" required type="text" readonly inputmode="none" autocomplete="off" placeholder="Select a date" value="${escapeAttr(profile.date)}">
+              <button class="appointment-calendar-toggle" type="button" data-toggle-appointment-calendar aria-expanded="false" aria-controls="appointmentCalendar">Calendar</button>
+              ${appointmentCalendarMarkup(profile.date)}
+            </div>
+            <span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span>
+          </div>
           <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
           <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
           ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
@@ -2697,15 +2825,9 @@ function bindDynamic() {
   });
   bookingForm?.addEventListener("change", () => saveBookingDraft(bookingForm));
   bindPersonalReferralActions(document);
+  bindAppointmentCalendar();
   document.getElementById("bookingDate")?.addEventListener("change", event => {
-    const timeInput = document.getElementById("bookingTime");
-    const emergencyInput = document.getElementById("bookingEmergencySlot");
-    if (timeInput) timeInput.value = "";
-    if (emergencyInput) emergencyInput.value = "";
-    bookingSlotState = { date: event.target.value, time: "", type: "", reason: "" };
-    setEmergencyFeeForSlot(false);
-    saveBookingDraft(bookingForm);
-    loadAvailabilityForDate(event.target.value);
+    handleAppointmentDateChange(event.target.value);
   });
   if (bookingDraft?.date) loadAvailabilityForDate(bookingDraft.date, bookingDraft);
   document.querySelectorAll("#brandSettingsForm input[type='range'], #brandSettingsForm input[name='url']").forEach(input => input.addEventListener("input", previewLogoSettings));

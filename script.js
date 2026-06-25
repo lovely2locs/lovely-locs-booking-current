@@ -2166,11 +2166,7 @@ function cartMarkup() {
               ${appliedDiscount ? `<button type="button" data-clear-promo>Clear</button>` : ""}
             </div>
             ${appliedDiscount ? `<p class="promo-status success">${appliedDiscount.code} applied: ${appliedDiscount.percent}% off. ${discountExpiryText(appliedDiscount)}.</p>` : `<p class="promo-status" id="promoStatus">Enter an active Lovely Locs promo code before booking.</p>`}
-            <div class="promo-email-row">
-              <label>Email Code For Later<input id="promoEmailInput" type="email" placeholder="you@example.com"></label>
-              <button type="button" data-email-promo>Email Code</button>
-            </div>
-            <p class="promo-status" id="promoEmailStatus" aria-live="polite"></p>
+
           </div>
           <div class="cart-total">
             <div class="service-top"><strong>Subtotal</strong><strong>${money(subtotal)}</strong></div>
@@ -2858,7 +2854,6 @@ function bindDynamic() {
   document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
-  document.querySelectorAll("[data-email-promo]").forEach(button => button.addEventListener("click", emailPromoCode));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
   document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
@@ -3676,28 +3671,6 @@ function clearPromoCode() {
   openCart();
 }
 
-async function emailPromoCode() {
-  const status = document.getElementById("promoEmailStatus");
-  const email = document.getElementById("promoEmailInput")?.value || "";
-  const code = normalizeDiscountCode(appliedDiscount?.code || document.getElementById("promoCodeInput")?.value || "");
-  if (!email || !code) {
-    if (status) status.textContent = "Add an email and an active promo code first.";
-    return;
-  }
-  if (status) status.textContent = "Sending promo code...";
-  try {
-    const response = await fetch("/api/discount/email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code })
-    });
-    const result = await response.json();
-    if (!result.ok) throw new Error(result.error || "Promo code could not be emailed.");
-    if (status) status.textContent = result.message || "Promo code email was queued.";
-  } catch (error) {
-    if (status) status.textContent = error.message;
-  }
-}
 
 function bookingSummaryFromForm(form) {
   const booking = bookingPayloadFromForm(form);

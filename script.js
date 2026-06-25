@@ -45,7 +45,7 @@ function publicPaymentOptions(options) {
 }
 
 const regularAppointmentTimes = ["11:00", "16:00"];
-const scheduledWorkAppointmentTimes = ["19:00", "20:00"];
+const scheduledWorkAppointmentTimes = ["19:00"];
 const scheduledWorkDates = new Set([
   "2026-06-08",
   "2026-06-09",
@@ -60,6 +60,7 @@ const scheduledWorkDates = new Set([
   "2026-06-27",
   "2026-06-30",
   "2026-07-01",
+  "2026-07-02",
   "2026-07-06",
   "2026-07-07",
   "2026-07-08",
@@ -2281,7 +2282,7 @@ function localAvailability(date, bookedTimes = []) {
     label: timeLabel(time),
     type: "standard",
     status: booked.has(time) ? "booked" : "open",
-    note: scheduledWorkDate ? "Scheduled workday opening between 7:00 PM and 11:00 PM." : "Open appointment time."
+    note: scheduledWorkDate ? "Scheduled workday opening at 7:00 PM only." : "Open appointment time."
   }));
   const emergencySlots = [];
   return { date, slots: [...regularSlots, ...emergencySlots] };

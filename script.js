@@ -68,7 +68,7 @@ const scheduledWorkDates = new Set([
   "2026-07-10",
 ]);
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
-const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
+const holidayDates = new Set(["2026-01-01", "2026-05-25", "2026-07-04", "2026-07-11", "2026-09-07", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
 const defaultLogoSettings = {
   url: logoUrl,
   navSize: 40,

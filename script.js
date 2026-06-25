@@ -1997,7 +1997,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
-          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the owner email or from the client's pay-options link after <strong>booking=</strong>. This marks the deposit paid and sends the client confirmation email.</p>
+          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note. This marks the deposit paid and sends the client confirmation email.</p>
           <p>If the deposit was not received, use the release button instead. That keeps the booking history but opens the appointment time again.</p>
           ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">

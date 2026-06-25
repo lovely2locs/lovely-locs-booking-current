@@ -98,7 +98,7 @@ const allowedPartingFees = new Map([
 ]);
 
 const regularAppointmentTimes = ["11:00", "16:00"];
-const scheduledWorkAppointmentTimes = ["19:00", "20:00"];
+const scheduledWorkAppointmentTimes = ["19:00"];
 const scheduledWorkDates = new Set([
   "2026-06-08",
   "2026-06-09",
@@ -113,6 +113,7 @@ const scheduledWorkDates = new Set([
   "2026-06-27",
   "2026-06-30",
   "2026-07-01",
+  "2026-07-02",
   "2026-07-06",
   "2026-07-07",
   "2026-07-08",
@@ -1442,7 +1443,7 @@ function appointmentTimesForDate(date) {
 }
 
 function regularHoursLabelForDate(date) {
-  return scheduledWorkDates.has(date) ? "7:00 PM - 11:00 PM" : "11:00 AM - 3:00 PM or 4:00 PM - 7:00 PM";
+  return scheduledWorkDates.has(date) ? "7:00 PM" : "11:00 AM - 3:00 PM or 4:00 PM - 7:00 PM";
 }
 
 function classifyAppointmentTime(date, time) {
@@ -1468,7 +1469,7 @@ function availabilityForDate(date) {
     label: timeLabel(time),
     type: "standard",
     status: booked.has(time) ? "booked" : "open",
-    note: scheduledWorkDate ? "Scheduled workday opening between 7:00 PM and 11:00 PM." : "Open appointment time.",
+    note: scheduledWorkDate ? "Scheduled workday opening at 7:00 PM only." : "Open appointment time.",
   }));
   const emergencySlots = [];
   return {

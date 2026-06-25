@@ -450,7 +450,8 @@ test("adding a service updates cart and booking modal", () => {
   assert(html.includes("Finalize Cart &amp; Enter Details"), "final cart CTA missing");
   assert(html.includes("Client sign in / saved details"), "cart saved-details link missing");
   assert(html.includes("Promo Code"), "cart promo field missing");
-  assert(html.includes("data-email-promo"), "promo email control missing");
+  assert(!html.includes("data-email-promo"), "promo email-for-later control should be removed from checkout card");
+  assert(!html.includes("Email Code For Later"), "promo email-for-later label should be removed from checkout card");
 });
 
 test("promo code can be applied and included in booking payload", async () => {

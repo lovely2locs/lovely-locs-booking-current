@@ -2361,15 +2361,13 @@ h1, h2, h3,
   padding: 10px 12px;
 }
 
-.promo-actions,
-.promo-email-row {
+.promo-actions {
   display: grid;
   gap: 8px;
   grid-template-columns: 1fr 1fr;
 }
 
-.promo-actions button,
-.promo-email-row button {
+.promo-actions button {
   border: 1px solid rgba(122, 82, 142, 0.28);
   border-radius: 10px;
   background: rgba(122, 82, 142, 0.08);

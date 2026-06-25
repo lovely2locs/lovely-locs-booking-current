@@ -941,6 +941,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
   assert(server.includes("/api/admin/bookings"), "protected recent bookings endpoint missing");
   assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
+  assert(server.includes("Double-check the booking ID from the pay-options page or payment note."), "owner confirmation fallback should mention pay-options or payment note");
+  assert(!server.includes("Double-check the booking ID from the owner email or pay-options page."), "owner confirmation fallback should not depend on the owner email");
   assert(server.includes("sanitizeFriendTest"), "friend-test payload sanitizer missing");
   assert(server.includes('const cleanTest = test && typeof test === "object" ? test : {};'), "friend-test sanitizer should handle null payloads");
   assert(server.includes('const code = String(cleanTest.code || "").trim().toUpperCase();'), "friend-test sanitizer should read from the guarded object");
@@ -1050,6 +1052,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
   assert(script.includes("Owner delivery target is configured."), "admin readiness should confirm owner email without exposing the raw address");
   assert(!script.includes("Owner email target:"), "admin readiness should not expose the raw owner email target");
+  assert(script.includes("booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note"), "manual deposit instructions should point to pay-options or payment note booking IDs");
+  assert(!script.includes("booking ID from the owner email or from the client's pay-options link"), "manual deposit instructions should not depend on the owner email");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");

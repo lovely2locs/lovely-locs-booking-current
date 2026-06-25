@@ -966,6 +966,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes('"2026-06-24"'), "green scheduled June 24 date missing from availability override");
   assert(server.includes('"2026-07-02"'), "green scheduled July 2 date missing from availability override");
   assert(server.includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
+  assert(server.includes('"2026-07-11"'), "blocked July 11 date missing from availability calendar");
   assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");

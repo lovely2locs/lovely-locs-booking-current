@@ -962,8 +962,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("smsReady"), "SMS readiness status missing");
   assert(server.includes("/api/availability"), "availability endpoint missing");
   assert(server.includes('const regularAppointmentTimes = ["11:00", "16:00"];'), "usual availability should allow two regular starts");
-  assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00", "20:00"];'), "scheduled workdays should be evening-only");
+  assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00"];'), "scheduled workdays should expose only the 7 PM start");
   assert(server.includes('"2026-06-24"'), "green scheduled June 24 date missing from availability override");
+  assert(server.includes('"2026-07-02"'), "green scheduled July 2 date missing from availability override");
   assert(server.includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
   assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");

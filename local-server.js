@@ -2305,7 +2305,7 @@ async function handleManualPaymentConfirm(req, res) {
       }
       sendHtml(res, 404, ownerConfirmPageHtml({
         title: "Booking not found",
-        intro: "No matching Lovely Locs booking was found for this confirmation link. Double-check the booking ID from the owner email or pay-options page.",
+        intro: "No matching Lovely Locs booking was found for this confirmation link. Double-check the booking ID from the pay-options page or payment note.",
         bookingId,
         adminUrl,
       }));

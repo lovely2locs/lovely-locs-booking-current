@@ -2467,7 +2467,8 @@ textarea { min-height: 92px; resize: vertical; }
   margin-top: 6px;
 }
 
-.birthday-credit-help summary {
+.birthday-credit-help summary,
+.appointment-color-help summary {
   color: var(--brown);
   cursor: pointer;
   display: inline-flex;
@@ -3095,4 +3096,22 @@ optional-label {
 .friend-test-code {
   margin-bottom: 0;
   font-size: 0.9rem;
+}
+
+.appointment-color-help {
+  margin-top: 6px;
+}
+
+.appointment-color-help summary:hover,
+.appointment-color-help summary:focus-visible {
+  color: var(--accent);
+}
+
+.appointment-color-copy {
+  display: block;
+  margin-top: 6px;
+}
+
+.booking-emergency-submit-note[hidden] {
+  display: none;
 }

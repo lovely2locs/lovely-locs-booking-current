@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --cream: #fffaf7;
   --taupe: #9a7a62;
   --brown: #4b332c;
@@ -17,12 +17,12 @@
   --shadow: 0 18px 44px rgba(31, 23, 20, 0.1);
   --nav-logo-size: 40px;
   --hero-logo-size: 88px;
-  --hero-logo-margin-inline: 0 auto;
-  --logo-fit: cover;
+  --hero-logo-margin-inline: auto;
+  --logo-fit: contain;
   --logo-position: 50% 50%;
   --logo-offset-x: 0%;
   --logo-offset-y: 0%;
-  --logo-image-scale: 1.16;
+  --logo-image-scale: 1;
   --font-display: "Cormorant Garamond", Georgia, serif;
   --font-body: "Manrope", "Segoe UI", Arial, sans-serif;
 }

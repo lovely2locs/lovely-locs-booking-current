@@ -1,4 +1,4 @@
-﻿const http = require("http");
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -127,6 +127,9 @@ const friendTestCheckpoints = ["home", "services", "products", "policies", "cont
 const friendTestCampaign = "friends-booking-test-2026-06";
 const friendTestCampaignLimit = 10;
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
+const holidayBookedAppointmentTimes = new Map([
+  ["2026-07-04", new Set(["11:00"])],
+]);
 const holidayDates = new Set([
   "2026-01-01",
   "2026-01-19",
@@ -137,7 +140,6 @@ const holidayDates = new Set([
   "2026-05-25",
   "2026-06-19",
   "2026-06-21",
-  "2026-07-03",
   "2026-07-04",
   "2026-07-11",
   "2026-07-31",
@@ -259,7 +261,7 @@ function serviceSummaryHtml(booking) {
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
-    ].filter(Boolean).join(" â€¢ ");
+    ].filter(Boolean).join(" • ");
     return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
   }).join("");
 }
@@ -309,7 +311,7 @@ function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], serv
             </tr>
             <tr>
               <td style="padding:20px 28px;background:#fff3ee;color:#7a6257;font-size:13px;line-height:1.5;text-align:center;">
-                Lovely Locs â€¢ Private in-home studio â€¢ Address shared after confirmation
+                Lovely Locs • Private in-home studio • Address shared after confirmation
               </td>
             </tr>
           </table>
@@ -1481,6 +1483,14 @@ function availabilityForDate(date) {
   const isSunday = dayOfWeek(date) === 0;
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
+  const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
+  const holidayBookedSlots = holiday ? [...holidayBookedTimes].map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "emergency",
+    status: "booked",
+    note: "Holiday appointment time is already booked. Emergency fee applies to approved holiday bookings.",
+  })) : [];
   const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
@@ -1493,7 +1503,7 @@ function availabilityForDate(date) {
     date,
     holiday,
     regularHours: holiday || isSunday ? "Emergency proposals only" : regularHoursLabelForDate(date),
-    slots: [...regularSlots, ...emergencySlots],
+    slots: [...holidayBookedSlots, ...regularSlots, ...emergencySlots],
   };
 }
 

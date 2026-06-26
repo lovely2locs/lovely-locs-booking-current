@@ -71,8 +71,14 @@ const scheduledWorkDates = new Set([
   "2026-07-10",
 ]);
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
+const forcedOpenAppointmentTimes = new Map([
+  ["2026-07-03", new Set(["11:00", "16:00"])],
+]);
+const holidayAppointmentTimesByDate = new Map([
+  ["2026-07-04", ["11:00", "16:00"]],
+]);
 const holidayBookedAppointmentTimes = new Map([
-  ["2026-07-04", new Set(["11:00"])],
+  ["2026-07-04", new Set(["16:00"])],
 ]);
 const holidayDates = new Set(["2026-01-01", "2026-01-19", "2026-02-14", "2026-02-16", "2026-04-05", "2026-05-10", "2026-05-25", "2026-06-19", "2026-06-21", "2026-07-04", "2026-07-11", "2026-07-31", "2026-09-07", "2026-10-12", "2026-10-31", "2026-11-11", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
 const defaultLogoSettings = {
@@ -2280,23 +2286,28 @@ function localAvailability(date, bookedTimes = []) {
   const isSunday = dayOfWeek(date) === 0;
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
+  const forcedOpenTimes = forcedOpenAppointmentTimes.get(date) || new Set();
+  const holidayTimes = holidayAppointmentTimesByDate.get(date) || [];
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
-  const holidayBookedSlots = holiday ? [...holidayBookedTimes].map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "emergency",
-    status: "booked",
-    note: "Holiday appointment time is already booked. Emergency fee applies to approved holiday bookings."
-  })) : [];
+  const holidaySlots = holiday ? holidayTimes.map(time => {
+    const isBooked = holidayBookedTimes.has(time) || booked.has(time);
+    return {
+      time,
+      label: timeLabel(time),
+      type: "emergency",
+      status: isBooked ? "booked" : "open",
+      note: isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee."
+    };
+  }) : [];
   const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
     type: "standard",
-    status: booked.has(time) ? "booked" : "open",
+    status: booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
     note: scheduledWorkDate ? "Scheduled workday opening at 7:00 PM only." : "Open appointment time."
   }));
   const emergencySlots = [];
-  return { date, holiday, slots: [...holidayBookedSlots, ...regularSlots, ...emergencySlots] };
+  return { date, holiday, slots: [...holidaySlots, ...regularSlots, ...emergencySlots] };
 }
 
 function slotPickerMarkup(profile = {}) {
@@ -2554,7 +2565,13 @@ function bookingModal() {
             </div>
             <span class="field-note">For scheduling this appointment only. This does not set your birthday-credit dates.</span>
           </div>
-          <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"><span class="field-note">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span></label>
+          <div class="birthday-field">
+            <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(profile.birthday)}"></label>
+            <details class="field-note birthday-credit-help">
+              <summary>Learn more about birthday discounts</summary>
+              <span class="birthday-credit-copy">Guest clients can enter only their birthday to receive the annual birthday credit. It becomes available automatically 2 weeks before your birthday and expires 1 month after it. No separate preferred redemption date is needed.</span>
+            </details>
+          </div>
           <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
           ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
           ${slotPickerMarkup(profile)}

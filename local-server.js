@@ -1,4 +1,4 @@
-const http = require("http");
+﻿const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -36,7 +36,10 @@ const bookingsFile = path.join(dataDir, "bookings.jsonl");
 const settingsFile = path.join(dataDir, "site-settings.json");
 const ownerEmail = process.env.BOOKING_OWNER_EMAIL || "lvlc.support@lovelylocsnc.com";
 const ownerPhone = process.env.BOOKING_OWNER_PHONE || "3364711098";
-const emailLogoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
+const emailLogoUrl = "https://lovelylocsnc.com/assets/lovely-locs-logo.jpg";
+const legacyLogoUrls = new Set([
+  "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
+]);
 const dayMs = 24 * 60 * 60 * 1000;
 const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
 const referredNewClientCreditAmount = Number(process.env.REFERRED_NEW_CLIENT_CREDIT_AMOUNT || 15);
@@ -50,8 +53,8 @@ const defaultSiteSettings = {
     url: emailLogoUrl,
     navSize: 40,
     heroSize: 88,
-    heroAlign: "left",
-    fit: "cover",
+    heroAlign: "center",
+    fit: "contain",
     x: 50,
     y: 50,
   },
@@ -256,7 +259,7 @@ function serviceSummaryHtml(booking) {
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
-    ].filter(Boolean).join(" • ");
+    ].filter(Boolean).join(" â€¢ ");
     return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
   }).join("");
 }
@@ -306,7 +309,7 @@ function brandEmailHtml({ eyebrow = "Lovely Locs", title, intro, rows = [], serv
             </tr>
             <tr>
               <td style="padding:20px 28px;background:#fff3ee;color:#7a6257;font-size:13px;line-height:1.5;text-align:center;">
-                Lovely Locs • Private in-home studio • Address shared after confirmation
+                Lovely Locs â€¢ Private in-home studio â€¢ Address shared after confirmation
               </td>
             </tr>
           </table>
@@ -901,6 +904,7 @@ function clampNumber(value, min, max, fallback) {
 function sanitizeLogoUrl(value) {
   const url = String(value || "").trim();
   if (!url) return defaultSiteSettings.logo.url;
+  if (legacyLogoUrls.has(url)) return defaultSiteSettings.logo.url;
   if (url.length > 1500000) return defaultSiteSettings.logo.url;
   if (/^https?:\/\/[^\s"'<>]+$/i.test(url)) return url;
   if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(url)) return url;

@@ -127,8 +127,14 @@ const friendTestCheckpoints = ["home", "services", "products", "policies", "cont
 const friendTestCampaign = "friends-booking-test-2026-06";
 const friendTestCampaignLimit = 10;
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
+const forcedOpenAppointmentTimes = new Map([
+  ["2026-07-03", new Set(["11:00", "16:00"])],
+]);
+const holidayAppointmentTimesByDate = new Map([
+  ["2026-07-04", ["11:00", "16:00"]],
+]);
 const holidayBookedAppointmentTimes = new Map([
-  ["2026-07-04", new Set(["11:00"])],
+  ["2026-07-04", new Set(["16:00"])],
 ]);
 const holidayDates = new Set([
   "2026-01-01",
@@ -1483,19 +1489,24 @@ function availabilityForDate(date) {
   const isSunday = dayOfWeek(date) === 0;
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
+  const forcedOpenTimes = forcedOpenAppointmentTimes.get(date) || new Set();
+  const holidayTimes = holidayAppointmentTimesByDate.get(date) || [];
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
-  const holidayBookedSlots = holiday ? [...holidayBookedTimes].map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "emergency",
-    status: "booked",
-    note: "Holiday appointment time is already booked. Emergency fee applies to approved holiday bookings.",
-  })) : [];
+  const holidaySlots = holiday ? holidayTimes.map(time => {
+    const isBooked = holidayBookedTimes.has(time) || booked.has(time);
+    return {
+      time,
+      label: timeLabel(time),
+      type: "emergency",
+      status: isBooked ? "booked" : "open",
+      note: isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee.",
+    };
+  }) : [];
   const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
     type: "standard",
-    status: booked.has(time) ? "booked" : "open",
+    status: booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
     note: scheduledWorkDate ? "Scheduled workday opening at 7:00 PM only." : "Open appointment time.",
   }));
   const emergencySlots = [];
@@ -1503,7 +1514,7 @@ function availabilityForDate(date) {
     date,
     holiday,
     regularHours: holiday || isSunday ? "Emergency proposals only" : regularHoursLabelForDate(date),
-    slots: [...holidayBookedSlots, ...regularSlots, ...emergencySlots],
+    slots: [...holidaySlots, ...regularSlots, ...emergencySlots],
   };
 }
 

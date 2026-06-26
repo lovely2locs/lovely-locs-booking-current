@@ -1,4 +1,7 @@
-const logoUrl = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png";
+﻿const logoUrl = "assets/lovely-locs-logo.jpg";
+const legacyLogoUrls = new Set([
+  "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
+]);
 
 const categories = [
   { id: "loc-maintenance", label: "Loc Maintenance", icon: "Retwist" },
@@ -73,8 +76,8 @@ const defaultLogoSettings = {
   url: logoUrl,
   navSize: 40,
   heroSize: 88,
-  heroAlign: "left",
-  fit: "cover",
+  heroAlign: "center",
+  fit: "contain",
   x: 50,
   y: 50
 };
@@ -574,6 +577,7 @@ function escapeAttr(value) {
 function cleanLogoUrl(value) {
   const url = String(value || "").trim();
   if (!url) return logoUrl;
+  if (legacyLogoUrls.has(url)) return logoUrl;
   if (/^https?:\/\/[^\s"'<>]+$/i.test(url)) return url;
   if (/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(url) && url.length <= 1500000) return url;
   return logoUrl;

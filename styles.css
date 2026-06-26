@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --cream: #fffaf7;
   --taupe: #9a7a62;
   --brown: #4b332c;
@@ -2457,6 +2457,33 @@ textarea { min-height: 92px; resize: vertical; }
   font-weight: 500;
   line-height: 1.35;
   margin-top: 4px;
+}
+
+.birthday-field {
+  position: relative;
+}
+
+.birthday-credit-help {
+  margin-top: 6px;
+}
+
+.birthday-credit-help summary {
+  color: var(--brown);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 750;
+  line-height: 1.2;
+  list-style-position: inside;
+}
+
+.birthday-credit-help summary:hover,
+.birthday-credit-help summary:focus-visible {
+  color: var(--accent);
+}
+
+.birthday-credit-copy {
+  display: block;
+  margin-top: 6px;
 }
 
 .appointment-date-field {

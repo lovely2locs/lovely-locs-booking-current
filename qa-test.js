@@ -641,6 +641,9 @@ test("booking form has required client fields", () => {
   assert(html.includes('id="bookingTime" name="time"'), "appointment time slot input missing");
   assert(html.includes("Appointment Time"), "appointment time label missing");
   assert(html.includes("time-slot-grid"), "time slot picker missing");
+  assert(html.includes("Learn more about slot colors"), "slot color details should be collapsed below the appointment selector");
+  assert(html.includes("Choose an open time after selecting your date."), "short appointment-time helper missing");
+  assert(!html.includes("Purple time slots are regular open appointment times"), "long color explanation should not remain in before-submit copy");
   assert(html.includes('aria-pressed="false"') || html.includes("time-slot-placeholder"), "time slots should expose selected state accessibly");
   assert(html.includes("Emergency proposal"), "emergency slot legend missing");
   assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
@@ -659,6 +662,8 @@ test("booking form has required client fields", () => {
   assert(html.includes('value="email" checked'), "new bookings should default to the active email contact option");
   assert(!html.includes('name="address"'), "address field should not be shown for studio-only bookings");
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
+  assert(html.includes("Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting"), "condensed before-submit deposit copy missing");
+  assert(html.includes('id="bookingEmergencySubmitNote" hidden'), "emergency submit details should be hidden until an emergency slot is selected");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
   assert(html.includes("outside the listed loc/natural-hair scope"), "service scope acknowledgement missing");
   assert((html.match(/type="checkbox"/g) || []).length === 2, "checkout should use exactly two checkboxes");

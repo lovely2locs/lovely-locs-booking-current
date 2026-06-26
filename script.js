@@ -1,4 +1,4 @@
-﻿const logoUrl = "assets/lovely-locs-logo.jpg";
+const logoUrl = "assets/lovely-locs-logo.jpg";
 const legacyLogoUrls = new Set([
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
 ]);
@@ -71,7 +71,10 @@ const scheduledWorkDates = new Set([
   "2026-07-10",
 ]);
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
-const holidayDates = new Set(["2026-01-01", "2026-01-19", "2026-02-14", "2026-02-16", "2026-04-05", "2026-05-10", "2026-05-25", "2026-06-19", "2026-06-21", "2026-07-03", "2026-07-04", "2026-07-11", "2026-07-31", "2026-09-07", "2026-10-12", "2026-10-31", "2026-11-11", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
+const holidayBookedAppointmentTimes = new Map([
+  ["2026-07-04", new Set(["11:00"])],
+]);
+const holidayDates = new Set(["2026-01-01", "2026-01-19", "2026-02-14", "2026-02-16", "2026-04-05", "2026-05-10", "2026-05-25", "2026-06-19", "2026-06-21", "2026-07-04", "2026-07-11", "2026-07-31", "2026-09-07", "2026-10-12", "2026-10-31", "2026-11-11", "2026-11-26", "2026-12-24", "2026-12-25", "2026-12-31"]);
 const defaultLogoSettings = {
   url: logoUrl,
   navSize: 40,
@@ -2277,6 +2280,14 @@ function localAvailability(date, bookedTimes = []) {
   const isSunday = dayOfWeek(date) === 0;
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
+  const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
+  const holidayBookedSlots = holiday ? [...holidayBookedTimes].map(time => ({
+    time,
+    label: timeLabel(time),
+    type: "emergency",
+    status: "booked",
+    note: "Holiday appointment time is already booked. Emergency fee applies to approved holiday bookings."
+  })) : [];
   const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
     time,
     label: timeLabel(time),
@@ -2285,7 +2296,7 @@ function localAvailability(date, bookedTimes = []) {
     note: scheduledWorkDate ? "Scheduled workday opening at 7:00 PM only." : "Open appointment time."
   }));
   const emergencySlots = [];
-  return { date, slots: [...regularSlots, ...emergencySlots] };
+  return { date, holiday, slots: [...holidayBookedSlots, ...regularSlots, ...emergencySlots] };
 }
 
 function slotPickerMarkup(profile = {}) {

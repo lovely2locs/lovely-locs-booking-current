@@ -969,6 +969,10 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes('"2026-06-24"'), "green scheduled June 24 date missing from availability override");
   assert(server.includes('"2026-07-02"'), "green scheduled July 2 date missing from availability override");
   assert(server.includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
+  const holidayDatesBlock = server.match(/const holidayDates = new Set\(\[([\s\S]*?)\]\);/);
+  assert(holidayDatesBlock && !holidayDatesBlock[1].includes('"2026-07-03"'), "July 3 should stay open for normal 11 AM or 4 PM availability");
+  assert(holidayDatesBlock && holidayDatesBlock[1].includes('"2026-07-04"'), "Fourth of July should remain a holiday emergency date");
+  assert(server.includes('["2026-07-04", new Set(["11:00"])]'), "Fourth of July 11 AM should show as booked");
   assert(server.includes('"2026-07-11"'), "blocked July 11 date missing from availability calendar");
   ["2026-01-19", "2026-02-16", "2026-06-19", "2026-07-31", "2026-10-12", "2026-11-11"].forEach(date => {
     assert(server.includes(`"${date}"`), `major holiday emergency date missing: ${date}`);

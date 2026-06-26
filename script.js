@@ -2324,7 +2324,11 @@ function slotPickerMarkup(profile = {}) {
       <div class="time-slot-grid" id="timeSlotGrid">
         <p class="time-slot-placeholder">Choose a date to see open appointment times.</p>
       </div>
-      <p class="time-slot-note" id="timeSlotNote">Regular appointment times are shown with a purple outline. Emergency proposals are brown and include the $45 emergency fee.</p>
+      <p class="time-slot-note" id="timeSlotNote">Choose an open time after selecting your date.</p>
+      <details class="field-note appointment-color-help">
+        <summary>Learn more about slot colors</summary>
+        <span class="appointment-color-copy">Purple means regular open times. Brown means emergency proposals for Sundays, holidays, key dates, or outside regular hours. Closed slots show as booked.</span>
+      </details>
     </div>
   `;
 }
@@ -2332,6 +2336,11 @@ function slotPickerMarkup(profile = {}) {
 function emergencyFeeItem() {
   const fee = services.find(item => item.id === "emergency-fee");
   return fee ? { ...fee, type: "service", autoEmergencyFee: true } : null;
+}
+
+function updateEmergencySubmitNote(enabled) {
+  const note = document.getElementById("bookingEmergencySubmitNote");
+  if (note) note.hidden = !enabled;
 }
 
 function setEmergencyFeeForSlot(enabled) {
@@ -2345,6 +2354,7 @@ function setEmergencyFeeForSlot(enabled) {
   }
   saveCart();
   updateBookingSummaryTotals();
+  updateEmergencySubmitNote(enabled);
 }
 
 function updateBookingSummaryTotals() {
@@ -2396,7 +2406,7 @@ function renderTimeSlots(availability, preferredSlot = null) {
   if (note) {
     note.textContent = restoredSlot
       ? restoredType === "emergency"
-        ? `${restoredSlot.note} This saved slot includes the Emergency Fee.`
+        ? `${restoredSlot.note} Emergency details are listed before you submit.`
         : "Your saved regular appointment time has been restored."
       : availability.holiday
         ? "Holiday/key dates are emergency proposals and include the $45 emergency fee."
@@ -2502,8 +2512,8 @@ function bindTimeSlotButtons() {
       saveBookingDraft(document.getElementById("bookingForm"));
       if (noteNode) {
         noteNode.textContent = type === "emergency"
-          ? `Selected: ${timeLabel(time)}. ${note} This adds the Emergency Fee to your total before the deposit is calculated.`
-          : `Selected: ${timeLabel(time)}. This is a regular Lovely Locs evening appointment time.`;
+          ? `Selected: ${timeLabel(time)}. Emergency proposal selected. Details are listed before you submit.`
+          : `Selected: ${timeLabel(time)}. This is a regular Lovely Locs appointment time.`;
       }
     });
   });
@@ -2518,6 +2528,7 @@ function bookingModal() {
   const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   const adminTest = isAdminTestBooking(cart);
+  const emergencySubmitHidden = profile.emergencySlot ? "" : " hidden";
   const confirmationMarkup = bookingConfirmation ? `
         <div class="confirmation-panel">
           <strong>${adminTest ? "Test booking saved" : "Payment step ready"}</strong>
@@ -2595,7 +2606,7 @@ function bookingModal() {
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
-            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio; the exact studio address is shared after your booking is confirmed.</p><p>Purple time slots are regular open appointment times. Brown time slots are emergency proposals outside business hours, on Sundays, or on holiday/key dates and include the $45 emergency fee.</p><p>After submitting, you will see the Venmo and Apple Pay deposit options. Your official confirmation is sent only after Lovely Locs verifies the matching receipt. Emergency proposals may receive a follow-up if the proposed time needs owner approval.</p>`}
+            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting, use the Venmo or Apple Pay options and include your booking ID. Your appointment is confirmed only after Lovely Locs verifies the matching receipt; the exact studio address is shared after confirmation.</p><p class="booking-emergency-submit-note" id="bookingEmergencySubmitNote"${emergencySubmitHidden}>Emergency appointments include the $45 Emergency Fee and may need owner approval before confirmation.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>

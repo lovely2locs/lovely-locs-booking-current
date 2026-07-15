@@ -53,6 +53,7 @@ const elements = {
   advisoryModal: new FakeElement("advisoryModal"),
   productPreferenceModal: new FakeElement("productPreferenceModal"),
   partingPreferenceModal: new FakeElement("partingPreferenceModal"),
+  enhancementModal: new FakeElement("enhancementModal"),
   cart: new FakeElement("cart"),
   bookingForm: new FakeElement("bookingForm"),
   bookingError: new FakeElement("bookingError"),
@@ -186,6 +187,12 @@ test("home renders core client sections", () => {
   assert(html.includes("Lovely Locs"), "brand missing");
   assert(html.includes("Which Service Should I Book?"), "service guide missing");
   assert(html.includes("Service Menu"), "service menu missing");
+  assert(html.includes("Add-Ons & More"), "Add-Ons category should remain available in the main services area");
+  assert(html.includes("Shampoo Service"), "Shampoo Service add-on missing");
+  assert(html.includes("Loc Trim"), "Loc Trim add-on missing");
+  assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation add-on missing");
+  assert(html.includes("Basic Style"), "Basic Style add-on missing");
+  assert(html.includes("Loc Repair"), "Loc Repair add-on missing");
   assert(html.includes("Service Focus"), "service focus section missing");
   assert(html.includes("What To Expect"), "visit expectations section missing");
   assert(!html.includes("Replace these draft reviews with real testimonials"), "draft testimonial placeholder copy should not be public");
@@ -517,6 +524,7 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   context.handleRetwistAnswer("overdue");
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference should open after overdue answer");
   context.handleProductPreference("Foam");
+  context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(!elements.advisoryModal.classList.contains("open"), "advisory modal did not close");
   assert(!elements.productPreferenceModal.classList.contains("open"), "product preference modal did not close");
@@ -533,6 +541,7 @@ test("maintenance services ask for base product preference before cart", () => {
   assert(appHtml().includes("BYOP (Bring Your Own Product)"), "BYOP product preference missing from modal");
   assert(appHtml().includes("Loctician Recommendation"), "loctician recommendation preference missing from modal");
   context.handleProductPreference("Oil and Water");
+  context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(html.includes("Children Retwist (Maintenance)"), "maintenance service was not added after product choice");
   assert(html.includes("Base product: Oil and Water"), "selected base product missing from cart");
@@ -545,6 +554,7 @@ test("maintenance services can use BYOP or loctician recommendation preference",
     context.clearCart();
     context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
     context.handleProductPreference("BYOP (Bring Your Own Product)");
+    context.finishEnhancementAppointment(false);
     let html = appHtml();
     assert(html.includes("Base product: BYOP (Bring Your Own Product)"), "BYOP preference missing from cart");
     assert(html.includes("Children Retwist (Maintenance) - BYOP (Bring Your Own Product)"), "BYOP preference missing from summary");
@@ -552,6 +562,7 @@ test("maintenance services can use BYOP or loctician recommendation preference",
     context.clearCart();
     context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
     context.handleProductPreference("Loctician Recommendation");
+    context.finishEnhancementAppointment(false);
     html = appHtml();
     assert(html.includes("Base product: Loctician Recommendation"), "loctician recommendation missing from cart");
     assert(html.includes("Children Retwist (Maintenance) - Loctician Recommendation"), "loctician recommendation missing from summary");
@@ -616,6 +627,38 @@ test("add-on can be added alongside service", () => {
   assert(html.includes("Estimated Total: $705"), "estimated total incorrect");
 });
 
+
+test("maintenance selection shows Enhance Your Appointment without replacing Add-Ons", () => {
+  context.clearCart();
+  context.window.location.hash = "";
+  context.render(context.currentRoute());
+  context.openProductPreference({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", includedAddOnIds: ["style-addon"] });
+  context.handleProductPreference("Foam");
+  let html = appHtml();
+  assert(html.includes("Enhance Your Appointment"), "recommendation step title missing");
+  assert(html.includes("Add-Ons & More"), "permanent Add-Ons category should still render");
+  assert(html.includes("Loc Trim"), "Loc Trim should be recommended when compatible");
+  assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation should be recommended when compatible");
+  assert(!html.includes("Shampoo Service</h3>"), "Shampoo should not be recommended after maintenance configuration");
+  assert(!html.includes("Basic Style</h3>"), "included Basic Style should not be recommended");
+  const recommendationCount = (html.match(/class="enhancement-card"/g) || []).length;
+  assert(recommendationCount <= 2, "Enhance Your Appointment should show no more than two recommendations");
+  context.finishEnhancementAppointment(false);
+});
+
+test("direct add-on selection requires a compatible maintenance service", () => {
+  context.clearCart();
+  context.addServiceFromAdvisory({ id: "loc-trim", type: "service", name: "Loc Trim", price: 10, duration: "20 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] });
+  context.openBooking();
+  let html = appHtml();
+  assert(html.includes("must be attached to an eligible maintenance service"), "standalone add-on should explain the maintenance requirement");
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Foam", includedAddOnIds: ["style-addon"] });
+  context.addServiceFromAdvisory({ id: "loc-trim", type: "service", name: "Loc Trim", price: 10, duration: "20 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] });
+  html = appHtml();
+  assert(html.includes("Loc Trim"), "compatible add-on should remain selectable after a maintenance service");
+  assert(!html.includes("Add-on needs a main service"), "compatible add-on should not show standalone warning");
+});
 test("booking form has required client fields", () => {
   context.window.location.hash = "";
   context.render(context.currentRoute());
@@ -1026,6 +1069,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("emailDeliveryTrackingConfigured"), "Resend delivery readiness status missing");
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
+  assert(server.includes("cartAddOnCompatibilityIssue"), "server should validate add-on compatibility before accepting bookings");
   assert(server.includes("notifyNoChargeTestBooking"), "no-charge test booking notifier missing");
   assert(server.includes("no_charge_test"), "no-charge test status missing");
   assert(server.includes("/api/automations/run"), "automation run endpoint missing");

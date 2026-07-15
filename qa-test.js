@@ -115,6 +115,7 @@ const context = {
         payOptionsUrl: "http://127.0.0.1:4175/?booking=LL-TEST&deposit=30#payment-options",
         paymentOptions: [
           { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
+          { id: "cash-app", label: "Cash App", handle: "https://cash.app/$TimasLovelyLocs", note: "Include your booking ID." },
           { id: "apple-pay", label: "Apple Pay", handle: "lvlc.support@lovelylocsnc.com", note: "Include your booking ID." }
         ],
         total: 100,
@@ -320,6 +321,7 @@ test("payment options route renders manual deposit instructions", () => {
     referralShareUrl: "http://127.0.0.1:4175/?ref=LOVELYLOCS%2FTESTCLIENT#services",
     paymentOptions: [
       { id: "venmo", label: "Venmo", handle: "@LovelyLocs", note: "Include your booking ID." },
+      { id: "cash-app", label: "Cash App", handle: "https://cash.app/$TimasLovelyLocs", note: "Include your booking ID." },
       { id: "apple-pay", label: "Apple Pay", handle: "lovely2locs@gmail.com", note: "Include your booking ID." }
     ]
   }));
@@ -327,7 +329,8 @@ test("payment options route renders manual deposit instructions", () => {
   const html = appHtml();
   assert(html.includes("Pay Your Lovely Locs Deposit"), "payment options heading missing");
   assert(html.includes("Venmo"), "Venmo option missing");
-  assert(!html.includes("Cash App"), "Cash App should be hidden until re-enabled");
+  assert(html.includes("Cash App"), "Cash App option missing");
+  assert(html.includes("https://cash.app/$TimasLovelyLocs"), "Cash App link missing");
   assert(html.includes("Apple Pay"), "Apple Pay option missing");
   assert(!html.includes("lovely2locs@gmail.com"), "payment page should not render non-official email handles");
   assert(html.includes("Confirm current Apple Pay contact with Lovely Locs before sending."), "payment page should replace non-official email handles");
@@ -930,6 +933,8 @@ test("admin no-charge booking submission does not require pay options URL", asyn
 test("server includes manual deposit confirmation and legacy Stripe webhook endpoints", () => {
   const server = fs.readFileSync("local-server.js", "utf8");
   assert(server.includes("manualPaymentOptions"), "manual payment options helper missing");
+  assert(server.includes("cash-app"), "Cash App manual payment option missing");
+  assert(server.includes("https://cash.app/$TimasLovelyLocs"), "Cash App tag link missing");
   assert(server.includes("notifyManualPaymentPending"), "manual pending owner notification missing");
   assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
   assert(server.includes("brandEmailHtml"), "branded email HTML template missing");

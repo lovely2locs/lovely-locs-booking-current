@@ -67,21 +67,24 @@ const defaultSiteSettings = {
 };
 
 const serviceCatalog = [
-  { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons" },
+  { id: "shampoo-service", duration: "30 min", price: 0, priceLabel: "Eligibility confirmed", name: "Shampoo Service", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "loc-trim", duration: "20 min", price: 10, name: "Loc Trim", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "emergency-fee", duration: "3h", price: 45, name: "Emergency Fee", category: "add-ons" },
   { id: "children-instant-starter", duration: "5h", price: 150, name: "Children Instant Starter Locs", category: "starter-locs" },
   { id: "medium-adult-starter", duration: "6h 30min", price: 150, name: "Medium Adult Starter Locs", category: "starter-locs" },
-  { id: "adult-retwist", duration: "3h 30min", price: 90, name: "Adult Retwist (Maintenance)", category: "loc-maintenance" },
+  { id: "adult-retwist", duration: "3h 30min", price: 90, name: "Adult Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", price: 50, name: "Loc Sprinkle Installation", category: "add-ons" },
-  { id: "children-retwist", duration: "3h", price: 75, name: "Children Retwist (Maintenance)", category: "loc-maintenance" },
-  { id: "adult-instant", duration: "5h 30min", price: 125, name: "Adult Instant Locs", category: "instant-crochet" },
-  { id: "child-instant", duration: "3h 30min", price: 85, name: "Children's Instant Loc", category: "instant-crochet" },
-  { id: "referral-retwist", duration: "3h 30min", price: 75, name: "Referral (Retwist)", category: "loc-maintenance" },
-  { id: "style-addon", duration: "1h 30min", price: 30, name: "Style (Add On)", category: "add-ons" },
+  { id: "sprinkle-install", duration: "2h 15min", price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "children-retwist", duration: "3h", price: 75, name: "Children Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
+  { id: "adult-instant", duration: "5h 30min", price: 125, name: "Adult Instant Locs", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
+  { id: "child-instant", duration: "3h 30min", price: 85, name: "Children's Instant Loc", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
+  { id: "referral-retwist", duration: "3h 30min", price: 75, name: "Referral (Retwist)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
+  { id: "style-addon", duration: "1h 30min", price: 30, name: "Basic Style", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "consultation", duration: "1h 15min", price: 30, name: "Consultation", category: "add-ons" },
+  { id: "loc-repair", duration: "30 min", price: 0, priceLabel: "Quote after review", name: "Loc Repair", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "small-adult-starter", duration: "5h 30min", price: 225, name: "Small Adult Starter Locs", category: "starter-locs" },
-  { id: "overdue-retwist", duration: "4-5 hours", price: 125, name: "Overdue Retwist (4+ Months)", category: "loc-maintenance" },
+  { id: "overdue-retwist", duration: "4-5 hours", price: 125, name: "Overdue Retwist (4+ Months)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "admin-test-booking", duration: "15 min", price: 0, name: "Free Admin Test Booking", category: "admin-test" },
 ];
 
@@ -1656,6 +1659,26 @@ function nextAutomaticFriendTest() {
     missing: [...friendTestCheckpoints],
     bookingSubmitted: true,
   };
+}
+
+function isMainAppointmentService(item = {}) {
+  return item.type === "service" && item.category !== "add-ons" && item.category !== "admin-test";
+}
+
+function addOnCompatibilityIssue(addOn = {}, cart = []) {
+  if (!addOn.requiresMainService) return "";
+  const compatibleCategories = Array.isArray(addOn.compatibleMainCategories) ? addOn.compatibleMainCategories : [];
+  const compatibleMainServices = cart.filter(item => isMainAppointmentService(item) && compatibleCategories.includes(item.category));
+  if (!compatibleMainServices.length) {
+    return `${addOn.name} must be attached to an eligible maintenance service.`;
+  }
+  const includedBy = compatibleMainServices.find(service => Array.isArray(service.includedAddOnIds) && service.includedAddOnIds.includes(addOn.id));
+  if (includedBy) return `${addOn.name} is already included in ${includedBy.name}.`;
+  return "";
+}
+
+function cartAddOnCompatibilityIssue(cart = []) {
+  return cart.map(item => addOnCompatibilityIssue(item, cart)).find(Boolean) || "";
 }
 
 function pricedCartItem(item = {}) {

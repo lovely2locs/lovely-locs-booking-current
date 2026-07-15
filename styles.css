@@ -3115,3 +3115,46 @@ optional-label {
 .booking-emergency-submit-note[hidden] {
   display: none;
 }
+.enhancement-panel {
+  width: min(820px, 100%);
+}
+
+.enhancement-list {
+  display: grid;
+  gap: 12px;
+}
+
+.enhancement-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--cream);
+}
+
+.enhancement-card h3 {
+  margin: 0 0 6px;
+  color: var(--dark-brown);
+  font-size: 1.05rem;
+}
+
+.enhancement-card p {
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+
+.enhancement-card span {
+  color: var(--brown);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 640px) {
+  .enhancement-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

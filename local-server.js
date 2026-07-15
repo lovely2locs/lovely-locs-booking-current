@@ -1531,6 +1531,12 @@ function manualPaymentOptions() {
       note: "Send the deposit through Venmo and include your booking ID in the note.",
     },
     {
+      id: "cash-app",
+      label: "Cash App",
+      handle: process.env.CASH_APP_LINK || "https://cash.app/$TimasLovelyLocs",
+      note: "Send the deposit through Cash App and include your booking ID in the note.",
+    },
+    {
       id: "apple-pay",
       label: "Apple Pay",
       handle: process.env.APPLE_PAY_CONTACT || "",
@@ -1830,14 +1836,14 @@ async function notifyManualPaymentPending(booking, req) {
     "Payment options shown to the client:",
     paymentOptionsText(booking),
     "",
-    "After you see the matching Venmo or Apple Pay receipt, approve the deposit here:",
+    "After you see the matching Venmo, Cash App, or Apple Pay receipt, approve the deposit here:",
     confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN in Render to enable one-click approval links.",
     "",
     details,
   ].join("\n");
   const ownerHtml = ownerBookingEmail(booking, {
     title: "A deposit is waiting for your eyes",
-    intro: "A client chose manual payment. Once you see the matching Venmo or Apple Pay receipt, use the approve button to send their confirmation.",
+    intro: "A client chose manual payment. Once you see the matching Venmo, Cash App, or Apple Pay receipt, use the approve button to send their confirmation.",
     ctaUrl: confirmLink,
     ctaLabel: "Confirm Deposit",
   });
@@ -1943,7 +1949,7 @@ async function runDepositReminderAutomation(booking, records, now) {
     `Your ${appointmentLine(booking)} appointment request is still waiting on the $${booking.deposit} deposit before it is fully confirmed.`,
     `Booking ID: ${booking.id}`,
     `Pay options: ${payUrl}`,
-    "Reply if you need help matching your Venmo or Apple Pay receipt.",
+    "Reply if you need help matching your Venmo, Cash App, or Apple Pay receipt.",
   ].join("\n");
   const sms = `Lovely Locs reminder: your $${booking.deposit} deposit is still needed to confirm ${booking.client.date} at ${timeLabel(booking.client.time)}. Pay options: ${payUrl}. Reply STOP to opt out or HELP for help.`;
   return sendClientAutomation(booking, "deposit_reminder", cycleKey, "Lovely Locs deposit reminder", text, sms);

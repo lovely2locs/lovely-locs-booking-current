@@ -26,6 +26,12 @@ const manualPaymentFallbackOptions = [
     note: "Include your booking ID in the payment note so the deposit can be matched quickly."
   },
   {
+    id: "cash-app",
+    label: "Cash App",
+    handle: "https://cash.app/$TimasLovelyLocs",
+    note: "Include your booking ID in the Cash App note so the deposit can be matched quickly."
+  },
+  {
     id: "apple-pay",
     label: "Apple Pay",
     handle: "Confirm current Apple Pay contact with Lovely Locs before sending.",
@@ -45,6 +51,14 @@ function publicPaymentHandle(option = {}) {
 function publicPaymentOptions(options) {
   const source = Array.isArray(options) && options.length ? options : manualPaymentFallbackOptions;
   return source.map(option => ({ ...option, handle: publicPaymentHandle(option) }));
+}
+
+function paymentOptionHandleMarkup(option = {}) {
+  const handle = String(option.handle || "");
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(handle)) {
+    return `<a href="${escapeAttr(handle)}" target="_blank" rel="noopener">${escapeAttr(handle)}</a>`;
+  }
+  return escapeAttr(handle);
 }
 
 const regularAppointmentTimes = ["11:00", "16:00"];
@@ -378,11 +392,11 @@ const visualVersions = [
 ];
 
 const policies = {
-  deposit: "A non-refundable deposit is required to hold the selected appointment time. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo or Apple Pay details after submitting.",
+  deposit: "A non-refundable deposit is required to hold the selected appointment time. The deposit is 30% of the selected services and products, with a $30 minimum. Clients are sent to a pay options page for Venmo, Cash App, or Apple Pay details after submitting.",
   cancellation: "Lovely Locs does not provide any refunds for cancellations made after your booking is confirmed. Cancelling your booking at any time will result in the loss of your deposit fee.",
   booking_rules: "Only in-home studio service appointments are accepted. Deposits are non-refundable under all circumstances.",
   emergency_fee: "A $45 Emergency Fee is added when a client selects a brown emergency proposal slot outside regular business hours, on Sundays, or on holidays/key dates.",
-  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt."
+  payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo, Cash App, or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt."
 };
 
 const faq = [
@@ -390,7 +404,7 @@ const faq = [
   { question: "How long do services take?", answer: "Service durations vary from 1.5 to 6.5 hours depending on the type and complexity of service." },
   { question: "Are deposits refundable?", answer: "No. All deposits are non-refundable under all circumstances. Cancelling will result in the loss of your deposit." },
   { question: "Where are appointments held?", answer: "All appointments are at our private in-home studio in the Piedmont Triad, NC. Studio address is shared after booking is confirmed." },
-  { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
+  { question: "What payment methods do you accept?", answer: "Appointment deposits can be sent through Venmo, Cash App, or Apple Pay from the pay options page. Remaining balances are handled directly with Lovely Locs after service." },
   { question: "What about emergency or holiday appointments?", answer: "Brown emergency proposal slots are outside regular business hours, Sundays, or holiday/key dates. The $45 Emergency Fee is added before the deposit is calculated." }
 ];
 
@@ -1518,7 +1532,7 @@ function processSection() {
   const steps = [
     ["1", "Choose your service", "Pick the service that fits your current loc stage, from maintenance to starter locs and add-ons."],
     ["2", "Share your notes", "Tell us your product preference, style goal, timing needs, and anything important about your loc history."],
-    ["3", "Pay from the options page", "Use Venmo or Apple Pay and include your booking ID so the deposit can be matched."],
+    ["3", "Pay from the options page", "Use Venmo, Cash App, or Apple Pay and include your booking ID so the deposit can be matched."],
     ["4", "Arrive relaxed", "The studio address is shared after confirmation, and your appointment is handled one-on-one."]
   ];
   return `
@@ -1884,7 +1898,7 @@ function paymentOptionsPage() {
   return `
     <section class="hero route-page" id="payment-options-page">
       <h1>Pay Your Lovely Locs Deposit</h1>
-      <p class="subtitle">Your appointment is not finalized yet. Use Venmo or Apple Pay for the required deposit, then Lovely Locs will verify the receipt and send your official confirmation once the deposit is confirmed as received.</p>
+      <p class="subtitle">Your appointment is not finalized yet. Use Venmo, Cash App, or Apple Pay for the required deposit, then Lovely Locs will verify the receipt and send your official confirmation once the deposit is confirmed as received.</p>
     </section>
     <section class="section payment-options-section">
       <div class="container">
@@ -1900,9 +1914,9 @@ function paymentOptionsPage() {
         <div class="payment-options-grid">
           ${details.paymentOptions.map(option => `
             <article class="payment-option-card">
-              <span>${option.label}</span>
-              <h3>${option.handle}</h3>
-              <p>${option.note}</p>
+              <span>${escapeAttr(option.label)}</span>
+              <h3>${paymentOptionHandleMarkup(option)}</h3>
+              <p>${escapeAttr(option.note)}</p>
             </article>
           `).join("")}
         </div>
@@ -1961,14 +1975,14 @@ function adminPage() {
   const discount = { ...defaultDiscountSettings, ...discountSettings };
   const confirmParams = manualDepositConfirmParams();
   const confirmNotice = confirmParams.active
-    ? `<p class="advisory-copy">Owner confirm link loaded. Review the matching Venmo or Apple Pay receipt, then press the confirmation button below. If the token field is blank, enter your owner confirmation token first.</p>`
+    ? `<p class="advisory-copy">Owner confirm link loaded. Review the matching Venmo, Cash App, or Apple Pay receipt, then press the confirmation button below. If the token field is blank, enter your owner confirmation token first.</p>`
     : "";
   const adminTitle = confirmParams.active ? "Owner Deposit Confirmation" : "Admin Test Booking";
   const adminSubtitle = confirmParams.active
     ? "Confirm a verified manual deposit, then send the client their official Lovely Locs confirmation."
     : "Run a no-charge booking test without sending the client to the pay options page.";
-  const methodOptions = ["venmo", "apple-pay", "manual"].map(method => `
-                <option value="${method}" ${confirmParams.method === method ? "selected" : ""}>${method === "apple-pay" ? "Apple Pay" : method === "venmo" ? "Venmo" : "Manual"}</option>
+  const methodOptions = ["venmo", "cash-app", "apple-pay", "manual"].map(method => `
+                <option value="${method}" ${confirmParams.method === method ? "selected" : ""}>${method === "apple-pay" ? "Apple Pay" : method === "cash-app" ? "Cash App" : method === "venmo" ? "Venmo" : "Manual"}</option>
               `).join("");
   return `
     <section class="hero route-page" id="admin-page">
@@ -2010,7 +2024,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
-          <p>After you verify the matching Venmo or Apple Pay receipt, enter the booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note. This marks the deposit paid and sends the client confirmation email.</p>
+          <p>After you verify the matching Venmo, Cash App, or Apple Pay receipt, enter the booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note. This marks the deposit paid and sends the client confirmation email.</p>
           <p>If the deposit was not received, use the release button instead. That keeps the booking history but opens the appointment time again.</p>
           ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">
@@ -2606,7 +2620,7 @@ function bookingModal() {
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
-            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting, use the Venmo or Apple Pay options and include your booking ID. Your appointment is confirmed only after Lovely Locs verifies the matching receipt; the exact studio address is shared after confirmation.</p><p class="booking-emergency-submit-note" id="bookingEmergencySubmitNote"${emergencySubmitHidden}>Emergency appointments include the $45 Emergency Fee and may need owner approval before confirmation.</p>`}
+            : `<p>Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting, use the Venmo, Cash App, or Apple Pay options and include your booking ID. Your appointment is confirmed only after Lovely Locs verifies the matching receipt; the exact studio address is shared after confirmation.</p><p class="booking-emergency-submit-note" id="bookingEmergencySubmitNote"${emergencySubmitHidden}>Emergency appointments include the $45 Emergency Fee and may need owner approval before confirmation.</p>`}
         </div>
         <div class="modal-actions">
           <button class="outline-btn" data-close-booking>Back</button>

@@ -112,21 +112,24 @@ const defaultDiscountSettings = {
 };
 
 const services = [
-  { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons" },
+  { id: "shampoo-service", duration: "30 min", featured: false, price: 0, priceLabel: "Eligibility confirmed", name: "Shampoo Service", description: "Cleanse service available only where eligible and attached to a compatible maintenance appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "loc-trim", duration: "20 min", featured: false, price: 10, name: "Loc Trim", description: "Light loc end trim for maintenance clients when the trim is compatible with the selected appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
+  { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "emergency-fee", duration: "3h", featured: false, price: 45, name: "Emergency Fee", description: "Additional fee for emergency bookings. Applies to same-day, within 24 hours, and major holiday appointments.", category: "add-ons" },
   { id: "children-instant-starter", duration: "5h", featured: false, price: 150, name: "Children Instant Starter Locs", description: "Instant starter locs for children. Ask about children's bundle services.", category: "starter-locs" },
   { id: "medium-adult-starter", duration: "6h 30min", featured: false, price: 150, name: "Medium Adult Starter Locs", description: "Medium-sized starter locs for adults.", category: "starter-locs" },
-  { id: "adult-retwist", duration: "3h 30min", featured: false, price: 90, name: "Adult Retwist (Maintenance)", description: "Keep your loc journey beautiful with a fresh retwist focused on neatness and hydration. Includes a complimentary two-strand twist style.", category: "loc-maintenance" },
+  { id: "adult-retwist", duration: "3h 30min", featured: false, price: 90, name: "Adult Retwist (Maintenance)", description: "Keep your loc journey beautiful with a fresh retwist focused on neatness and hydration. Includes a complimentary two-strand twist style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", featured: false, price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", description: "Starter locs for children using coils and two-strand twist method.", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, name: "Loc Sprinkle Installation", description: "Hand-installed, high-quality beads and crystals. Includes 4 locs; add premium accessory color preferences in your notes.", category: "add-ons" },
-  { id: "children-retwist", duration: "3h", featured: false, price: 75, name: "Children Retwist (Maintenance)", description: "Gentle retwist maintenance designed for children. Complimentary two-strand twist style included.", category: "loc-maintenance" },
-  { id: "adult-instant", duration: "5h 30min", featured: false, price: 125, name: "Adult Instant Locs", description: "Uses 0.5mm and 0.75mm crochet needles for instant loc maintenance. Includes complimentary two-strand twist style.", category: "instant-crochet" },
-  { id: "child-instant", duration: "3h 30min", featured: false, price: 85, name: "Children's Instant Loc", description: "Starting price for children's instant loc maintenance. Complimentary two-strand twist style included.", category: "instant-crochet" },
-  { id: "referral-retwist", duration: "3h 30min", featured: false, price: 75, name: "Referral (Retwist)", description: "Special referral pricing for retwist service. First-time clients only. Referral can only be used once.", category: "loc-maintenance" },
-  { id: "style-addon", duration: "1h 30min", featured: false, price: 30, name: "Style (Add On)", description: "Additional styling service. Must be booked with a maintenance service.", category: "add-ons" },
+  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Hand-installed, high-quality beads and crystals. Includes 4 locs; add premium accessory color preferences in your notes.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
+  { id: "children-retwist", duration: "3h", featured: false, price: 75, name: "Children Retwist (Maintenance)", description: "Gentle retwist maintenance designed for children. Complimentary two-strand twist style included.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
+  { id: "adult-instant", duration: "5h 30min", featured: false, price: 125, name: "Adult Instant Locs", description: "Uses 0.5mm and 0.75mm crochet needles for instant loc maintenance. Includes complimentary two-strand twist style.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
+  { id: "child-instant", duration: "3h 30min", featured: false, price: 85, name: "Children's Instant Loc", description: "Starting price for children's instant loc maintenance. Complimentary two-strand twist style included.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
+  { id: "referral-retwist", duration: "3h 30min", featured: false, price: 75, name: "Referral (Retwist)", description: "Special referral pricing for retwist service. First-time clients only. Referral can only be used once.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
+  { id: "style-addon", duration: "1h 30min", featured: false, price: 30, name: "Basic Style", description: "Additional basic styling service. Must be booked with a compatible maintenance service that does not already include a style.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
   { id: "consultation", duration: "1h 15min", featured: false, price: 30, name: "Consultation", description: "Discuss parting, size, texture, and method for your loc journey.", category: "add-ons" },
+  { id: "loc-repair", duration: "30 min", featured: false, price: 0, priceLabel: "Quote after review", name: "Loc Repair", description: "Targeted repair for compatible maintenance appointments. Final repair pricing is confirmed after Lovely Locs reviews the loc condition.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
   { id: "small-adult-starter", duration: "5h 30min", featured: false, price: 225, name: "Small Adult Starter Locs", description: "Small-sized starter locs for adults. Consultation required before booking.", category: "starter-locs" },
-  { id: "overdue-retwist", duration: "4-5 hours", featured: true, price: 125, name: "Overdue Retwist (4+ Months)", description: "For clients who haven't had a retwist in over 3 months. Includes full retwist and basic style.", category: "loc-maintenance" }
+  { id: "overdue-retwist", duration: "4-5 hours", featured: true, price: 125, name: "Overdue Retwist (4+ Months)", description: "For clients who haven't had a retwist in over 3 months. Includes full retwist and basic style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] }
 ];
 
 const adminTestService = {
@@ -747,6 +750,9 @@ let savedClientProfile = loadClientProfile();
 let advisoryMessage = "";
 let baseProductMessage = "";
 let partingMessage = "";
+let addOnCompatibilityMessage = "";
+let pendingEnhancementService = null;
+let pendingEnhancementAddOns = [];
 let bookingConfirmation = null;
 let clientSettingsResult = null;
 let lastRoute = null;
@@ -923,6 +929,54 @@ function bookingDeposit(total, items = cart) {
   return items.length ? Math.max(Math.round(total * 0.3), 30) : 30;
 }
 
+function servicePriceText(service = {}) {
+  return service.priceLabel || money(service.price || 0);
+}
+
+function isMainAppointmentService(item = {}) {
+  return item.type === "service" && item.category !== "add-ons" && item.id !== adminTestService.id;
+}
+
+function compatibleMainServicesForAddOn(addOn = {}, items = cart) {
+  if (!addOn.requiresMainService) return items.filter(isMainAppointmentService);
+  const categories = Array.isArray(addOn.compatibleMainCategories) ? addOn.compatibleMainCategories : [];
+  return items.filter(item => isMainAppointmentService(item) && categories.includes(item.category));
+}
+
+function addOnCompatibilityIssue(addOn = {}, items = cart) {
+  if (!addOn?.requiresMainService) return "";
+  const compatibleMainServices = compatibleMainServicesForAddOn(addOn, items);
+  if (!compatibleMainServices.length) {
+    return `${addOn.name} must be attached to an eligible maintenance service. Please select and configure a compatible maintenance service before adding this add-on.`;
+  }
+  const includedBy = compatibleMainServices.find(service => Array.isArray(service.includedAddOnIds) && service.includedAddOnIds.includes(addOn.id));
+  if (includedBy) return `${addOn.name} is already included in ${includedBy.name} and does not need to be added separately.`;
+  return "";
+}
+
+function cartAddOnCompatibilityIssue(items = cart) {
+  return items.map(item => addOnCompatibilityIssue(item, items)).find(Boolean) || "";
+}
+
+function serviceWithCartFields(service = {}) {
+  return { ...service, type: "service" };
+}
+
+const enhancementRecommendationIds = ["loc-trim", "sprinkle-install", "style-addon", "loc-repair"];
+
+function enhancementRecommendations(mainService, selectedAddOns = pendingEnhancementAddOns) {
+  if (!mainService || mainService.category !== "loc-maintenance") return [];
+  const stagedItems = [...cart, mainService, ...selectedAddOns];
+  const blockedIds = new Set(stagedItems.map(item => item.id));
+  const includedIds = new Set([...(mainService.includedAddOnIds || [])]);
+  return enhancementRecommendationIds
+    .map(id => services.find(service => service.id === id))
+    .filter(service => service && service.recommendationEligible)
+    .filter(service => !blockedIds.has(service.id))
+    .filter(service => !includedIds.has(service.id))
+    .filter(service => !addOnCompatibilityIssue(service, stagedItems))
+    .slice(0, 2);
+}
 function serviceDetails(service) {
   if (service.category === "loc-maintenance") return ["Wash prep encouraged", "Retwist care", "Style included when noted"];
   if (service.category === "starter-locs") return ["Parting plan", "Starter method", "Aftercare guidance"];
@@ -936,7 +990,7 @@ function serviceCard(service) {
     <article class="service-card card">
       <div class="service-top">
         <h4>${service.name}</h4>
-        <span class="price">${money(service.price)}</span>
+        <span class="price">${servicePriceText(service)}</span>
       </div>
       <div class="service-meta"><span>${service.duration}</span><span>${service.category.replace(/-/g, " ")}</span></div>
       <p class="description">${service.description}</p>
@@ -1023,6 +1077,40 @@ function partingPreferenceModal() {
             <button class="outline-btn" data-parting-preference="Natural C Parts" data-parting-fee="0">Natural C Parts</button>
             <button class="outline-btn" data-parting-preference="Triangle Parts" data-parting-fee="40">Triangle Parts (+$40)</button>
           </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function enhancementModal() {
+  const recommendations = enhancementRecommendations(pendingEnhancementService);
+  const selectedIds = new Set(pendingEnhancementAddOns.map(item => item.id));
+  return `
+    <div class="modal advisory-modal" id="enhancementModal">
+      <div class="modal-panel advisory-panel enhancement-panel">
+        <div class="modal-head">
+          <div>
+            <h2>Enhance Your Appointment</h2>
+            <p class="duration">Optional compatible add-ons for ${pendingEnhancementService?.name || "your maintenance service"}.</p>
+          </div>
+          <button class="modal-close" data-close-enhancement>x</button>
+        </div>
+        <div class="enhancement-list">
+          ${recommendations.length ? recommendations.map(service => `
+            <article class="enhancement-card">
+              <div>
+                <h3>${service.name}</h3>
+                <p>${service.description}</p>
+                <span>${service.duration} | ${servicePriceText(service)}</span>
+              </div>
+              <button class="book-small ${selectedIds.has(service.id) ? "added" : ""}" data-enhancement-add="${service.id}">${selectedIds.has(service.id) ? "Selected" : "Add"}</button>
+            </article>
+          `).join("") : `<p class="section-subtitle">No compatible add-ons are available for this appointment.</p>`}
+        </div>
+        <div class="advisory-actions">
+          <button class="primary-btn" data-enhancement-continue>Continue</button>
+          <button class="outline-btn" data-enhancement-skip>Skip Add-Ons</button>
         </div>
       </div>
     </div>
@@ -1138,6 +1226,7 @@ function homePage() {
     ${advisoryModal()}
     ${productPreferenceModal()}
     ${partingPreferenceModal()}
+    ${enhancementModal()}
   `;
 }
 
@@ -1454,7 +1543,7 @@ function featuredServicesSection() {
                 <p>${service.description}</p>
               </div>
               <div class="featured-foot">
-                <strong>${money(service.price)}</strong>
+                <strong>${servicePriceText(service)}</strong>
                 <button data-add-service="${service.id}">Add Service</button>
               </div>
             </article>
@@ -2178,9 +2267,10 @@ function cartMarkup() {
           ${advisoryMessage ? `<div class="cart-advisory"><strong>Service updated</strong><p>${advisoryMessage}</p></div>` : ""}
           ${baseProductMessage ? `<div class="cart-advisory"><strong>Base product saved</strong><p>${baseProductMessage}</p></div>` : ""}
           ${partingMessage ? `<div class="cart-advisory"><strong>Parting preference saved</strong><p>${partingMessage}</p></div>` : ""}
+          ${addOnCompatibilityMessage ? `<div class="cart-advisory"><strong>Add-on needs a main service</strong><p>${addOnCompatibilityMessage}</p></div>` : ""}
           ${cart.length ? cart.map(item => `
             <div class="cart-item">
-              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${money(item.price)}</p></div>
+              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${servicePriceText(item)}</p></div>
               <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
@@ -2681,6 +2771,7 @@ function currentRoute() {
 
 function addToCart(item) {
   bookingConfirmation = null;
+  addOnCompatibilityMessage = "";
   if (!cart.some(existing => existing.id === item.id)) cart.push(item);
   saveCart();
   render(currentRoute());
@@ -2690,6 +2781,9 @@ function clearCart() {
   cart = [];
   selectedService = null;
   bookingConfirmation = null;
+  addOnCompatibilityMessage = "";
+  pendingEnhancementService = null;
+  pendingEnhancementAddOns = [];
   saveCart();
   render(currentRoute());
 }
@@ -2712,14 +2806,20 @@ function addAdminTestBooking() {
 
 function addServiceFromAdvisory(service) {
   selectedService = service;
-  addToCart({ ...service, type: "service" });
+  addToCart(serviceWithCartFields(service));
   openCart();
 }
 
 function addServiceWithProductPreference(service, productPreference) {
-  selectedService = service;
+  const configuredService = serviceWithCartFields({ ...service, baseProduct: productPreference });
+  selectedService = configuredService;
   baseProductMessage = `${service.name} will be prepared with ${productPreference}.`;
-  addToCart({ ...service, type: "service", baseProduct: productPreference });
+  const recommendations = enhancementRecommendations(configuredService, []);
+  if (recommendations.length) {
+    openEnhancement(configuredService);
+    return;
+  }
+  addToCart(configuredService);
   openCart();
 }
 
@@ -2771,6 +2871,46 @@ function closePartingPreference() {
   document.getElementById("partingPreferenceModal")?.classList.remove("open");
 }
 
+function openEnhancement(service) {
+  pendingEnhancementService = service;
+  pendingEnhancementAddOns = [];
+  render(currentRoute());
+  document.getElementById("enhancementModal")?.classList.add("open");
+}
+
+function closeEnhancement() {
+  pendingEnhancementService = null;
+  pendingEnhancementAddOns = [];
+  document.getElementById("enhancementModal")?.classList.remove("open");
+}
+
+function finishEnhancementAppointment(includeSelected = true) {
+  const service = pendingEnhancementService;
+  const addOns = includeSelected ? [...pendingEnhancementAddOns] : [];
+  pendingEnhancementService = null;
+  pendingEnhancementAddOns = [];
+  if (!service) return;
+  [service, ...addOns.map(serviceWithCartFields)].forEach(item => {
+    if (!cart.some(existing => existing.id === item.id)) cart.push(item);
+  });
+  bookingConfirmation = null;
+  saveCart();
+  render(currentRoute());
+  openCart();
+}
+
+function toggleEnhancementAddOn(serviceId) {
+  const service = services.find(item => item.id === serviceId);
+  if (!service) return;
+  if (pendingEnhancementAddOns.some(item => item.id === service.id)) {
+    pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== service.id);
+  } else if (pendingEnhancementAddOns.length < 2) {
+    pendingEnhancementAddOns.push(serviceWithCartFields(service));
+  }
+  render(currentRoute());
+  document.getElementById("enhancementModal")?.classList.add("open");
+}
+
 function handlePartingPreference(partingPreference, partingFee) {
   const service = pendingPartingService;
   closePartingPreference();
@@ -2816,6 +2956,15 @@ function bindDynamic() {
       if (cart.some(item => item.id === service?.id)) {
         openCart();
         return;
+      }
+      if (service?.category === "add-ons" && service.requiresMainService) {
+        const issue = addOnCompatibilityIssue(service);
+        if (issue) {
+          addOnCompatibilityMessage = issue;
+          render(currentRoute());
+          openCart();
+          return;
+        }
       }
       if (service?.id === "adult-retwist" && !cart.some(item => item.id === service.id)) {
         openAdvisory(service);
@@ -2865,6 +3014,10 @@ function bindDynamic() {
   document.querySelectorAll("[data-close-advisory]").forEach(button => button.addEventListener("click", closeAdvisory));
   document.querySelectorAll("[data-close-product-preference]").forEach(button => button.addEventListener("click", closeProductPreference));
   document.querySelectorAll("[data-close-parting-preference]").forEach(button => button.addEventListener("click", closePartingPreference));
+  document.querySelectorAll("[data-close-enhancement]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(false)));
+  document.querySelectorAll("[data-enhancement-add]").forEach(button => button.addEventListener("click", () => toggleEnhancementAddOn(button.dataset.enhancementAdd)));
+  document.querySelectorAll("[data-enhancement-continue]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(true)));
+  document.querySelectorAll("[data-enhancement-skip]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(false)));
   document.querySelectorAll("[data-retwist-answer]").forEach(button => button.addEventListener("click", () => handleRetwistAnswer(button.dataset.retwistAnswer)));
   document.querySelectorAll("[data-product-preference]").forEach(button => button.addEventListener("click", () => handleProductPreference(button.dataset.productPreference)));
   document.querySelectorAll("[data-parting-preference]").forEach(button => button.addEventListener("click", () => handlePartingPreference(button.dataset.partingPreference, button.dataset.partingFee)));
@@ -3012,6 +3165,13 @@ function deleteClientAccount() {
 function openBooking() {
   if (!cart.length) {
     goToServices();
+    return;
+  }
+  const issue = cartAddOnCompatibilityIssue();
+  if (issue) {
+    addOnCompatibilityMessage = issue;
+    render(currentRoute());
+    openCart();
     return;
   }
   closeCart();

@@ -59,6 +59,7 @@ const elements = {
   bookingForm: new FakeElement("bookingForm"),
   bookingError: new FakeElement("bookingError"),
   policyAcknowledgement: new FakeElement("policyAcknowledgement"),
+  shampooDeclineAcknowledgement: new FakeElement("shampooDeclineAcknowledgement"),
   bookingTime: new FakeElement("bookingTime"),
   bookingEmergencySlot: new FakeElement("bookingEmergencySlot"),
   services: new FakeElement("services")
@@ -159,6 +160,7 @@ context.FormData = class {
       ["preferredContact", "text_email"],
       ["smsOptIn", "on"],
       ["specialRequests", "Test booking notes"],
+      ["shampooDeclineAcknowledgement", "on"],
       ["policyAcknowledgement", "on"]
     ]);
   }
@@ -528,7 +530,7 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(elements.advisoryModal.classList.contains("open"), "advisory modal did not open");
   context.handleRetwistAnswer("overdue");
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference should open after overdue answer");
-  context.handleProductPreference("Foam");
+  context.handleProductPreference("Jamaican Mango & Lime Locking Gel");
   context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(!elements.advisoryModal.classList.contains("open"), "advisory modal did not close");
@@ -536,41 +538,41 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(html.includes("Overdue Retwist (4+ Months)"), "overdue retwist was not selected");
   assert(html.includes("$125"), "overdue retwist price was not applied");
   assert(html.includes("Because your last retwist was 4+ months ago"), "price-change explanation missing");
-  assert(html.includes("Base product: Foam"), "base product preference missing from cart");
-  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Foam"), "base product preference missing from booking summary");
+  assert(html.includes("Base product: Jamaican Mango & Lime Locking Gel"), "base product preference missing from cart");
+  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Jamaican Mango & Lime Locking Gel"), "base product preference missing from booking summary");
 });
 
 test("maintenance services ask for base product preference before cart", () => {
   context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference modal did not open");
-  assert(appHtml().includes("BYOP (Bring Your Own Product)"), "BYOP product preference missing from modal");
-  assert(appHtml().includes("Loctician Recommendation"), "loctician recommendation preference missing from modal");
-  context.handleProductPreference("Oil and Water");
+  assert(appHtml().includes("Bring Your Own Product"), "bring your own product preference missing from modal");
+  assert(appHtml().includes("Loctician's Preference"), "loctician preference missing from modal");
+  context.handleProductPreference("Taliah Waajid Lock It Up");
   context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(html.includes("Children Retwist (Maintenance)"), "maintenance service was not added after product choice");
-  assert(html.includes("Base product: Oil and Water"), "selected base product missing from cart");
-  assert(html.includes("Children Retwist (Maintenance) - Oil and Water"), "selected base product missing from summary");
+  assert(html.includes("Base product: Taliah Waajid Lock It Up"), "selected base product missing from cart");
+  assert(html.includes("Children Retwist (Maintenance) - Taliah Waajid Lock It Up"), "selected base product missing from summary");
 });
 
-test("maintenance services can use BYOP or loctician recommendation preference", () => {
+test("maintenance services can use bring your own product or loctician preference", () => {
   const originalCart = localStore.get("lovelyLocsCart") || "[]";
   try {
     context.clearCart();
     context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
-    context.handleProductPreference("BYOP (Bring Your Own Product)");
+    context.handleProductPreference("Bring Your Own Product");
     context.finishEnhancementAppointment(false);
     let html = appHtml();
-    assert(html.includes("Base product: BYOP (Bring Your Own Product)"), "BYOP preference missing from cart");
-    assert(html.includes("Children Retwist (Maintenance) - BYOP (Bring Your Own Product)"), "BYOP preference missing from summary");
+    assert(html.includes("Base product: Bring Your Own Product"), "bring your own product preference missing from cart");
+    assert(html.includes("Children Retwist (Maintenance) - Bring Your Own Product"), "bring your own product preference missing from summary");
 
     context.clearCart();
     context.openProductPreference({ id: "children-retwist", type: "service", name: "Children Retwist (Maintenance)", price: 75, duration: "3h", category: "loc-maintenance" });
-    context.handleProductPreference("Loctician Recommendation");
+    context.handleProductPreference("Loctician's Preference");
     context.finishEnhancementAppointment(false);
     html = appHtml();
-    assert(html.includes("Base product: Loctician Recommendation"), "loctician recommendation missing from cart");
-    assert(html.includes("Children Retwist (Maintenance) - Loctician Recommendation"), "loctician recommendation missing from summary");
+    assert(html.includes("Base product: Loctician's Preference"), "loctician preference missing from cart");
+    assert(html.includes("Children Retwist (Maintenance) - Loctician's Preference"), "loctician preference missing from summary");
   } finally {
     localStore.set("lovelyLocsCart", originalCart);
     vm.runInContext("cart = loadCart(); render(currentRoute());", context);
@@ -638,7 +640,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   context.window.location.hash = "";
   context.render(context.currentRoute());
   context.openProductPreference({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", includedAddOnIds: ["style-addon"] });
-  context.handleProductPreference("Foam");
+  context.handleProductPreference("Jamaican Mango & Lime Locking Gel");
   let html = appHtml();
   assert(html.includes("Enhance Your Appointment"), "recommendation step title missing");
   assert(html.includes("Add-Ons & More"), "permanent Add-Ons category should still render");
@@ -653,7 +655,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
 
 test("loc sprinkles collect required preferences from add-ons and recommendations", () => {
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Foam" });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel" });
   const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 15, duration: "30 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
   context.openSprinklePreference(directSprinkles, "cart");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
@@ -671,13 +673,15 @@ test("direct add-on selection requires a compatible maintenance service", () => 
   let html = appHtml();
   assert(html.includes("must be attached to an eligible maintenance service"), "standalone add-on should explain the maintenance requirement");
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Foam", includedAddOnIds: ["style-addon"] });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
   context.addServiceFromAdvisory({ id: "loc-trim", type: "service", name: "Loc Trim", price: 10, duration: "20 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] });
   html = appHtml();
   assert(html.includes("Loc Trim"), "compatible add-on should remain selectable after a maintenance service");
   assert(!html.includes("Add-on needs a main service"), "compatible add-on should not show standalone warning");
 });
 test("booking form has required client fields", () => {
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
   context.window.location.hash = "";
   context.render(context.currentRoute());
   const html = appHtml();
@@ -728,9 +732,13 @@ test("booking form has required client fields", () => {
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes("Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting"), "condensed before-submit deposit copy missing");
   assert(html.includes('id="bookingEmergencySubmitNote" hidden'), "emergency submit details should be hidden until an emergency slot is selected");
+  assert(html.includes('name="shampooDeclineAcknowledgement"'), "shampoo decline acknowledgement checkbox missing");
+  assert(html.includes("By declining the Shampoo Service, you agree to arrive with your scalp and locs freshly shampooed, thoroughly rinsed, and free from heavy oils, product buildup, odor, lint, or debris."), "full shampoo preparation policy missing");
+  assert(html.includes("I understand I must arrive freshly shampooed if I decline this service."), "short shampoo acknowledgement missing");
+  assert(html.indexOf("By declining the Shampoo Service") < html.indexOf("I understand I must arrive freshly shampooed"), "full shampoo policy should appear above the short acknowledgement");
   assert(html.includes('name="policyAcknowledgement"'), "policy acknowledgement checkbox missing");
   assert(html.includes("outside the listed loc/natural-hair scope"), "service scope acknowledgement missing");
-  assert((html.match(/type="checkbox"/g) || []).length === 2, "checkout should use exactly two checkboxes");
+  assert((html.match(/type="checkbox"/g) || []).length === 3, "checkout should use SMS, shampoo prep, and policy checkboxes");
   assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });
@@ -938,11 +946,24 @@ test("booking submission requires policy acknowledgement", async () => {
   assert(!context.lastAlert, "booking should not submit without policy acknowledgement");
 });
 
+test("booking submission requires shampoo prep acknowledgement when shampoo is declined", async () => {
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
+  context.lastAlert = "";
+  elements.bookingForm.reportValidity = () => true;
+  elements.policyAcknowledgement.checked = true;
+  elements.shampooDeclineAcknowledgement.checked = false;
+  await context.submitBooking();
+  assert(elements.bookingError.textContent.includes("shampoo preparation requirement"), "shampoo prep acknowledgement error missing");
+  assert(!context.lastAlert, "booking should not submit without shampoo prep acknowledgement");
+});
+
 test("booking submission sends booking to backend and shows confirmation", async () => {
   context.lastAlert = "";
   context.window.location.href = "";
   elements.bookingError.textContent = "previous error";
   elements.policyAcknowledgement.checked = true;
+  elements.shampooDeclineAcknowledgement.checked = true;
   await context.submitBooking();
   assert(elements.bookingError.textContent === "", "valid booking should clear error");
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
@@ -981,6 +1002,7 @@ test("admin no-charge booking submission does not require pay options URL", asyn
   context.window.location.href = "";
   context.addAdminTestBooking();
   elements.policyAcknowledgement.checked = true;
+  elements.shampooDeclineAcknowledgement.checked = true;
   await context.submitBooking();
   assert(context.lastFetch.url === "/api/bookings", "admin test should post to booking backend");
   assert(context.lastFetch.options.body.includes("admin-test-booking"), "admin test payload missing service id");
@@ -1088,6 +1110,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("checkout.session.completed"), "Stripe completed event handling missing");
   assert(server.includes("priceBooking"), "trusted server-side pricing helper missing");
   assert(server.includes("cartAddOnCompatibilityIssue"), "server should validate add-on compatibility before accepting bookings");
+  assert(server.includes("requiresShampooDeclineAcknowledgement"), "server should validate shampoo prep acknowledgement when Shampoo Service is declined");
   assert(server.includes("notifyNoChargeTestBooking"), "no-charge test booking notifier missing");
   assert(server.includes("no_charge_test"), "no-charge test status missing");
   assert(server.includes("/api/automations/run"), "automation run endpoint missing");

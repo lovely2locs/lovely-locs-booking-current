@@ -1718,8 +1718,12 @@ function cartAddOnCompatibilityIssue(cart = []) {
   return cart.map(item => addOnCompatibilityIssue(item, cart)).find(Boolean) || "";
 }
 
+function shampooDeclineAcknowledged(cart = []) {
+  return cart.some(item => item.shampooDeclineAcknowledgement);
+}
+
 function requiresShampooDeclineAcknowledgement(cart = []) {
-  return !isAdminTestBooking(cart) && cart.some(isMainAppointmentService) && !cart.some(item => item.id === "shampoo-service");
+  return !isAdminTestBooking(cart) && cart.some(isMainAppointmentService) && !cart.some(item => item.id === "shampoo-service") && !shampooDeclineAcknowledged(cart);
 }
 
 function pricedCartItem(item = {}) {
@@ -1736,6 +1740,8 @@ function pricedCartItem(item = {}) {
       ...exactService,
       type: "service",
       baseProduct: allowedBaseProducts.has(item.baseProduct) ? item.baseProduct : undefined,
+      ...(item.shampooDeclined ? { shampooDeclined: true } : {}),
+      ...(item.shampooDeclineAcknowledgement ? { shampooDeclineAcknowledgement: true } : {}),
       ...(sprinklePreferences ? { sprinklePreferences } : {}),
     };
   }
@@ -1813,7 +1819,7 @@ function priceBooking(booking) {
     total,
     deposit,
     policyAcknowledgement: true,
-    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart),
+    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart) || shampooDeclineAcknowledged(cart),
     friendTest: sanitizeFriendTest(booking.friendTest),
   };
 }

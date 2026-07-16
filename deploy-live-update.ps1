@@ -34,7 +34,11 @@ function Get-SecretValue {
 
   if ($Optional) {
     if (-not [Environment]::UserInteractive) { return "" }
-    $plain = Read-Host "$Prompt (press Enter to skip)"
+    try {
+      $plain = Read-Host "$Prompt (press Enter to skip)"
+    } catch {
+      return ""
+    }
     if (-not $plain) { return "" }
     return $plain
   }
@@ -107,6 +111,7 @@ $files = @(
   "VERSION_HISTORY.md",
   "payment-platform-plan.md",
   "qa-test.js",
+  "reward-flow-test.js",
   "OPEN_WEBSITE.bat",
   "PREPARE_LIVE_UPDATE.bat",
   "prepare-live-update.ps1",

@@ -112,22 +112,23 @@ const defaultDiscountSettings = {
 };
 
 const services = [
-  { id: "shampoo-service", duration: "30 min", featured: false, price: 0, priceLabel: "Eligibility confirmed", name: "Shampoo Service", description: "Cleanse service available only where eligible and attached to a compatible maintenance appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "shampoo-service", duration: "30 min", featured: false, price: 0, priceLabel: "Add-on service", name: "Shampoo Service", description: "Standalone shampoo cleanse add-on. Book this when you want Lovely Locs to include shampoo care with your appointment.", category: "add-ons" },
+  { id: "acv-deep-cleanse", duration: "45 min", featured: false, price: 0, priceLabel: "Add-on service", name: "ACV Deep Cleanse", description: "Standalone apple cider vinegar deep cleanse add-on for clients who need a deeper loc refresh.", category: "add-ons" },
   { id: "loc-trim", duration: "20 min", featured: false, price: 10, name: "Loc Trim", description: "Light loc end trim for maintenance clients when the trim is compatible with the selected appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
-  { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Premium loc accessories, glitter, charms, and sparkle. Must be added alongside a service booking. Custom colors available for $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Base $15 option covers up to two locs and includes only in-stock beads unless you bring your own beads. Add color and preference notes before it is added.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
   { id: "emergency-fee", duration: "3h", featured: false, price: 45, name: "Emergency Fee", description: "Additional fee for emergency bookings. Applies to same-day, within 24 hours, and major holiday appointments.", category: "add-ons" },
   { id: "children-instant-starter", duration: "5h", featured: false, price: 150, name: "Children Instant Starter Locs", description: "Instant starter locs for children. Ask about children's bundle services.", category: "starter-locs" },
   { id: "medium-adult-starter", duration: "6h 30min", featured: false, price: 150, name: "Medium Adult Starter Locs", description: "Medium-sized starter locs for adults.", category: "starter-locs" },
   { id: "adult-retwist", duration: "3h 30min", featured: false, price: 90, name: "Adult Retwist (Maintenance)", description: "Keep your loc journey beautiful with a fresh retwist focused on neatness and hydration. Includes a complimentary two-strand twist style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", featured: false, price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", description: "Starter locs for children using coils and two-strand twist method.", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Hand-installed, high-quality beads and crystals. Includes 4 locs; add premium accessory color preferences in your notes.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
+  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Starting at $50. Base installation covers up to two locs and includes only in-stock beads unless you bring your own beads. Add up to two color or preference notes before it is added.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true, requiresSprinklePreferences: true },
   { id: "children-retwist", duration: "3h", featured: false, price: 75, name: "Children Retwist (Maintenance)", description: "Gentle retwist maintenance designed for children. Complimentary two-strand twist style included.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "adult-instant", duration: "5h 30min", featured: false, price: 125, name: "Adult Instant Locs", description: "Uses 0.5mm and 0.75mm crochet needles for instant loc maintenance. Includes complimentary two-strand twist style.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "child-instant", duration: "3h 30min", featured: false, price: 85, name: "Children's Instant Loc", description: "Starting price for children's instant loc maintenance. Complimentary two-strand twist style included.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "referral-retwist", duration: "3h 30min", featured: false, price: 75, name: "Referral (Retwist)", description: "Special referral pricing for retwist service. First-time clients only. Referral can only be used once.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "style-addon", duration: "1h 30min", featured: false, price: 30, name: "Basic Style", description: "Additional basic styling service. Must be booked with a compatible maintenance service that does not already include a style.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
   { id: "consultation", duration: "1h 15min", featured: false, price: 30, name: "Consultation", description: "Discuss parting, size, texture, and method for your loc journey.", category: "add-ons" },
-  { id: "loc-repair", duration: "30 min", featured: false, price: 0, priceLabel: "Quote after review", name: "Loc Repair", description: "Targeted repair for compatible maintenance appointments. Final repair pricing is confirmed after Lovely Locs reviews the loc condition.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
+  { id: "loc-repair", duration: "30 min", featured: false, price: 3, priceLabel: "$3 per loc", name: "Loc Repair", description: "Targeted repair for compatible maintenance appointments. Repair pricing is $3 per loc.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
   { id: "small-adult-starter", duration: "5h 30min", featured: false, price: 225, name: "Small Adult Starter Locs", description: "Small-sized starter locs for adults. Consultation required before booking.", category: "starter-locs" },
   { id: "overdue-retwist", duration: "4-5 hours", featured: true, price: 125, name: "Overdue Retwist (4+ Months)", description: "For clients who haven't had a retwist in over 3 months. Includes full retwist and basic style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] }
 ];
@@ -349,7 +350,7 @@ const serviceGuide = [
   {
     id: "extra-style",
     label: "I want accessories or a style",
-    recommendation: "Add Style, Loc Sprinkle Installation, or Loc Sprinkles alongside your main service. Add color/style preferences in your booking notes.",
+    recommendation: "Add Style, Loc Sprinkle Installation, or Loc Sprinkles alongside your main service. Sprinkles selections ask for color and preference notes before they are added.",
     serviceIds: ["style-addon", "sprinkle-install", "sprinkles-addon"]
   }
 ];
@@ -733,6 +734,8 @@ let pendingAnchor = null;
 let pendingAdvisoryService = null;
 let pendingProductService = null;
 let pendingPartingService = null;
+let pendingSprinkleService = null;
+let pendingSprinkleContext = "cart";
 let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
@@ -962,6 +965,35 @@ function serviceWithCartFields(service = {}) {
   return { ...service, type: "service" };
 }
 
+function requiresSprinklePreferences(service = {}) {
+  return Boolean(service?.requiresSprinklePreferences);
+}
+
+function cleanSprinklePreference(value = "") {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 120);
+}
+
+function normalizeSprinklePreferences(input = {}) {
+  const source = input && typeof input === "object" ? input : {};
+  const preferences = (Array.isArray(source.preferences) ? source.preferences : [source.preferenceOne, source.preferenceTwo])
+    .map(cleanSprinklePreference)
+    .filter(Boolean);
+  const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
+  return { preferences, notes };
+}
+
+function sprinklePreferencesSummary(item = {}) {
+  const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
+  const parts = [];
+  if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
+  if (details.notes) parts.push(`Notes: ${details.notes}`);
+  return parts.join("; ");
+}
+
+function serviceWithSprinklePreferences(service = {}, preferences = {}) {
+  return serviceWithCartFields({ ...service, sprinklePreferences: normalizeSprinklePreferences(preferences) });
+}
+
 const enhancementRecommendationIds = ["loc-trim", "sprinkle-install", "style-addon", "loc-repair"];
 
 function enhancementRecommendations(mainService, selectedAddOns = pendingEnhancementAddOns) {
@@ -1078,6 +1110,34 @@ function partingPreferenceModal() {
             <button class="outline-btn" data-parting-preference="Triangle Parts" data-parting-fee="40">Triangle Parts (+$40)</button>
           </div>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function sprinklePreferenceModal() {
+  const serviceName = pendingSprinkleService?.name || "Loc Sprinkles";
+  return `
+    <div class="modal advisory-modal" id="sprinklePreferenceModal">
+      <div class="modal-panel advisory-panel">
+        <div class="modal-head">
+          <div>
+            <h2>Loc Sprinkles Preferences</h2>
+            <p class="duration">Required before ${serviceName} is added.</p>
+          </div>
+          <button class="modal-close" data-close-sprinkle-preference>x</button>
+        </div>
+        <form class="brand-settings-form sprinkle-preference-form" id="sprinklePreferenceForm">
+          <label>First Color or Preference<input name="preferenceOne" maxlength="60" required placeholder="Example: gold beads"></label>
+          <label>Second Color or Preference <span class="optional-label">(optional)</span><input name="preferenceTwo" maxlength="60" placeholder="Example: clear crystals"></label>
+          <label class="full">Color and Preference Notes <span class="optional-label">(optional)</span><textarea name="notes" maxlength="220" placeholder="Mention in-stock beads, client-provided beads, placement, or style notes."></textarea></label>
+          <p class="field-note full">Base price includes up to two preferences. In-stock beads are used unless you bring your own beads.</p>
+          <p class="form-error full" id="sprinklePreferenceStatus" aria-live="polite"></p>
+          <div class="advisory-actions full">
+            <button class="primary-btn" type="button" data-save-sprinkle-preference>Save Preferences</button>
+            <button class="outline-btn" type="button" data-close-sprinkle-preference>Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   `;
@@ -1226,6 +1286,7 @@ function homePage() {
     ${advisoryModal()}
     ${productPreferenceModal()}
     ${partingPreferenceModal()}
+    ${sprinklePreferenceModal()}
     ${enhancementModal()}
   `;
 }
@@ -2113,7 +2174,7 @@ function adminPage() {
         <div class="policy-box brand-settings-box">
           <p class="eyebrow">Manual Deposits</p>
           <h2>Confirm a Client Deposit</h2>
-          <p>After you verify the matching Venmo, Cash App, or Apple Pay receipt, enter the booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note. This marks the deposit paid and sends the client confirmation email.</p>
+          <p>Open the owner confirmation link from the deposit confirmation email to automatically fill the booking ID. After you verify the matching Venmo, Cash App, or Apple Pay receipt, confirm the deposit below. If you opened this page manually, paste the booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note.</p>
           <p>If the deposit was not received, use the release button instead. That keeps the booking history but opens the appointment time again.</p>
           ${confirmNotice}
           <form class="brand-settings-form" id="manualDepositConfirmForm">
@@ -2270,7 +2331,7 @@ function cartMarkup() {
           ${addOnCompatibilityMessage ? `<div class="cart-advisory"><strong>Add-on needs a main service</strong><p>${addOnCompatibilityMessage}</p></div>` : ""}
           ${cart.length ? cart.map(item => `
             <div class="cart-item">
-              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}<p>${servicePriceText(item)}</p></div>
+              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}${sprinklePreferencesSummary(item) ? `<p class="duration">Sprinkles: ${escapeAttr(sprinklePreferencesSummary(item))}</p>` : ""}<p>${servicePriceText(item)}</p></div>
               <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
@@ -2656,6 +2717,7 @@ function bookingModal() {
           ${selectedServices.length ? `<p>Estimated Service Time: ${selectedServices.map(item => item.duration).join(" + ")}</p>` : ""}
           ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
+          ${selectedServices.some(item => sprinklePreferencesSummary(item)) ? `<p>Sprinkles Preferences: ${selectedServices.filter(item => sprinklePreferencesSummary(item)).map(item => `${item.name} - ${sprinklePreferencesSummary(item)}`).join(", ")}</p>` : ""}
           <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
           ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
           <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscountCodeLabel()}): -${money(discountAmount)}` : ""}</p>
@@ -2871,6 +2933,21 @@ function closePartingPreference() {
   document.getElementById("partingPreferenceModal")?.classList.remove("open");
 }
 
+function openSprinklePreference(service, context = "cart") {
+  pendingSprinkleService = service;
+  pendingSprinkleContext = context;
+  render(currentRoute());
+  if (context === "enhancement") document.getElementById("enhancementModal")?.classList.add("open");
+  document.getElementById("sprinklePreferenceModal")?.classList.add("open");
+}
+
+function closeSprinklePreference() {
+  pendingSprinkleService = null;
+  pendingSprinkleContext = "cart";
+  document.getElementById("sprinklePreferenceModal")?.classList.remove("open");
+  if (pendingEnhancementService) document.getElementById("enhancementModal")?.classList.add("open");
+}
+
 function openEnhancement(service) {
   pendingEnhancementService = service;
   pendingEnhancementAddOns = [];
@@ -2905,10 +2982,46 @@ function toggleEnhancementAddOn(serviceId) {
   if (pendingEnhancementAddOns.some(item => item.id === service.id)) {
     pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== service.id);
   } else if (pendingEnhancementAddOns.length < 2) {
+    if (requiresSprinklePreferences(service)) {
+      openSprinklePreference(service, "enhancement");
+      return;
+    }
     pendingEnhancementAddOns.push(serviceWithCartFields(service));
   }
   render(currentRoute());
   document.getElementById("enhancementModal")?.classList.add("open");
+}
+
+function handleSprinklePreference() {
+  const service = pendingSprinkleService;
+  const form = document.getElementById("sprinklePreferenceForm");
+  const status = document.getElementById("sprinklePreferenceStatus");
+  if (!service || !form) return;
+  const data = new FormData(form);
+  const details = normalizeSprinklePreferences({
+    preferenceOne: data.get("preferenceOne"),
+    preferenceTwo: data.get("preferenceTwo"),
+    notes: data.get("notes")
+  });
+  if (!details.preferences.length) {
+    if (status) status.textContent = "Add at least one color or preference before selecting loc sprinkles.";
+    return;
+  }
+  if (details.preferences.length > 2) {
+    if (status) status.textContent = "The base price includes up to two color or preference choices.";
+    return;
+  }
+  const configuredService = serviceWithSprinklePreferences(service, details);
+  const context = pendingSprinkleContext;
+  closeSprinklePreference();
+  if (context === "enhancement") {
+    pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== configuredService.id);
+    if (pendingEnhancementAddOns.length < 2) pendingEnhancementAddOns.push(configuredService);
+    render(currentRoute());
+    document.getElementById("enhancementModal")?.classList.add("open");
+    return;
+  }
+  addServiceFromAdvisory(configuredService);
 }
 
 function handlePartingPreference(partingPreference, partingFee) {
@@ -2966,6 +3079,10 @@ function bindDynamic() {
           return;
         }
       }
+      if (requiresSprinklePreferences(service)) {
+        openSprinklePreference(service, "cart");
+        return;
+      }
       if (service?.id === "adult-retwist" && !cart.some(item => item.id === service.id)) {
         openAdvisory(service);
         return;
@@ -3014,6 +3131,8 @@ function bindDynamic() {
   document.querySelectorAll("[data-close-advisory]").forEach(button => button.addEventListener("click", closeAdvisory));
   document.querySelectorAll("[data-close-product-preference]").forEach(button => button.addEventListener("click", closeProductPreference));
   document.querySelectorAll("[data-close-parting-preference]").forEach(button => button.addEventListener("click", closePartingPreference));
+  document.querySelectorAll("[data-close-sprinkle-preference]").forEach(button => button.addEventListener("click", closeSprinklePreference));
+  document.querySelectorAll("[data-save-sprinkle-preference]").forEach(button => button.addEventListener("click", handleSprinklePreference));
   document.querySelectorAll("[data-close-enhancement]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(false)));
   document.querySelectorAll("[data-enhancement-add]").forEach(button => button.addEventListener("click", () => toggleEnhancementAddOn(button.dataset.enhancementAdd)));
   document.querySelectorAll("[data-enhancement-continue]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(true)));
@@ -3896,7 +4015,8 @@ function bookingSummaryFromForm(form) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
-      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}` : ""
+      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}` : "",
+      sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : ""
     ].filter(Boolean).join("; ");
     return `- ${item.name} (${money(item.price)}${details ? ` | ${details}` : ""})`;
   });

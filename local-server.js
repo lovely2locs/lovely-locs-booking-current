@@ -96,7 +96,14 @@ const productCatalog = [
   { id: "product-Custom Color Sprinkles", price: 15, name: "Custom Color Sprinkles" },
 ];
 
-const allowedBaseProducts = new Set(["Oil and Water", "Foam", "Gel", "BYOP (Bring Your Own Product)", "Loctician Recommendation"]);
+const allowedBaseProducts = new Set([
+  "Loctician's Preference",
+  "Jamaican Mango & Lime Locking Gel",
+  "Taliah Waajid Lock It Up",
+  "Dr Locs Imani Locking Spray",
+  "Mielle Rosemary Mint Scalp & Hair Strengthening Oil",
+  "Bring Your Own Product",
+]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
@@ -1712,6 +1719,10 @@ function cartAddOnCompatibilityIssue(cart = []) {
   return cart.map(item => addOnCompatibilityIssue(item, cart)).find(Boolean) || "";
 }
 
+function requiresShampooDeclineAcknowledgement(cart = []) {
+  return !isAdminTestBooking(cart) && cart.some(isMainAppointmentService) && !cart.some(item => item.id === "shampoo-service");
+}
+
 function pricedCartItem(item = {}) {
   const exactService = serviceCatalog.find(service => service.id === item.id);
   if (exactService) {
@@ -1766,6 +1777,7 @@ function priceBooking(booking) {
   if (!booking.policyAcknowledgement) throw new Error("Policy acknowledgement is required.");
 
   const cart = booking.cart.map(pricedCartItem);
+  if (requiresShampooDeclineAcknowledgement(cart) && !booking.shampooDeclineAcknowledgement) throw new Error("Shampoo preparation acknowledgement is required.");
   if (client.emergencySlot && !cart.some(item => item.id === "emergency-fee")) {
     const emergencyFee = serviceCatalog.find(service => service.id === "emergency-fee");
     if (emergencyFee) cart.push({ ...emergencyFee, type: "service", autoEmergencyFee: true });
@@ -1802,6 +1814,7 @@ function priceBooking(booking) {
     total,
     deposit,
     policyAcknowledgement: true,
+    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart),
     friendTest: sanitizeFriendTest(booking.friendTest),
   };
 }

@@ -98,10 +98,9 @@ const productCatalog = [
 
 const allowedBaseProducts = new Set([
   "Loctician's Preference",
-  "Jamaican Mango & Lime Locking Gel",
-  "Taliah Waajid Lock It Up",
-  "Dr Locs Imani Locking Spray",
-  "Mielle Rosemary Mint Scalp & Hair Strengthening Oil",
+  "Gel",
+  "Foam",
+  "Oil and Water",
   "Bring Your Own Product",
 ]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);

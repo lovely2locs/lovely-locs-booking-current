@@ -156,7 +156,7 @@ async function createBooking(clientData, overrides = {}) {
   };
   const response = await request("POST", "/api/bookings", {
     client: bookingClient,
-    cart: overrides.cart || [{ id: "adult-retwist", baseProduct: "Taliah Waajid Lock It Up" }],
+    cart: overrides.cart || [{ id: "adult-retwist", baseProduct: "Foam" }],
     discountCode: overrides.discountCode || "",
     policyAcknowledgement: true,
     shampooDeclineAcknowledgement: overrides.shampooDeclineAcknowledgement !== false,
@@ -298,7 +298,7 @@ async function main() {
       referredByCode: referrerSettings.referralCode,
     });
     const overdueReferredBooking = await createBooking(overdueReferred, {
-      cart: [{ id: "overdue-retwist", baseProduct: "Jamaican Mango & Lime Locking Gel" }],
+      cart: [{ id: "overdue-retwist", baseProduct: "Gel" }],
     });
     assert(String(overdueReferredBooking.discountCode || "").startsWith(`NEW-${referrerSettings.referralCode}`) && overdueReferredBooking.discountAmount === 15 && overdueReferredBooking.total === 110, "Referred overdue retwist bookings over $75 receive the $15 first-service discount.", overdueReferredBooking);
 
@@ -311,7 +311,7 @@ async function main() {
       referredByCode: referrerSettings.referralCode,
     });
     const nonQualifyingReferredBooking = await createBooking(nonQualifyingReferred, {
-      cart: [{ id: "children-retwist", baseProduct: "Jamaican Mango & Lime Locking Gel" }],
+      cart: [{ id: "children-retwist", baseProduct: "Gel" }],
     });
     assert(!nonQualifyingReferredBooking.discountCode && nonQualifyingReferredBooking.discountAmount === 0 && nonQualifyingReferredBooking.total === 75, "Referred first-service discount does not apply when the booked service is $75 or less.", nonQualifyingReferredBooking);
 

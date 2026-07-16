@@ -295,7 +295,7 @@ const stockShortlist = [
   {
     name: "Dr Locs Imani Locking Spray",
     role: "Professional retwist support",
-    quality: "A lighter hold option that fits the updated booking flow because clients can choose a named gel, hold spray, oil, loctician preference, or bring their own product.",
+    quality: "A lighter hold option that fits the booking flow because clients can choose a product form, loctician preference, or bring their own product.",
     proof: "Shop App and Dr Locs buyer reviews mention hold, scent, sensitive-scalp use, and loctician use.",
     margin: "Worth testing in limited quantity because professional hold products can sell after maintenance services.",
     action: "Test small"
@@ -379,7 +379,7 @@ const serviceQuizQuestions = [
 const bookingPrepItems = [
   { title: "Send recent hair photos", copy: "Clear front, side, back, and root photos help Lovely Locs prepare for your current loc stage." },
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
-  { title: "Choose product preferences", copy: "Maintenance clients can ask the loctician to choose, select a named gel, hold spray, or oil product, or bring their own product for the service." },
+  { title: "Choose product preferences", copy: "Maintenance clients can ask the loctician to choose, select Gel, Foam, or Oil and Water, or bring their own product for the service." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
   { title: "Wait for final confirmation", copy: "Submitting the form does not finalize your appointment. Your official confirmation is sent only after Lovely Locs verifies that your deposit was received. Emergency proposals may need an extra owner follow-up." }
 ];
@@ -1086,10 +1086,9 @@ function productPreferenceModal() {
           <p>Your preference helps Lovely Locs prepare the right finish for your scalp, hair texture, and style goals.</p>
           <div class="advisory-actions product-actions">
             <button class="primary-btn" data-product-preference="Loctician's Preference">Loctician's Preference</button>
-            <button class="outline-btn" data-product-preference="Jamaican Mango & Lime Locking Gel">Jamaican Mango & Lime Locking Gel</button>
-            <button class="outline-btn" data-product-preference="Taliah Waajid Lock It Up">Taliah Waajid Lock It Up</button>
-            <button class="outline-btn" data-product-preference="Dr Locs Imani Locking Spray">Dr Locs Imani Locking Spray</button>
-            <button class="outline-btn" data-product-preference="Mielle Rosemary Mint Scalp & Hair Strengthening Oil">Mielle Rosemary Mint Scalp & Hair Strengthening Oil</button>
+            <button class="outline-btn" data-product-preference="Gel">Gel</button>
+            <button class="outline-btn" data-product-preference="Foam">Foam</button>
+            <button class="outline-btn" data-product-preference="Oil and Water">Oil and Water</button>
             <button class="outline-btn" data-product-preference="Bring Your Own Product">Bring Your Own Product</button>
           </div>
         </div>

@@ -295,7 +295,7 @@ const stockShortlist = [
   {
     name: "Dr Locs Imani Locking Spray",
     role: "Professional retwist support",
-    quality: "A lighter hold option that fits your current booking flow because clients already choose Oil and Water, Foam, or Gel.",
+    quality: "A lighter hold option that fits the updated booking flow because clients can choose a named gel, hold spray, oil, loctician preference, or bring their own product.",
     proof: "Shop App and Dr Locs buyer reviews mention hold, scent, sensitive-scalp use, and loctician use.",
     margin: "Worth testing in limited quantity because professional hold products can sell after maintenance services.",
     action: "Test small"
@@ -379,7 +379,7 @@ const serviceQuizQuestions = [
 const bookingPrepItems = [
   { title: "Send recent hair photos", copy: "Clear front, side, back, and root photos help Lovely Locs prepare for your current loc stage." },
   { title: "Know your last service date", copy: "Retwist timing helps prevent underbooking, especially for overdue maintenance." },
-  { title: "Choose product preferences", copy: "Maintenance clients can choose Oil and Water, Foam, Gel, BYOP, or ask the loctician to decide so the finish matches their scalp and style goals." },
+  { title: "Choose product preferences", copy: "Maintenance clients can ask the loctician to choose, select a named gel, hold spray, or oil product, or bring their own product for the service." },
   { title: "Prepare your deposit method", copy: "After submitting, use the pay options page and include your booking ID with the deposit." },
   { title: "Wait for final confirmation", copy: "Submitting the form does not finalize your appointment. Your official confirmation is sent only after Lovely Locs verifies that your deposit was received. Emergency proposals may need an extra owner follow-up." }
 ];
@@ -402,6 +402,9 @@ const policies = {
   emergency_fee: "A $45 Emergency Fee is added when a client selects a brown emergency proposal slot outside regular business hours, on Sundays, or on holidays/key dates.",
   payment_options: "Deposits are paid through the Lovely Locs pay options page using Venmo, Cash App, or Apple Pay. The official client confirmation is sent only after Lovely Locs verifies the matching payment receipt."
 };
+
+const shampooDeclinePolicy = "By declining the Shampoo Service, you agree to arrive with your scalp and locs freshly shampooed, thoroughly rinsed, and free from heavy oils, product buildup, odor, lint, or debris.";
+const shampooDeclineAcknowledgement = "I understand I must arrive freshly shampooed if I decline this service.";
 
 const faq = [
   { question: "Do you repair locs?", answer: "Yes. Please contact us at lvlc.support@lovelylocsnc.com to discuss your specific needs and schedule a consultation." },
@@ -466,6 +469,7 @@ function saveBookingDraft(form) {
     preferredContact: data.get("preferredContact") || "email",
     smsOptIn: Boolean(data.get("smsOptIn")),
     specialRequests: data.get("specialRequests") || "",
+    shampooDeclineAcknowledgement: Boolean(data.get("shampooDeclineAcknowledgement")),
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
     updatedAt: new Date().toISOString()
   };
@@ -961,6 +965,10 @@ function cartAddOnCompatibilityIssue(items = cart) {
   return items.map(item => addOnCompatibilityIssue(item, items)).find(Boolean) || "";
 }
 
+function requiresShampooDeclineAcknowledgement(items = cart) {
+  return !isAdminTestBooking(items) && items.some(isMainAppointmentService) && !items.some(item => item.id === "shampoo-service");
+}
+
 function serviceWithCartFields(service = {}) {
   return { ...service, type: "service" };
 }
@@ -1077,11 +1085,12 @@ function productPreferenceModal() {
           <h3>Which base product would you prefer?</h3>
           <p>Your preference helps Lovely Locs prepare the right finish for your scalp, hair texture, and style goals.</p>
           <div class="advisory-actions product-actions">
-            <button class="primary-btn" data-product-preference="Oil and Water">Oil and Water</button>
-            <button class="outline-btn" data-product-preference="Foam">Foam</button>
-            <button class="outline-btn" data-product-preference="Gel">Gel</button>
-            <button class="outline-btn" data-product-preference="BYOP (Bring Your Own Product)">BYOP (Bring Your Own Product)</button>
-            <button class="outline-btn" data-product-preference="Loctician Recommendation">Loctician Recommendation</button>
+            <button class="primary-btn" data-product-preference="Loctician's Preference">Loctician's Preference</button>
+            <button class="outline-btn" data-product-preference="Jamaican Mango & Lime Locking Gel">Jamaican Mango & Lime Locking Gel</button>
+            <button class="outline-btn" data-product-preference="Taliah Waajid Lock It Up">Taliah Waajid Lock It Up</button>
+            <button class="outline-btn" data-product-preference="Dr Locs Imani Locking Spray">Dr Locs Imani Locking Spray</button>
+            <button class="outline-btn" data-product-preference="Mielle Rosemary Mint Scalp & Hair Strengthening Oil">Mielle Rosemary Mint Scalp & Hair Strengthening Oil</button>
+            <button class="outline-btn" data-product-preference="Bring Your Own Product">Bring Your Own Product</button>
           </div>
         </div>
       </div>
@@ -2693,6 +2702,7 @@ function bookingModal() {
   const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   const adminTest = isAdminTestBooking(cart);
+  const showShampooDeclineAck = requiresShampooDeclineAcknowledgement(cart);
   const emergencySubmitHidden = profile.emergencySlot ? "" : " hidden";
   const confirmationMarkup = bookingConfirmation ? `
         <div class="confirmation-panel">
@@ -2761,6 +2771,12 @@ function bookingModal() {
           </fieldset>
           <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
+          ${showShampooDeclineAck ? `
+            <div class="full shampoo-prep-ack">
+              <p>${shampooDeclinePolicy}</p>
+              <label class="policy-ack"><input id="shampooDeclineAcknowledgement" name="shampooDeclineAcknowledgement" type="checkbox" ${profile.shampooDeclineAcknowledgement ? "checked" : ""}><span>${shampooDeclineAcknowledgement}</span></label>
+            </div>
+          ` : ""}
           <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
         <div id="bookingReferralPreview">
@@ -4047,6 +4063,7 @@ function bookingSummaryFromForm(form) {
     `Notes: ${client.specialRequests || "No special requests added."}`,
     "",
     "Policy acknowledgement: Client confirmed they read the Lovely Locs policies.",
+    booking.shampooDeclineAcknowledgement ? "Shampoo preparation acknowledgement: Client confirmed they must arrive freshly shampooed after declining Shampoo Service." : "",
     "Studio note: Address is shared after booking and deposit are confirmed."
   ].filter(line => line !== "").join("\n");
 }
@@ -4084,6 +4101,7 @@ function bookingPayloadFromForm(form) {
     deposit,
     discountCode: appliedDiscount?.code || "",
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
+    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart) ? Boolean(data.get("shampooDeclineAcknowledgement")) : false,
     friendTest: friendTestSnapshot(true)
   };
 }
@@ -4130,6 +4148,7 @@ async function submitBooking() {
   const form = document.getElementById("bookingForm");
   const error = document.getElementById("bookingError");
   const policyAcknowledgement = document.getElementById("policyAcknowledgement");
+  const shampooDeclineAcknowledgement = document.getElementById("shampooDeclineAcknowledgement");
   const submitButton = document.querySelector("[data-submit-booking]");
   if (!form) return;
   if (!form.reportValidity()) {
@@ -4138,6 +4157,10 @@ async function submitBooking() {
   }
   if (policyAcknowledgement && !policyAcknowledgement.checked) {
     if (error) error.textContent = "Please confirm that you have read the Lovely Locs policies before submitting your appointment request.";
+    return;
+  }
+  if (requiresShampooDeclineAcknowledgement(cart) && shampooDeclineAcknowledgement && !shampooDeclineAcknowledgement.checked) {
+    if (error) error.textContent = "Please confirm you understand the shampoo preparation requirement before continuing.";
     return;
   }
   const timeInput = document.getElementById("bookingTime");

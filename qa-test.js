@@ -53,6 +53,7 @@ const elements = {
   advisoryModal: new FakeElement("advisoryModal"),
   productPreferenceModal: new FakeElement("productPreferenceModal"),
   partingPreferenceModal: new FakeElement("partingPreferenceModal"),
+  sprinklePreferenceModal: new FakeElement("sprinklePreferenceModal"),
   enhancementModal: new FakeElement("enhancementModal"),
   cart: new FakeElement("cart"),
   bookingForm: new FakeElement("bookingForm"),
@@ -189,10 +190,14 @@ test("home renders core client sections", () => {
   assert(html.includes("Service Menu"), "service menu missing");
   assert(html.includes("Add-Ons & More"), "Add-Ons category should remain available in the main services area");
   assert(html.includes("Shampoo Service"), "Shampoo Service add-on missing");
+  assert(html.includes("ACV Deep Cleanse"), "ACV Deep Cleanse add-on missing");
+  assert(html.includes("Add-on service"), "shampoo add-on should no longer show eligibility confirmed copy");
+  assert(!html.includes("Eligibility confirmed"), "old shampoo eligibility text should not render");
   assert(html.includes("Loc Trim"), "Loc Trim add-on missing");
   assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation add-on missing");
   assert(html.includes("Basic Style"), "Basic Style add-on missing");
   assert(html.includes("Loc Repair"), "Loc Repair add-on missing");
+  assert(html.includes("$3 per loc"), "Loc Repair should show the per-loc price");
   assert(html.includes("Service Focus"), "service focus section missing");
   assert(html.includes("What To Expect"), "visit expectations section missing");
   assert(!html.includes("Replace these draft reviews with real testimonials"), "draft testimonial placeholder copy should not be public");
@@ -646,6 +651,19 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   context.finishEnhancementAppointment(false);
 });
 
+test("loc sprinkles collect required preferences from add-ons and recommendations", () => {
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Foam" });
+  const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 15, duration: "30 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
+  context.openSprinklePreference(directSprinkles, "cart");
+  assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
+  context.closeSprinklePreference();
+  context.addServiceFromAdvisory(context.serviceWithSprinklePreferences(directSprinkles, { preferences: ["gold beads", "clear crystals"], notes: "client bringing rose gold cuffs" }));
+  const html = appHtml();
+  assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
+  assert(html.includes("Sprinkles Preferences: Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+});
+
 test("direct add-on selection requires a compatible maintenance service", () => {
   context.clearCart();
   context.addServiceFromAdvisory({ id: "loc-trim", type: "service", name: "Loc Trim", price: 10, duration: "20 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] });
@@ -996,8 +1014,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("handleAdminBookingLookup"), "protected owner booking lookup handler missing");
   assert(server.includes("/api/admin/bookings"), "protected recent bookings endpoint missing");
   assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
-  assert(server.includes("Double-check the booking ID from the pay-options page or payment note."), "owner confirmation fallback should mention pay-options or payment note");
-  assert(!server.includes("Double-check the booking ID from the owner email or pay-options page."), "owner confirmation fallback should not depend on the owner email");
+  assert(server.includes("booking ID is captured automatically"), "owner confirmation fallback should mention automatic booking ID capture from email link");
+  assert(server.includes("pay-options page or payment note"), "owner confirmation fallback should still mention pay-options or payment note");
   assert(server.includes("sanitizeFriendTest"), "friend-test payload sanitizer missing");
   assert(server.includes('const cleanTest = test && typeof test === "object" ? test : {};'), "friend-test sanitizer should handle null payloads");
   assert(server.includes('const code = String(cleanTest.code || "").trim().toUpperCase();'), "friend-test sanitizer should read from the guarded object");
@@ -1114,11 +1132,39 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
   assert(script.includes("Owner delivery target is configured."), "admin readiness should confirm owner email without exposing the raw address");
   assert(!script.includes("Owner email target:"), "admin readiness should not expose the raw owner email target");
-  assert(script.includes("booking ID from the client's pay-options link after <strong>booking=</strong> or from the payment note"), "manual deposit instructions should point to pay-options or payment note booking IDs");
-  assert(!script.includes("booking ID from the owner email or from the client's pay-options link"), "manual deposit instructions should not depend on the owner email");
+  assert(script.includes("Open the owner confirmation link from the deposit confirmation email to automatically fill the booking ID"), "manual deposit instructions should explain automatic booking ID capture from the email link");
+  assert(script.includes("booking ID from the client\'s pay-options link after <strong>booking=</strong> or from the payment note"), "manual deposit instructions should keep manual pay-options fallback");
   assert(script.includes("async function sendNotificationTest"), "notification test handler missing");
   assert(script.includes("notificationResultsText"), "notification result display helper missing");
   assert(script.includes("loadAdminNotificationStatus"), "admin notification readiness loader missing");
+});
+
+test("manual deposit confirmation preloads booking details from owner email link", () => {
+  const originalHash = context.window.location.hash;
+  const originalSearch = context.window.location.search;
+  try {
+    context.window.location.hash = "#admin-confirm-deposit";
+    context.window.location.search = "?booking=LL-EMAIL-LINK&method=cash-app&token=owner-token";
+    const params = context.manualDepositConfirmParams();
+    assert(params.active, "owner confirmation params should be active from the email link");
+    assert(params.booking === "LL-EMAIL-LINK", "booking ID should be captured from the owner email link");
+    assert(params.method === "cash-app", "payment method should be captured from the owner email link");
+    const html = context.adminPage();
+    assert(html.includes('value="LL-EMAIL-LINK"'), "admin deposit form should prefill booking ID from owner email link");
+    assert(html.includes('value="owner-token"'), "admin deposit form should prefill token from owner email link");
+    assert(html.includes('value="cash-app" selected'), "admin deposit form should preselect method from owner email link");
+  } finally {
+    context.window.location.hash = originalHash;
+    context.window.location.search = originalSearch;
+  }
+});
+
+test("server validates loc sprinkles preference rules", () => {
+  const server = fs.readFileSync("local-server.js", "utf8");
+  assert(server.includes("requiresSprinklePreferences: true"), "sprinkles services should require preferences server-side");
+  assert(server.includes("Color and preference notes are required"), "server should reject sprinkles without preferences");
+  assert(server.includes("includes up to two color or preference choices"), "server should cap base sprinkles preferences at two");
+  assert(server.includes('priceLabel: "$3 per loc"'), "server loc repair should use $3 per loc label");
 });
 
 test("live fallback thanks invited testers after a successful booking", () => {

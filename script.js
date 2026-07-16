@@ -1,4 +1,4 @@
-const logoUrl = "assets/lovely-locs-logo.jpg";
+﻿const logoUrl = "assets/lovely-locs-logo.jpg";
 const legacyLogoUrls = new Set([
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
 ]);
@@ -737,6 +737,7 @@ let selectedService = cart.find(item => item.type === "service") || null;
 let pendingAnchor = null;
 let pendingAdvisoryService = null;
 let pendingProductService = null;
+let pendingShampooService = null;
 let pendingPartingService = null;
 let pendingSprinkleService = null;
 let pendingSprinkleContext = "cart";
@@ -756,6 +757,7 @@ let appliedDiscount = loadAppliedDiscount();
 let savedClientProfile = loadClientProfile();
 let advisoryMessage = "";
 let baseProductMessage = "";
+let shampooMessage = "";
 let partingMessage = "";
 let addOnCompatibilityMessage = "";
 let pendingEnhancementService = null;
@@ -965,8 +967,12 @@ function cartAddOnCompatibilityIssue(items = cart) {
   return items.map(item => addOnCompatibilityIssue(item, items)).find(Boolean) || "";
 }
 
+function shampooDeclineAcknowledged(items = cart) {
+  return items.some(item => item.shampooDeclineAcknowledgement);
+}
+
 function requiresShampooDeclineAcknowledgement(items = cart) {
-  return !isAdminTestBooking(items) && items.some(isMainAppointmentService) && !items.some(item => item.id === "shampoo-service");
+  return !isAdminTestBooking(items) && items.some(isMainAppointmentService) && !items.some(item => item.id === "shampoo-service") && !shampooDeclineAcknowledged(items);
 }
 
 function serviceWithCartFields(service = {}) {
@@ -1090,6 +1096,40 @@ function productPreferenceModal() {
             <button class="outline-btn" data-product-preference="Foam">Foam</button>
             <button class="outline-btn" data-product-preference="Oil and Water">Oil and Water</button>
             <button class="outline-btn" data-product-preference="Bring Your Own Product">Bring Your Own Product</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function shampooPreferenceModal() {
+  if (!pendingShampooService) return "";
+  const serviceName = pendingShampooService?.name || "your maintenance service";
+  return `
+    <div class="modal advisory-modal" id="shampooPreferenceModal">
+      <div class="modal-panel advisory-panel">
+        <div class="modal-head">
+          <div>
+            <h2>Shampoo Service Preference</h2>
+            <p class="duration">Required before ${serviceName} goes to your cart.</p>
+          </div>
+          <button class="modal-close" data-close-shampoo-preference>x</button>
+        </div>
+        <div class="advisory-box">
+          <p class="eyebrow">Maintenance Service Prep</p>
+          <h3>Would you like Lovely Locs to include Shampoo Service?</h3>
+          <p>Choose one option so your cart shows whether Shampoo Service is being added or declined.</p>
+          <div class="advisory-actions product-actions">
+            <button class="primary-btn" data-shampoo-preference="add">Add Shampoo Service</button>
+          </div>
+          <div class="shampoo-prep-ack">
+            <p>${shampooDeclinePolicy}</p>
+            <label class="policy-ack"><input id="shampooPreferenceAcknowledgement" type="checkbox"><span>${shampooDeclineAcknowledgement}</span></label>
+          </div>
+          <p class="form-error" id="shampooPreferenceStatus" aria-live="polite"></p>
+          <div class="advisory-actions product-actions">
+            <button class="outline-btn" data-shampoo-preference="decline">Continue Without Shampoo</button>
           </div>
         </div>
       </div>
@@ -1293,6 +1333,7 @@ function homePage() {
     ${bookingModal()}
     ${advisoryModal()}
     ${productPreferenceModal()}
+    ${shampooPreferenceModal()}
     ${partingPreferenceModal()}
     ${sprinklePreferenceModal()}
     ${enhancementModal()}
@@ -2335,11 +2376,12 @@ function cartMarkup() {
         <div class="cart-items">
           ${advisoryMessage ? `<div class="cart-advisory"><strong>Service updated</strong><p>${advisoryMessage}</p></div>` : ""}
           ${baseProductMessage ? `<div class="cart-advisory"><strong>Base product saved</strong><p>${baseProductMessage}</p></div>` : ""}
+          ${shampooMessage ? `<div class="cart-advisory"><strong>Shampoo preference saved</strong><p>${shampooMessage}</p></div>` : ""}
           ${partingMessage ? `<div class="cart-advisory"><strong>Parting preference saved</strong><p>${partingMessage}</p></div>` : ""}
           ${addOnCompatibilityMessage ? `<div class="cart-advisory"><strong>Add-on needs a main service</strong><p>${addOnCompatibilityMessage}</p></div>` : ""}
           ${cart.length ? cart.map(item => `
             <div class="cart-item">
-              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}${sprinklePreferencesSummary(item) ? `<p class="duration">Sprinkles: ${escapeAttr(sprinklePreferencesSummary(item))}</p>` : ""}<p>${servicePriceText(item)}</p></div>
+              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.shampooDeclined ? `<p class="duration">Shampoo: Client will arrive freshly shampooed.</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}${sprinklePreferencesSummary(item) ? `<p class="duration">Sprinkles: ${escapeAttr(sprinklePreferencesSummary(item))}</p>` : ""}<p>${servicePriceText(item)}</p></div>
               <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
           `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
@@ -2721,10 +2763,12 @@ function bookingModal() {
           <strong>Booking Summary</strong>
           ${advisoryMessage ? `<p class="advisory-copy">${advisoryMessage}</p>` : ""}
           ${baseProductMessage ? `<p class="advisory-copy">${baseProductMessage}</p>` : ""}
+          ${shampooMessage ? `<p class="advisory-copy">${shampooMessage}</p>` : ""}
           ${partingMessage ? `<p class="advisory-copy">${partingMessage}</p>` : ""}
           ${selectedServices.length ? `<p>Services: ${selectedServices.map(item => item.name).join(", ")}</p>` : `<p>No service selected yet. Please choose from the service menu before submitting.</p>`}
           ${selectedServices.length ? `<p>Estimated Service Time: ${selectedServices.map(item => item.duration).join(" + ")}</p>` : ""}
           ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
+          ${selectedServices.some(item => item.shampooDeclined) ? `<p>Shampoo Preparation: Client will arrive freshly shampooed.</p>` : ""}
           ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
           ${selectedServices.some(item => sprinklePreferencesSummary(item)) ? `<p>Sprinkles Preferences: ${selectedServices.filter(item => sprinklePreferencesSummary(item)).map(item => `${item.name} - ${sprinklePreferencesSummary(item)}`).join(", ")}</p>` : ""}
           <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
@@ -2859,8 +2903,10 @@ function clearCart() {
   selectedService = null;
   bookingConfirmation = null;
   addOnCompatibilityMessage = "";
+  pendingShampooService = null;
   pendingEnhancementService = null;
   pendingEnhancementAddOns = [];
+  shampooMessage = "";
   saveCart();
   render(currentRoute());
 }
@@ -2874,6 +2920,7 @@ function addAdminTestBooking() {
   cart = [{ ...adminTestService, type: "service" }];
   advisoryMessage = "";
   baseProductMessage = "";
+  shampooMessage = "";
   partingMessage = "";
   bookingConfirmation = null;
   saveCart();
@@ -2891,13 +2938,7 @@ function addServiceWithProductPreference(service, productPreference) {
   const configuredService = serviceWithCartFields({ ...service, baseProduct: productPreference });
   selectedService = configuredService;
   baseProductMessage = `${service.name} will be prepared with ${productPreference}.`;
-  const recommendations = enhancementRecommendations(configuredService, []);
-  if (recommendations.length) {
-    openEnhancement(configuredService);
-    return;
-  }
-  addToCart(configuredService);
-  openCart();
+  continueConfiguredMaintenanceService(configuredService);
 }
 
 function addServiceWithPartingPreference(service, partingPreference, partingFee) {
@@ -2938,6 +2979,38 @@ function closeProductPreference() {
   document.getElementById("productPreferenceModal")?.classList.remove("open");
 }
 
+function openShampooPreference(service) {
+  pendingShampooService = service;
+  render(currentRoute());
+  document.getElementById("shampooPreferenceModal")?.classList.add("open");
+}
+
+function closeShampooPreference() {
+  pendingShampooService = null;
+  document.getElementById("shampooPreferenceModal")?.classList.remove("open");
+}
+
+function shampooServiceCartItem() {
+  const shampoo = services.find(item => item.id === "shampoo-service");
+  return shampoo ? serviceWithCartFields(shampoo) : null;
+}
+
+function continueConfiguredMaintenanceService(service, addOns = []) {
+  const stagedAddOns = addOns.filter(Boolean).map(serviceWithCartFields);
+  const recommendations = enhancementRecommendations(service, stagedAddOns);
+  if (recommendations.length) {
+    openEnhancement(service, stagedAddOns);
+    return;
+  }
+  [service, ...stagedAddOns].forEach(item => {
+    if (!cart.some(existing => existing.id === item.id)) cart.push(item);
+  });
+  bookingConfirmation = null;
+  saveCart();
+  render(currentRoute());
+  openCart();
+}
+
 function openPartingPreference(service) {
   pendingPartingService = service;
   document.getElementById("partingPreferenceModal")?.classList.add("open");
@@ -2963,9 +3036,9 @@ function closeSprinklePreference() {
   if (pendingEnhancementService) document.getElementById("enhancementModal")?.classList.add("open");
 }
 
-function openEnhancement(service) {
+function openEnhancement(service, initialAddOns = []) {
   pendingEnhancementService = service;
-  pendingEnhancementAddOns = [];
+  pendingEnhancementAddOns = [...initialAddOns];
   render(currentRoute());
   document.getElementById("enhancementModal")?.classList.add("open");
 }
@@ -2978,7 +3051,9 @@ function closeEnhancement() {
 
 function finishEnhancementAppointment(includeSelected = true) {
   const service = pendingEnhancementService;
-  const addOns = includeSelected ? [...pendingEnhancementAddOns] : [];
+  const requiredAddOns = pendingEnhancementAddOns.filter(item => item.id === "shampoo-service");
+  const optionalAddOns = pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service");
+  const addOns = includeSelected ? [...requiredAddOns, ...optionalAddOns] : requiredAddOns;
   pendingEnhancementService = null;
   pendingEnhancementAddOns = [];
   if (!service) return;
@@ -2996,7 +3071,7 @@ function toggleEnhancementAddOn(serviceId) {
   if (!service) return;
   if (pendingEnhancementAddOns.some(item => item.id === service.id)) {
     pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== service.id);
-  } else if (pendingEnhancementAddOns.length < 2) {
+  } else if (pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service").length < 2) {
     if (requiresSprinklePreferences(service)) {
       openSprinklePreference(service, "enhancement");
       return;
@@ -3031,7 +3106,7 @@ function handleSprinklePreference() {
   closeSprinklePreference();
   if (context === "enhancement") {
     pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== configuredService.id);
-    if (pendingEnhancementAddOns.length < 2) pendingEnhancementAddOns.push(configuredService);
+    if (pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service").length < 2) pendingEnhancementAddOns.push(configuredService);
     render(currentRoute());
     document.getElementById("enhancementModal")?.classList.add("open");
     return;
@@ -3044,6 +3119,30 @@ function handlePartingPreference(partingPreference, partingFee) {
   closePartingPreference();
   if (!service) return;
   addServiceWithPartingPreference(service, partingPreference, partingFee);
+}
+
+function handleShampooPreference(preference) {
+  const service = pendingShampooService;
+  const status = document.getElementById("shampooPreferenceStatus");
+  if (!service) return;
+  if (preference === "add") {
+    const shampoo = shampooServiceCartItem();
+    shampooMessage = "Shampoo Service added to this appointment.";
+    closeShampooPreference();
+    continueConfiguredMaintenanceService(service, shampoo ? [shampoo] : []);
+    return;
+  }
+  if (preference === "decline") {
+    const acknowledgement = document.getElementById("shampooPreferenceAcknowledgement");
+    if (!acknowledgement?.checked) {
+      if (status) status.textContent = "Please check the shampoo preparation acknowledgement before continuing.";
+      return;
+    }
+    const configuredService = { ...service, shampooDeclined: true, shampooDeclineAcknowledgement: true };
+    shampooMessage = "Shampoo Service declined. Client confirmed they will arrive freshly shampooed.";
+    closeShampooPreference();
+    continueConfiguredMaintenanceService(configuredService, []);
+  }
 }
 
 function handleProductPreference(preference) {
@@ -3145,6 +3244,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-open-booking]").forEach(button => button.addEventListener("click", openBooking));
   document.querySelectorAll("[data-close-advisory]").forEach(button => button.addEventListener("click", closeAdvisory));
   document.querySelectorAll("[data-close-product-preference]").forEach(button => button.addEventListener("click", closeProductPreference));
+  document.querySelectorAll("[data-close-shampoo-preference]").forEach(button => button.addEventListener("click", closeShampooPreference));
   document.querySelectorAll("[data-close-parting-preference]").forEach(button => button.addEventListener("click", closePartingPreference));
   document.querySelectorAll("[data-close-sprinkle-preference]").forEach(button => button.addEventListener("click", closeSprinklePreference));
   document.querySelectorAll("[data-save-sprinkle-preference]").forEach(button => button.addEventListener("click", handleSprinklePreference));
@@ -3154,6 +3254,7 @@ function bindDynamic() {
   document.querySelectorAll("[data-enhancement-skip]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(false)));
   document.querySelectorAll("[data-retwist-answer]").forEach(button => button.addEventListener("click", () => handleRetwistAnswer(button.dataset.retwistAnswer)));
   document.querySelectorAll("[data-product-preference]").forEach(button => button.addEventListener("click", () => handleProductPreference(button.dataset.productPreference)));
+  document.querySelectorAll("[data-shampoo-preference]").forEach(button => button.addEventListener("click", () => handleShampooPreference(button.dataset.shampooPreference)));
   document.querySelectorAll("[data-parting-preference]").forEach(button => button.addEventListener("click", () => handlePartingPreference(button.dataset.partingPreference, button.dataset.partingFee)));
   document.querySelectorAll("[data-view-services]").forEach(button => button.addEventListener("click", goToServices));
   document.querySelectorAll("[data-close-booking]").forEach(button => button.addEventListener("click", closeBooking));
@@ -4030,6 +4131,7 @@ function bookingSummaryFromForm(form) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
+      item.shampooDeclined ? "Shampoo: Client will arrive freshly shampooed" : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}` : "",
       sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : ""
     ].filter(Boolean).join("; ");
@@ -4074,6 +4176,7 @@ function bookingPayloadFromForm(form) {
   const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
   const communicationsOptIn = Boolean(data.get("smsOptIn"));
+  const cartShampooDeclineAcknowledged = shampooDeclineAcknowledged(cart);
   return {
     ...(isAdminTestBooking(cart) ? { adminToken: data.get("adminToken") || "" } : {}),
     client: {
@@ -4100,7 +4203,7 @@ function bookingPayloadFromForm(form) {
     deposit,
     discountCode: appliedDiscount?.code || "",
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
-    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart) ? Boolean(data.get("shampooDeclineAcknowledgement")) : false,
+    shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart) ? Boolean(data.get("shampooDeclineAcknowledgement")) : cartShampooDeclineAcknowledged,
     friendTest: friendTestSnapshot(true)
   };
 }

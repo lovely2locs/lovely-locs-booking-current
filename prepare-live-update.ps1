@@ -36,6 +36,7 @@ $files = @(
   "VERSION_HISTORY.md",
   "payment-platform-plan.md",
   "qa-test.js",
+  "reward-flow-test.js",
   "OPEN_WEBSITE.bat",
   "PREPARE_LIVE_UPDATE.bat",
   "prepare-live-update.ps1",

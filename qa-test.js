@@ -530,7 +530,7 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(elements.advisoryModal.classList.contains("open"), "advisory modal did not open");
   context.handleRetwistAnswer("overdue");
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference should open after overdue answer");
-  context.handleProductPreference("Jamaican Mango & Lime Locking Gel");
+  context.handleProductPreference("Gel");
   context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(!elements.advisoryModal.classList.contains("open"), "advisory modal did not close");
@@ -538,8 +538,8 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(html.includes("Overdue Retwist (4+ Months)"), "overdue retwist was not selected");
   assert(html.includes("$125"), "overdue retwist price was not applied");
   assert(html.includes("Because your last retwist was 4+ months ago"), "price-change explanation missing");
-  assert(html.includes("Base product: Jamaican Mango & Lime Locking Gel"), "base product preference missing from cart");
-  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Jamaican Mango & Lime Locking Gel"), "base product preference missing from booking summary");
+  assert(html.includes("Base product: Gel"), "base product preference missing from cart");
+  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Gel"), "base product preference missing from booking summary");
 });
 
 test("maintenance services ask for base product preference before cart", () => {
@@ -547,12 +547,12 @@ test("maintenance services ask for base product preference before cart", () => {
   assert(elements.productPreferenceModal.classList.contains("open"), "product preference modal did not open");
   assert(appHtml().includes("Bring Your Own Product"), "bring your own product preference missing from modal");
   assert(appHtml().includes("Loctician's Preference"), "loctician preference missing from modal");
-  context.handleProductPreference("Taliah Waajid Lock It Up");
+  context.handleProductPreference("Foam");
   context.finishEnhancementAppointment(false);
   const html = appHtml();
   assert(html.includes("Children Retwist (Maintenance)"), "maintenance service was not added after product choice");
-  assert(html.includes("Base product: Taliah Waajid Lock It Up"), "selected base product missing from cart");
-  assert(html.includes("Children Retwist (Maintenance) - Taliah Waajid Lock It Up"), "selected base product missing from summary");
+  assert(html.includes("Base product: Foam"), "selected base product missing from cart");
+  assert(html.includes("Children Retwist (Maintenance) - Foam"), "selected base product missing from summary");
 });
 
 test("maintenance services can use bring your own product or loctician preference", () => {
@@ -640,7 +640,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   context.window.location.hash = "";
   context.render(context.currentRoute());
   context.openProductPreference({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", includedAddOnIds: ["style-addon"] });
-  context.handleProductPreference("Jamaican Mango & Lime Locking Gel");
+  context.handleProductPreference("Gel");
   let html = appHtml();
   assert(html.includes("Enhance Your Appointment"), "recommendation step title missing");
   assert(html.includes("Add-Ons & More"), "permanent Add-Ons category should still render");
@@ -655,7 +655,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
 
 test("loc sprinkles collect required preferences from add-ons and recommendations", () => {
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel" });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel" });
   const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 15, duration: "30 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
   context.openSprinklePreference(directSprinkles, "cart");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
@@ -673,7 +673,7 @@ test("direct add-on selection requires a compatible maintenance service", () => 
   let html = appHtml();
   assert(html.includes("must be attached to an eligible maintenance service"), "standalone add-on should explain the maintenance requirement");
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel", includedAddOnIds: ["style-addon"] });
   context.addServiceFromAdvisory({ id: "loc-trim", type: "service", name: "Loc Trim", price: 10, duration: "20 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] });
   html = appHtml();
   assert(html.includes("Loc Trim"), "compatible add-on should remain selectable after a maintenance service");
@@ -681,7 +681,7 @@ test("direct add-on selection requires a compatible maintenance service", () => 
 });
 test("booking form has required client fields", () => {
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel", includedAddOnIds: ["style-addon"] });
   context.window.location.hash = "";
   context.render(context.currentRoute());
   const html = appHtml();
@@ -948,7 +948,7 @@ test("booking submission requires policy acknowledgement", async () => {
 
 test("booking submission requires shampoo prep acknowledgement when shampoo is declined", async () => {
   context.clearCart();
-  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Jamaican Mango & Lime Locking Gel", includedAddOnIds: ["style-addon"] });
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel", includedAddOnIds: ["style-addon"] });
   context.lastAlert = "";
   elements.bookingForm.reportValidity = () => true;
   elements.policyAcknowledgement.checked = true;

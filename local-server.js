@@ -67,22 +67,23 @@ const defaultSiteSettings = {
 };
 
 const serviceCatalog = [
-  { id: "shampoo-service", duration: "30 min", price: 0, priceLabel: "Eligibility confirmed", name: "Shampoo Service", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "shampoo-service", duration: "30 min", price: 0, priceLabel: "Add-on service", name: "Shampoo Service", category: "add-ons" },
+  { id: "acv-deep-cleanse", duration: "45 min", price: 0, priceLabel: "Add-on service", name: "ACV Deep Cleanse", category: "add-ons" },
   { id: "loc-trim", duration: "20 min", price: 10, name: "Loc Trim", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
-  { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
   { id: "emergency-fee", duration: "3h", price: 45, name: "Emergency Fee", category: "add-ons" },
   { id: "children-instant-starter", duration: "5h", price: 150, name: "Children Instant Starter Locs", category: "starter-locs" },
   { id: "medium-adult-starter", duration: "6h 30min", price: 150, name: "Medium Adult Starter Locs", category: "starter-locs" },
   { id: "adult-retwist", duration: "3h 30min", price: 90, name: "Adult Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "sprinkle-install", duration: "2h 15min", price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
   { id: "children-retwist", duration: "3h", price: 75, name: "Children Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "adult-instant", duration: "5h 30min", price: 125, name: "Adult Instant Locs", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "child-instant", duration: "3h 30min", price: 85, name: "Children's Instant Loc", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "referral-retwist", duration: "3h 30min", price: 75, name: "Referral (Retwist)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "style-addon", duration: "1h 30min", price: 30, name: "Basic Style", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "consultation", duration: "1h 15min", price: 30, name: "Consultation", category: "add-ons" },
-  { id: "loc-repair", duration: "30 min", price: 0, priceLabel: "Quote after review", name: "Loc Repair", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "loc-repair", duration: "30 min", price: 3, priceLabel: "$3 per loc", name: "Loc Repair", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "small-adult-starter", duration: "5h 30min", price: 225, name: "Small Adult Starter Locs", category: "starter-locs" },
   { id: "overdue-retwist", duration: "4-5 hours", price: 125, name: "Overdue Retwist (4+ Months)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "admin-test-booking", duration: "15 min", price: 0, name: "Free Admin Test Booking", category: "admin-test" },
@@ -205,7 +206,8 @@ function bookingText(booking) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
-      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
+      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${item.partingFee})` : ""}` : "",
+      sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : "",
     ].filter(Boolean).join("; ");
     return `- ${item.name} ($${item.price}${details ? ` | ${details}` : ""})`;
   });
@@ -269,7 +271,8 @@ function serviceSummaryHtml(booking) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
-      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+$${item.partingFee})` : ""}` : "",
+      item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${item.partingFee})` : ""}` : "",
+      sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : "",
     ].filter(Boolean).join(" • ");
     return `<li style="margin:0 0 8px;color:#3b2821;"><strong>${escapeHtml(item.name)}</strong>${details ? `<br><span style="color:#7a6257;">${escapeHtml(details)}</span>` : ""}</li>`;
   }).join("");
@@ -1665,6 +1668,34 @@ function isMainAppointmentService(item = {}) {
   return item.type === "service" && item.category !== "add-ons" && item.category !== "admin-test";
 }
 
+function cleanSprinklePreference(value = "") {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 120);
+}
+
+function normalizeSprinklePreferences(input = {}) {
+  const source = input && typeof input === "object" ? input : {};
+  const preferences = (Array.isArray(source.preferences) ? source.preferences : [source.preferenceOne, source.preferenceTwo])
+    .map(cleanSprinklePreference)
+    .filter(Boolean);
+  const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
+  return { preferences, notes };
+}
+
+function validatedSprinklePreferences(input = {}, serviceName = "Loc Sprinkles") {
+  const details = normalizeSprinklePreferences(input);
+  if (!details.preferences.length) throw new Error(`Color and preference notes are required for ${serviceName}.`);
+  if (details.preferences.length > 2) throw new Error(`The base price for ${serviceName} includes up to two color or preference choices.`);
+  return details;
+}
+
+function sprinklePreferencesSummary(item = {}) {
+  const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
+  const parts = [];
+  if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
+  if (details.notes) parts.push(`Notes: ${details.notes}`);
+  return parts.join("; ");
+}
+
 function addOnCompatibilityIssue(addOn = {}, cart = []) {
   if (!addOn.requiresMainService) return "";
   const compatibleCategories = Array.isArray(addOn.compatibleMainCategories) ? addOn.compatibleMainCategories : [];
@@ -1688,10 +1719,14 @@ function pricedCartItem(item = {}) {
     if (exactService.category === "loc-maintenance" && !allowedBaseProducts.has(item.baseProduct)) {
       throw new Error(`Base product preference is required for ${exactService.name}.`);
     }
+    const sprinklePreferences = exactService.requiresSprinklePreferences
+      ? validatedSprinklePreferences(item.sprinklePreferences, exactService.name)
+      : undefined;
     return {
       ...exactService,
       type: "service",
       baseProduct: allowedBaseProducts.has(item.baseProduct) ? item.baseProduct : undefined,
+      ...(sprinklePreferences ? { sprinklePreferences } : {}),
     };
   }
 
@@ -2359,7 +2394,7 @@ async function handleManualPaymentConfirm(req, res) {
       }
       sendHtml(res, 404, ownerConfirmPageHtml({
         title: "Booking not found",
-        intro: "No matching Lovely Locs booking was found for this confirmation link. Double-check the booking ID from the pay-options page or payment note.",
+        intro: "No matching Lovely Locs booking was found for this confirmation link. Open the owner confirmation email link again so the booking ID is captured automatically, or double-check the booking ID from the pay-options page or payment note.",
         bookingId,
         adminUrl,
       }));

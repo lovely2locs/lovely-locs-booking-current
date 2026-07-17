@@ -271,7 +271,7 @@ test("products route renders products and cart", () => {
   assert(html.includes("product-visual"), "product visual badges missing");
   assert(html.includes("Locsanity Rosewater & Peppermint Spray"), "recommended loc product missing");
   assert((html.match(/Add to Cart/g) || []).length >= 4, "product add buttons missing");
-  assert(html.includes("Your Cart"), "cart markup missing");
+  assert(html.includes("Review Cart"), "cart markup missing");
 });
 
 test("version route renders rollback options", () => {
@@ -472,9 +472,11 @@ test("adding a service updates cart and booking modal", () => {
   assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
   assert(html.includes("I agree to receive text messages from Lovely Locs about my booking"), "booking modal SMS consent wording missing");
   assert(html.includes("deposit/payment updates"), "booking modal SMS payment-update scope missing");
-  assert(html.includes("Finalize Cart &amp; Enter Details"), "final cart CTA missing");
+  assert(html.includes("Continue to Appointment Details"), "cart review CTA missing");
   assert(html.includes("Client sign in / saved details"), "cart saved-details link missing");
   assert(html.includes("Promo Code"), "cart promo field missing");
+  assert(html.includes("Checkout Step 1"), "mobile cart review summary missing");
+  assert(html.includes("Deposit due before confirmation"), "cart review deposit summary missing");
   assert(!html.includes("data-email-promo"), "promo email-for-later control should be removed from checkout card");
   assert(!html.includes("Email Code For Later"), "promo email-for-later label should be removed from checkout card");
 });
@@ -616,7 +618,7 @@ test("maintenance services require shampoo choice before cart", () => {
     context.handleShampooPreference("decline");
     context.finishEnhancementAppointment(false);
     html = appHtml();
-    assert(html.includes("Shampoo preference saved"), "cart should show saved shampoo preference");
+    assert(html.includes("Saved choices"), "cart should show saved shampoo preference");
     assert(html.includes("Shampoo: Client will arrive freshly shampooed."), "cart should show declined shampoo detail");
     assert(!html.includes('name="shampooDeclineAcknowledgement"'), "checkout should not ask again after shampoo preference acknowledgement");
   } finally {
@@ -1347,12 +1349,13 @@ test("service cards stay compact while showing details", () => {
   assert(html.includes("Aftercare guidance") || html.includes("Retwist care"), "service detail text missing");
 });
 
-test("mobile cart uses one roomy full-height scroll area", () => {
+test("mobile cart starts with a compact review step", () => {
   const styles = fs.readFileSync("styles.css", "utf8");
   assert(styles.includes("height: 100dvh"), "mobile cart should fill the available phone height");
   assert(styles.includes("overscroll-behavior: contain"), "mobile cart should contain its page scroll");
-  assert(styles.includes(".cart-items {\n    flex: none;\n    overflow: visible;"), "mobile cart items should not collapse into a short nested scroller");
-  assert(styles.includes("min-height: 112px"), "mobile cart item cards should preserve enough room for item details");
+  assert(styles.includes(".cart-checkout-summary {\n    display: grid;"), "mobile cart should show the first-screen review summary");
+  assert(styles.includes("position: sticky"), "mobile cart totals should stay reachable while reviewing items");
+  assert(styles.includes(".cart-saved-details p {\n    display: none;"), "mobile cart should hide saved-detail helper copy");
 });
 
 test("dark mode primary buttons keep readable contrast", () => {

@@ -67,8 +67,9 @@ const defaultSiteSettings = {
 };
 
 const serviceCatalog = [
-  { id: "shampoo-service", duration: "30 min", price: 0, priceLabel: "Add-on service", name: "Shampoo Service", category: "add-ons" },
-  { id: "acv-deep-cleanse", duration: "45 min", price: 0, priceLabel: "Add-on service", name: "ACV Deep Cleanse", category: "add-ons" },
+  { id: "shampoo-service", duration: "30 min", price: 15, name: "Shampoo Service", description: "Standard shampoo cleanse add-on for clients who want Lovely Locs to shampoo their scalp and locs before the booked service.", category: "add-ons" },
+  { id: "acv-clarifying-wash", duration: "45 min", price: 25, name: "ACV Clarifying Wash", description: "Apple cider vinegar clarifying wash for light buildup, oils, or product residue that needs a deeper cleanse than a standard shampoo.", category: "add-ons" },
+  { id: "full-acv-buildup-removal", duration: "1h", price: 40, name: "Full ACV Buildup Removal Service", description: "Full ACV buildup removal for heavier product buildup, lint, odor, or residue before styling or maintenance begins.", category: "add-ons" },
   { id: "loc-trim", duration: "20 min", price: 10, name: "Loc Trim", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "sprinkles-addon", duration: "30 min", price: 15, name: "Loc Sprinkles (Add On)", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
   { id: "emergency-fee", duration: "3h", price: 45, name: "Emergency Fee", category: "add-ons" },

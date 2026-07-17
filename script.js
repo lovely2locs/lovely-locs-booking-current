@@ -987,6 +987,15 @@ function serviceWithCartFields(service = {}) {
   return { ...service, type: "service" };
 }
 
+function cartItemDetailTags(item = {}) {
+  return [
+    item.baseProduct ? `Base product: ${item.baseProduct}` : "",
+    item.shampooDeclined ? "Shampoo: Client will arrive freshly shampooed." : "",
+    item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}` : "",
+    sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : ""
+  ].filter(Boolean);
+}
+
 function requiresSprinklePreferences(service = {}) {
   return Boolean(service?.requiresSprinklePreferences);
 }
@@ -2374,28 +2383,45 @@ function cartMarkup() {
   const subtotal = cartSubtotal();
   const discountAmount = discountAmountForTotal(subtotal);
   const total = discountedCartTotal();
+  const deposit = bookingDeposit(total);
   const promoValue = appliedDiscount?.code || "";
+  const itemLabel = count === 1 ? "item" : "items";
+  const statusMessages = [advisoryMessage, baseProductMessage, shampooMessage, partingMessage, addOnCompatibilityMessage].filter(Boolean);
   return `
     <button class="cart-button" id="cartButton">Cart ${count ? `(${count})` : ""}</button>
     <div class="cart" id="cart">
       <div class="cart-backdrop" data-close-cart></div>
       <aside class="cart-panel">
-        <div class="cart-head"><span>Your Cart</span><button data-close-cart>x</button></div>
+        <div class="cart-head"><span>Review Cart</span><button data-close-cart>x</button></div>
+        ${cart.length ? `
+          <section class="cart-checkout-summary" aria-label="Checkout step one">
+            <span>Checkout Step 1</span>
+            <h2>Your Cart (${count})</h2>
+            <div class="cart-summary-row"><span>Order total</span><strong>${money(total)}</strong></div>
+            <div class="cart-summary-row"><span>Deposit due before confirmation</span><strong>${money(deposit)}</strong></div>
+            <button class="primary-btn" data-open-booking>Continue to Appointment Details</button>
+            <p>${count} ${itemLabel} ready for review before service details and policies.</p>
+          </section>
+        ` : ""}
         <div class="cart-items">
-          ${advisoryMessage ? `<div class="cart-advisory"><strong>Service updated</strong><p>${advisoryMessage}</p></div>` : ""}
-          ${baseProductMessage ? `<div class="cart-advisory"><strong>Base product saved</strong><p>${baseProductMessage}</p></div>` : ""}
-          ${shampooMessage ? `<div class="cart-advisory"><strong>Shampoo preference saved</strong><p>${shampooMessage}</p></div>` : ""}
-          ${partingMessage ? `<div class="cart-advisory"><strong>Parting preference saved</strong><p>${partingMessage}</p></div>` : ""}
-          ${addOnCompatibilityMessage ? `<div class="cart-advisory"><strong>Add-on needs a main service</strong><p>${addOnCompatibilityMessage}</p></div>` : ""}
-          ${cart.length ? cart.map(item => `
+          ${statusMessages.length ? `<div class="cart-advisory compact"><strong>Saved choices</strong><p>${statusMessages.map(escapeAttr).join(" ")}</p></div>` : ""}
+          ${cart.length ? cart.map(item => {
+            const tags = cartItemDetailTags(item);
+            return `
             <div class="cart-item">
-              <div><strong>${item.name}</strong><p class="duration">${item.duration || "Accessory"}</p>${item.description ? `<p class="cart-item-description">${item.description}</p>` : ""}${item.priceLabel ? `<p class="duration">${item.priceLabel}</p>` : ""}${item.baseProduct ? `<p class="duration">Base product: ${item.baseProduct}</p>` : ""}${item.shampooDeclined ? `<p class="duration">Shampoo: Client will arrive freshly shampooed.</p>` : ""}${item.partingPreference ? `<p class="duration">Parting: ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}</p>` : ""}${sprinklePreferencesSummary(item) ? `<p class="duration">Sprinkles: ${escapeAttr(sprinklePreferencesSummary(item))}</p>` : ""}<p>${servicePriceText(item)}</p></div>
+              <div class="cart-item-main">
+                <div class="cart-item-heading"><strong>${item.name}</strong><span>${servicePriceText(item)}</span></div>
+                <p class="duration">${item.duration || "Accessory"}${item.priceLabel ? ` | ${item.priceLabel}` : ""}</p>
+                ${tags.length ? `<div class="cart-item-tags">${tags.map(tag => `<span>${escapeAttr(tag)}</span>`).join("")}</div>` : ""}
+                ${item.description ? `<details class="cart-item-details"><summary>Details</summary><p class="cart-item-description">${item.description}</p></details>` : ""}
+              </div>
               <button class="modal-close" data-remove="${item.id}">x</button>
             </div>
-          `).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
+          `}).join("") : `<p class="section-subtitle">Your cart is empty.</p>`}
         </div>
         ${cart.length ? `
-          <div class="promo-box">
+          <details class="promo-box cart-collapsible">
+            <summary>Promo Code</summary>
             <label>Promo Code<input id="promoCodeInput" value="${promoValue}" placeholder="Enter promo code"></label>
             <div class="promo-actions">
               <button type="button" data-apply-promo>Apply</button>
@@ -2403,17 +2429,17 @@ function cartMarkup() {
             </div>
             ${appliedDiscount ? `<p class="promo-status success">${appliedDiscount.code} applied: ${appliedDiscount.percent}% off. ${discountExpiryText(appliedDiscount)}.</p>` : `<p class="promo-status" id="promoStatus">Enter an active Lovely Locs promo code before booking.</p>`}
 
-          </div>
+          </details>
           <div class="cart-total">
             <div class="service-top"><strong>Subtotal</strong><strong>${money(subtotal)}</strong></div>
             ${discountAmount ? `<div class="service-top discount-total"><strong>Promo Discount</strong><strong>-${money(discountAmount)}</strong></div>` : ""}
             <div class="service-top"><strong>Total</strong><strong>${money(total)}</strong></div>
             <div class="cart-saved-details">
-              <strong>${savedClientProfile ? "Your saved details are ready" : bookingDraft ? "Your checkout details are saved" : "Make future bookings faster"}</strong>
-              <p>${bookingDraft ? "You can refresh or add another item without starting over." : "Use your booking email and phone to load or manage saved details."}</p>
-              <button type="button" data-open-client-settings>${savedClientProfile ? "Manage saved details" : "Client sign in / saved details"}</button>
+              <strong>${savedClientProfile ? "Saved details ready" : bookingDraft ? "Checkout details saved" : "Saved details"}</strong>
+              <p>${bookingDraft ? "Your draft stays saved while you review." : "Sign in with your booking email and phone."}</p>
+              <button type="button" data-open-client-settings>${savedClientProfile ? "Manage" : "Client sign in / saved details"}</button>
             </div>
-            <button class="primary-btn" data-open-booking>Finalize Cart &amp; Enter Details</button>
+            <button class="primary-btn" data-open-booking>Continue to Appointment Details</button>
           </div>
         ` : ""}
       </aside>

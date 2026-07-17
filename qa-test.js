@@ -1124,7 +1124,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("cash-app"), "Cash App manual payment option missing");
   assert(server.includes("https://cash.app/$TimasLovelyLocs"), "Cash App tag link missing");
   assert(server.includes("notifyManualPaymentPending"), "manual pending owner notification missing");
+  assert(server.includes("depositRequestEmail"), "initial deposit request client email missing");
   assert(server.includes("notifyManualDepositPaid"), "manual deposit confirmation notifier missing");
+  assert(server.includes("notifyManualDepositReleased"), "manual unpaid release client notifier missing");
   assert(server.includes("brandEmailHtml"), "branded email HTML template missing");
   assert(server.includes("emailLogoUrl"), "email logo asset missing");
   assert(server.includes("Your loc time is confirmed"), "relaxed confirmation email copy missing");
@@ -1132,6 +1134,10 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("Share My Referral Link"), "confirmation email referral share button missing");
   assert(server.includes("Your personal referral code:"), "confirmation email referral code text missing");
   assert(server.includes("Take a breath"), "warm confirmation email intro missing");
+  assert(server.includes("Your Lovely Locs deposit step is ready"), "initial deposit email subject missing");
+  assert(server.includes("Your official appointment confirmation is sent after Lovely Locs verifies the matching receipt."), "initial deposit email should explain official confirmation timing");
+  assert(server.includes("Shampoo: Client will arrive freshly shampooed"), "email service details should include shampoo decline state");
+  assert(server.includes("Shampoo preparation acknowledgement: Client confirmed they must arrive freshly shampooed after declining Shampoo Service."), "email text should include shampoo acknowledgement");
   assert(server.includes("html: options.html"), "Resend HTML email payload missing");
   assert(server.includes("gmailComposeUrl"), "email compose fallback missing");
   assert(server.includes("gmailDraftUrl"), "client confirmation email draft link missing");
@@ -1266,6 +1272,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(script.includes("notificationResultsHtml"), "HTML notification result renderer missing");
   assert(script.includes("Open email draft for client confirmation"), "admin email draft fallback link missing");
   assert(script.includes("clientEmail: not delivered automatically"), "client email blocked status should be explicit");
+  assert(script.includes("notificationResultsHtml(result.notificationResults)"), "release result should render provider results as HTML");
   assert(script.includes("Owner delivery target is configured."), "admin readiness should confirm owner email without exposing the raw address");
   assert(!script.includes("Owner email target:"), "admin readiness should not expose the raw owner email target");
   assert(script.includes("Open the owner confirmation link from the deposit confirmation email to automatically fill the booking ID"), "manual deposit instructions should explain automatic booking ID capture from the email link");

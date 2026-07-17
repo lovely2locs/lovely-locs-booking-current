@@ -203,6 +203,8 @@ test("home renders core client sections", () => {
   assert(!html.includes("Eligibility confirmed"), "old shampoo eligibility text should not render");
   assert(html.includes("Loc Trim"), "Loc Trim add-on missing");
   assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation add-on missing");
+  assert(html.includes("Maintenance add-on includes up to two locs with jewels on hand or jewels provided by the client"), "Loc Sprinkles add-on description missing included jewel wording");
+  assert(html.includes("Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15"), "Loc Sprinkles custom jewelry fee wording missing");
   assert(html.includes("Basic Style"), "Basic Style add-on missing");
   assert(html.includes("Loc Repair"), "Loc Repair add-on missing");
   assert(html.includes("$3 per loc"), "Loc Repair should show the per-loc price");
@@ -719,7 +721,9 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   assert(html.includes("Enhance Your Appointment"), "recommendation step title missing");
   assert(html.includes("Add-Ons & More"), "permanent Add-Ons category should still render");
   assert(html.includes("Loc Trim"), "Loc Trim should be recommended when compatible");
-  assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation should be recommended when compatible");
+  assert(html.includes("Loc Sprinkles (Add On)"), "Loc Sprinkles add-on should be recommended when compatible");
+  assert(html.includes("1h | $20"), "Loc Sprinkles maintenance add-on should show 1h and $20 in recommendations");
+  assert(!html.includes("2h 15min | Starting at $50"), "standalone Loc Sprinkles install should not be recommended as a maintenance add-on");
   assert(!html.includes("Shampoo Service</h3>"), "Shampoo should not be recommended after maintenance configuration");
   assert(!html.includes("Basic Style</h3>"), "included Basic Style should not be recommended");
   const recommendationCount = (html.match(/class="enhancement-card"/g) || []).length;
@@ -730,7 +734,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
 test("loc sprinkles collect required preferences from add-ons and recommendations", () => {
   context.clearCart();
   context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel" });
-  const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 15, duration: "30 min", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
+  const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 20, duration: "1h", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
   context.openSprinklePreference(directSprinkles, "cart");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
   context.closeSprinklePreference();
@@ -1307,6 +1311,8 @@ test("server validates loc sprinkles preference rules", () => {
   assert(server.includes("requiresSprinklePreferences: true"), "sprinkles services should require preferences server-side");
   assert(server.includes("Color and preference notes are required"), "server should reject sprinkles without preferences");
   assert(server.includes("includes up to two color or preference choices"), "server should cap base sprinkles preferences at two");
+  assert(server.includes('id: "sprinkles-addon", duration: "1h", price: 20'), "server should trust the $20 one-hour Loc Sprinkles add-on");
+  assert(server.includes("jewelry purchased specifically for your order start at an additional $15"), "server should mirror custom jewelry fee wording");
   assert(server.includes('priceLabel: "$3 per loc"'), "server loc repair should use $3 per loc label");
 });
 

@@ -214,6 +214,7 @@ function bookingText(booking) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
+      item.shampooDeclined ? "Shampoo: Client will arrive freshly shampooed" : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${item.partingFee})` : ""}` : "",
       sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : "",
     ].filter(Boolean).join("; ");
@@ -249,8 +250,9 @@ function bookingText(booking) {
     `Notes: ${booking.client?.specialRequests || "No special requests added."}`,
     "",
     "Policy acknowledgement: Client confirmed they read the Lovely Locs policies.",
+    booking.shampooDeclineAcknowledgement ? "Shampoo preparation acknowledgement: Client confirmed they must arrive freshly shampooed after declining Shampoo Service." : "",
     "Studio note: Address is shared after booking and deposit are confirmed.",
-  ].join("\n");
+  ].filter(line => line !== "").join("\n");
 }
 
 function escapeHtml(value = "") {
@@ -279,6 +281,7 @@ function serviceSummaryHtml(booking) {
     const details = [
       item.duration ? `Time: ${item.duration}` : "",
       item.baseProduct ? `Base product: ${item.baseProduct}` : "",
+      item.shampooDeclined ? "Shampoo: Client will arrive freshly shampooed" : "",
       item.partingPreference ? `Parting: ${item.partingPreference}${item.partingFee ? ` (+${item.partingFee})` : ""}` : "",
       sprinklePreferencesSummary(item) ? `Sprinkles: ${sprinklePreferencesSummary(item)}` : "",
     ].filter(Boolean).join(" • ");
@@ -388,6 +391,85 @@ function confirmationEmail(booking, { test = false } = {}) {
   };
 }
 
+function depositRequestEmail(booking, payUrl) {
+  const title = "Your Lovely Locs deposit step is ready";
+  const intro = "Your appointment request was saved, but it is not finalized yet. Send the deposit through Venmo, Cash App, or Apple Pay and include your booking ID so Lovely Locs can match the receipt.";
+  const rows = [
+    { label: "Client", value: booking.client?.fullName },
+    { label: "Date", value: booking.client?.date },
+    { label: "Time", value: timeLabel(booking.client?.time) },
+    { label: "Booking ID", value: booking.id },
+    { label: "Deposit", value: `$${booking.deposit || 0}` },
+    { label: "Estimated Total", value: `$${booking.total || 0}` },
+  ];
+  const paymentOptions = paymentOptionsText(booking);
+  return {
+    text: [
+      title,
+      "",
+      intro,
+      "",
+      `Booking ID: ${booking.id}`,
+      `Date: ${booking.client?.date || ""}`,
+      `Time: ${timeLabel(booking.client?.time)}`,
+      `Deposit required: $${booking.deposit || 0}`,
+      `Pay options: ${payUrl}`,
+      "",
+      "Payment options:",
+      paymentOptions,
+      "",
+      "Your official appointment confirmation is sent after Lovely Locs verifies the matching receipt.",
+      "",
+      bookingText(booking),
+    ].join("\n"),
+    html: brandEmailHtml({
+      eyebrow: "Deposit Needed",
+      title,
+      intro,
+      rows,
+      services: serviceSummaryHtml(booking),
+      note: "Your official appointment confirmation is sent after Lovely Locs verifies the matching receipt.",
+      ctaUrl: payUrl,
+      ctaLabel: "Open Pay Options",
+    }),
+  };
+}
+
+function depositReleasedEmail(booking, reason) {
+  const title = "Your Lovely Locs appointment request was released";
+  const intro = "Lovely Locs did not receive a matching deposit for this appointment request, so the unpaid hold was released and the time is open for booking again.";
+  const rows = [
+    { label: "Client", value: booking.client?.fullName },
+    { label: "Date", value: booking.client?.date },
+    { label: "Time", value: timeLabel(booking.client?.time) },
+    { label: "Booking ID", value: booking.id },
+    { label: "Deposit", value: `$${booking.deposit || 0}` },
+  ];
+  return {
+    text: [
+      title,
+      "",
+      intro,
+      "",
+      `Booking ID: ${booking.id}`,
+      `Date: ${booking.client?.date || ""}`,
+      `Time: ${timeLabel(booking.client?.time)}`,
+      `Reason: ${reason}`,
+      "",
+      "You can submit a new appointment request from the Lovely Locs booking page when you are ready.",
+      "",
+      bookingText(booking),
+    ].join("\n"),
+    html: brandEmailHtml({
+      eyebrow: "Appointment Request Released",
+      title,
+      intro,
+      rows,
+      services: serviceSummaryHtml(booking),
+      note: reason,
+    }),
+  };
+}
 function ownerBookingEmail(booking, { title, intro, ctaUrl = "", ctaLabel = "" }) {
   const rows = [
     { label: "Client", value: booking.client?.fullName },
@@ -1906,6 +1988,8 @@ async function notifyDepositPaid(booking, session) {
 async function notifyManualPaymentPending(booking, req) {
   const details = bookingText(booking);
   const confirmLink = manualConfirmUrl(req, booking);
+  const payUrl = bookingPaymentOptionsUrl(booking);
+  const clientEmail = depositRequestEmail(booking, payUrl);
   const ownerText = [
     `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}.`,
     `Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}. Total estimate: $${booking.total}.`,
@@ -1928,6 +2012,7 @@ async function notifyManualPaymentPending(booking, req) {
   const results = [];
 
   for (const task of [
+    ["clientEmail", () => sendEmail(booking.client.email, "Your Lovely Locs deposit step is ready", clientEmail.text, { html: clientEmail.html })],
     ["ownerEmail", () => sendEmail(ownerEmail, `Lovely Locs deposit awaiting receipt: ${booking.client.fullName}`, ownerText, { html: ownerHtml })],
     ["ownerSms", () => sendSms(normalizePhone(ownerPhone), `Manual deposit pending for ${booking.client.fullName}: $${booking.deposit}. ${booking.client.date} ${timeLabel(booking.client.time)}. Confirm link: ${confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN."}`)],
   ]) {
@@ -1983,6 +2068,23 @@ async function notifyManualDepositPaid(booking, method) {
     clientEmailResult.fallback = "Client email was blocked by the provider. Open the email draft link to send the confirmation from the owner email.";
   }
 
+  return results;
+}
+
+async function notifyManualDepositReleased(booking, reason) {
+  const clientEmail = depositReleasedEmail(booking, reason);
+  const results = await runNotificationTasks([
+    ["clientEmail", () => sendEmail(booking.client.email, "Your Lovely Locs appointment request was released", clientEmail.text, { html: clientEmail.html })],
+  ]);
+  const clientEmailResult = results.find(result => result.channel === "clientEmail");
+  if (clientEmailResult?.failed) {
+    clientEmailResult.gmailDraftUrl = gmailComposeUrl(
+      booking.client.email,
+      "Your Lovely Locs appointment request was released",
+      clientEmail.text
+    );
+    clientEmailResult.fallback = "Client release email was blocked by the provider. Open the email draft link to send the release message from the owner email.";
+  }
   return results;
 }
 
@@ -2508,6 +2610,9 @@ async function handleManualPaymentRelease(req, res) {
       .reverse()
       .find(record => bookingRecordId(record) === bookingId && record.type === "manual.deposit.released_unpaid");
     if (existingRelease) {
+      const notificationResults = Array.isArray(existingRelease.notificationResults)
+        ? existingRelease.notificationResults
+        : [];
       sendJson(res, 200, {
         ok: true,
         bookingId,
@@ -2517,9 +2622,11 @@ async function handleManualPaymentRelease(req, res) {
           date: booking.client?.date || "",
           time: booking.client?.time || "",
         },
+        notificationResults,
       });
       return;
     }
+    const notificationResults = await notifyManualDepositReleased(booking, reason);
     appendBookingRecord({
       type: "manual.deposit.released_unpaid",
       bookingId,
@@ -2527,6 +2634,7 @@ async function handleManualPaymentRelease(req, res) {
       status: "released_unpaid",
       reason,
       releasedBy: "owner",
+      notificationResults,
     });
     sendJson(res, 200, {
       ok: true,
@@ -2537,6 +2645,7 @@ async function handleManualPaymentRelease(req, res) {
         date: booking.client?.date || "",
         time: booking.client?.time || "",
       },
+      notificationResults,
       message: "Unpaid hold released. The appointment time can be booked again.",
     });
   } catch (error) {

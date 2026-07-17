@@ -132,10 +132,10 @@ const context = {
           slot: 1,
           automatic: true,
           completedCheckpoints: 0,
-          totalCheckpoints: 8,
+          totalCheckpoints: 7,
           percentComplete: 0,
           complete: false,
-          missing: ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"],
+          missing: ["home", "services", "products", "policies", "contact", "privacy", "terms"],
           bookingSubmitted: true
         },
         referralCode: "LOVELYLOCS/TESTCLIENT",
@@ -156,8 +156,6 @@ const context = {
     ["adminToken", "OWNER-TEST-TOKEN"],
     ["referredByCode", "lovelylocs/Test Client"],
     ["emergencySlot", ""],
-    ["preferredContact", "text_email"],
-    ["smsOptIn", "on"],
     ["specialRequests", "Test booking notes"],
     ["shampooDeclineAcknowledgement", "on"],
     ["policyAcknowledgement", "on"]
@@ -241,7 +239,7 @@ test("site shell keeps public policy links in the left menu and hides owner admi
   assert(html.includes('href="#client-settings?mode=signup" data-route="client-settings" data-auth-nav="signup">Sign Up'), "sign up link missing from site shell");
   assert(html.includes('href="#client-settings?mode=login" data-route="client-settings" data-auth-nav="login">Login'), "login link missing from site shell");
   assert(html.includes('data-auth-nav="logout" hidden>Log Out'), "logout link should stay hidden by default");
-  for (const route of ["policies", "contact", "privacy", "sms-opt-in"]) {
+  for (const route of ["policies", "contact", "privacy"]) {
     assert(!nav.includes(`data-route="${route}"`), `${route} should not remain in the top navigation`);
     assert(drawerMarkup.includes(`data-route="${route}"`), `${route} should remain in the left menu`);
   }
@@ -376,14 +374,14 @@ test("friend test invite tracks checkpoints and unlocks the checkout Easter egg"
 
   context.window.location.hash = "#services";
   context.render(context.currentRoute());
-  for (const route of ["products", "policies", "contact", "privacy", "sms-opt-in", "terms"]) {
+  for (const route of ["products", "policies", "contact", "privacy", "terms"]) {
     context.window.location.hash = `#${route}`;
     context.render(context.currentRoute());
   }
 
   const state = JSON.parse(localStore.get("lovelyLocsFriendTest") || "{}");
   assert(state.code === "LL-FRIEND-01", "friend-test invite code was not stored");
-  assert(state.visited.length === 8, "all friend-test checkpoints should be recorded once");
+  assert(state.visited.length === 7, "all friend-test checkpoints should be recorded once");
   const snapshot = context.friendTestSnapshot(true);
   assert(snapshot.complete, "complete friend-test journey should be recognized");
   assert(snapshot.percentComplete === 100, "complete friend-test journey should report 100 percent");
@@ -419,18 +417,18 @@ test("contact route renders public business contact", () => {
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes("lvlc.support@lovelylocsnc.com"), "email missing");
-  assert(html.includes("(336)-471-1098"), "phone missing");
+  assert(!html.includes("Text (336)-471-1098"), "public text contact should be removed");
   assert(html.includes("Piedmont Triad"), "location missing");
 });
 
-test("privacy and terms routes render SMS safeguards", () => {
+test("privacy and terms routes render email-only contact policy", () => {
   context.window.location.hash = "#privacy";
   context.render(context.currentRoute());
   let html = appHtml();
   assert(html.includes("Privacy Policy"), "privacy page missing");
-  assert(html.includes("does not sell, rent, or share SMS opt-in data"), "SMS no-sharing privacy language missing");
-  assert(html.includes("appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates"), "privacy transactional SMS scope missing");
-  assert(html.includes("replying STOP"), "privacy opt-out language missing");
+  assert(html.includes("optional phone number"), "privacy should describe phone as optional");
+  assert(!html.includes("SMS Privacy"), "privacy should not show SMS consent language while texting is unavailable");
+  assert(!html.includes("replying STOP"), "privacy should not show SMS opt-out instructions while texting is unavailable");
 
   context.window.location.hash = "#terms";
   context.render(context.currentRoute());
@@ -442,28 +440,8 @@ test("privacy and terms routes render SMS safeguards", () => {
   assert(html.includes("must be disclosed before services begin"), "pre-service allergy disclosure terms missing");
   assert(html.includes("not responsible for reactions, irritation, damage, or other issues caused by information that was not shared"), "undisclosed allergy liability terms missing");
   assert(html.includes("quality work cannot be rushed"), "unrushed timing terms missing");
-  assert(html.includes("including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates"), "terms transactional SMS scope missing");
-  assert(!html.includes("campaign messages"), "terms should not include SMS campaign consent");
+  assert(!html.includes("SMS Terms"), "terms should not show SMS consent language while texting is unavailable");
 });
-
-test("sms opt-in route renders consent proof form", () => {
-  context.window.location.hash = "#sms-opt-in";
-  context.render(context.currentRoute());
-  const html = appHtml();
-  assert(html.includes("SMS Opt-In"), "sms opt-in page missing");
-  assert(html.includes("Lovely Locs Text Message Opt-In"), "sms consent form heading missing");
-  assert(html.includes("Coming Soon"), "sms opt-in page should mark text messaging as coming soon");
-  assert(html.includes("Text service is not active yet"), "sms opt-in page should explain current text availability");
-  assert(html.includes("appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates"), "transactional opt-in scope missing");
-  assert(html.includes('name="smsConsent" type="checkbox"'), "sms consent checkbox missing");
-  assert(!html.includes('name="smsConsent" type="checkbox" checked'), "sms consent checkbox must not be preselected");
-  assert(html.includes("Message frequency varies"), "message frequency disclosure missing");
-  assert(html.includes("Reply STOP to opt out"), "STOP disclosure missing");
-  assert(html.includes("HELP for help"), "HELP disclosure missing");
-  assert(!html.includes("loc care tips"), "sms opt-in proof should not include loc care marketing language");
-  assert(!html.includes("referral updates"), "sms opt-in proof should not include referral marketing language");
-});
-
 test("adding a service updates cart and booking modal", () => {
   context.clearClientProfile();
   context.window.location.hash = "";
@@ -473,8 +451,7 @@ test("adding a service updates cart and booking modal", () => {
   assert(html.includes("Cart (1)"), "cart count did not update");
   assert(html.includes("Services: QA Service"), "booking modal did not use selected service");
   assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
-  assert(html.includes("I agree to receive text messages from Lovely Locs about my booking"), "booking modal SMS consent wording missing");
-  assert(html.includes("deposit/payment updates"), "booking modal SMS payment-update scope missing");
+  assert(!html.includes("I agree to receive text messages from Lovely Locs about my booking"), "booking modal SMS consent wording should be removed");
   assert(html.includes("Continue to Appointment Details"), "cart review CTA missing");
   assert(html.includes("Client sign in / saved details"), "cart saved-details link missing");
   assert(html.includes("Promo Code"), "cart promo field missing");
@@ -682,7 +659,7 @@ test("route links include policies and explicit route handling", () => {
   assert(html.includes('href="#policies" data-route="policies"'), "header policies link should have explicit route data");
   assert(html.includes('href="#privacy" data-route="privacy"'), "privacy link should have explicit route data");
   assert(html.includes('href="#terms" data-route="terms"'), "terms link should have explicit route data");
-  assert(html.includes('href="#sms-opt-in" data-route="sms-opt-in"'), "sms opt-in link should have explicit route data");
+  assert(!html.includes('href="#sms-opt-in" data-route="sms-opt-in"'), "sms opt-in link should be removed while texting is unavailable");
   assert(script.includes('document.querySelectorAll("[data-route]")'), "route link handler missing");
   context.window.location.hash = "#policies";
   context.render(context.currentRoute());
@@ -794,7 +771,8 @@ test("booking form has required client fields", () => {
   const html = appHtml();
   assert(html.includes('name="fullName" required'), "full name not required");
   assert(html.includes('name="email" required'), "email not required");
-  assert(html.includes('name="phone" required'), "phone not required");
+  assert(html.includes('name="phone"'), "phone field missing");
+  assert(!html.includes('name="phone" required'), "phone should be optional while texting is unavailable");
   assert(html.includes('name="date" required'), "date not required");
   assert(html.includes("Appointment Date"), "appointment date label missing");
   assert(html.includes('class="appointment-date-field"'), "appointment date should use the calendar picker wrapper");
@@ -823,20 +801,15 @@ test("booking form has required client fields", () => {
   assert(!html.includes("Purple time slots are regular open appointment times"), "long color explanation should not remain in before-submit copy");
   assert(html.includes('aria-pressed="false"') || html.includes("time-slot-placeholder"), "time slots should expose selected state accessibly");
   assert(html.includes("Emergency proposal"), "emergency slot legend missing");
-  assert(html.includes('name="preferredContact"'), "preferred contact selector missing");
-  assert(html.includes('name="smsOptIn"'), "optional communications opt-in checkbox missing");
-  assert(html.includes("I agree to receive text messages from Lovely Locs about my booking"), "transactional SMS consent copy missing");
-  assert(!html.includes('name="marketingEmailOptIn"'), "marketing email checkbox should stay separate from SMS booking consent");
-  assert(!html.includes('name="referralOptIn"'), "referral reminder checkbox should stay separate from SMS booking consent");
+  assert(!html.includes('name="preferredContact"'), "preferred contact selector should be removed");
+  assert(!html.includes('name="smsOptIn"'), "SMS opt-in checkbox should be removed");
+  assert(!html.includes("I agree to receive text messages from Lovely Locs about my booking"), "transactional SMS consent copy should be removed");
+  assert(!html.includes('name="marketingEmailOptIn"'), "marketing email checkbox should stay separate from checkout");
+  assert(!html.includes('name="referralOptIn"'), "referral reminder checkbox should stay separate from checkout");
   assert(html.includes("Good People Know Good People"), "referral campaign headline missing");
-  assert(html.includes('value="text"'), "text contact option missing");
-  assert(html.includes('value="email"'), "email contact option missing");
-  assert(html.includes('Text + Email'), "text plus email contact option missing");
-  assert(html.includes('class="contact-option-text">Text + Email'), "contact option text wrapper missing");
-  assert(fs.readFileSync("styles.css", "utf8").includes('.contact-preference { grid-template-columns: 1fr; }'), "mobile contact options should stack to avoid coming soon badge overlap");
-  assert(html.includes("Text messaging is coming soon while carrier approval is completed"), "checkout should explain that text messaging is coming soon");
-  assert((html.match(/Coming Soon/g) || []).length >= 2, "checkout should mark both text contact choices as coming soon");
-  assert(html.includes('value="email" checked'), "new bookings should default to the active email contact option");
+  assert(!html.includes('Text + Email'), "text plus email contact option should be removed");
+  assert(!html.includes("Text messaging is coming soon while carrier approval is completed"), "old texting-coming-soon copy should be removed");
+  assert(html.includes("Email is the active confirmation method. Phone is optional."), "checkout should explain optional phone and email confirmations");
   assert(!html.includes('name="address"'), "address field should not be shown for studio-only bookings");
   assert(html.includes("All services are held at the private Lovely Locs home studio"), "studio-only note missing");
   assert(html.includes("Deposits are non-refundable. All services are held at the private Lovely Locs home studio. After submitting"), "condensed before-submit deposit copy missing");
@@ -850,7 +823,7 @@ test("booking form has required client fields", () => {
   const bookingFormStart = html.indexOf('<form class="form-grid" id="bookingForm"');
   const bookingFormEnd = html.indexOf("</form>", bookingFormStart);
   const bookingFormHtml = html.slice(bookingFormStart, bookingFormEnd);
-  assert((bookingFormHtml.match(/type="checkbox"/g) || []).length === 3, "checkout should use SMS, shampoo prep, and policy checkboxes");
+  assert((bookingFormHtml.match(/type="checkbox"/g) || []).length === 2, "checkout should use only shampoo prep and policy checkboxes");
   assert(html.includes("Privacy Policy"), "checkout should link to privacy policy");
   assert(html.includes("Terms &amp; Conditions"), "checkout should link to terms");
 });
@@ -864,7 +837,7 @@ test("client settings route shows review and rebook hub", () => {
   assert(html.includes('href="#client-settings?mode=login"'), "login switch missing");
   assert(html.includes("data-client-settings-login"), "client settings lookup control missing");
   assert(html.includes('id="googleSignInButton"'), "Google sign-in button container missing");
-  assert(html.includes("New clients will complete a short one-time profile"), "Google signup guidance missing");
+  assert(html.includes("New clients can sign up with Google"), "Google signup guidance missing");
   assert(html.includes("data-switch-google-account"), "Google account switch control missing");
   assert(html.includes("Past Visits"), "past visits section missing");
   assert(html.includes("Book Again"), "rebook action copy missing");
@@ -967,8 +940,6 @@ test("saved client profile pre-fills booking basics", () => {
     birthday: "1998-07-31",
     locJourneyLength: "3_to_5_years",
     onboardingCompleted: true,
-    preferredContact: "email",
-    smsOptIn: true,
     marketingEmailOptIn: true,
     referralOptIn: true,
     specialRequests: "Saved notes"
@@ -980,8 +951,8 @@ test("saved client profile pre-fills booking basics", () => {
   assert(html.includes('value="saved@example.com"'), "saved email did not prefill");
   assert(html.includes('value="(336) 555-1212"'), "saved phone did not prefill");
   assert(html.includes('value="1998-07-31"'), "saved birthday did not prefill");
-  assert(html.includes('value="email" checked'), "saved preferred contact did not preselect");
-  assert(html.includes('name="smsOptIn" type="checkbox" checked'), "saved SMS opt-in did not precheck");
+  assert(!html.includes('name="preferredContact"'), "saved preferred contact should not render");
+  assert(!html.includes('name="smsOptIn"'), "saved SMS opt-in should not render");
   assert(html.includes("Saved notes"), "saved notes did not prefill");
   const payload = context.bookingPayloadFromForm(elements.bookingForm);
   assert(payload.client.birthday === "1998-07-31", "saved birthday should travel with future booking records");
@@ -1099,8 +1070,9 @@ test("booking submission sends booking to backend and shows confirmation", async
   assert(context.lastFetch.url === "/api/bookings", "valid booking should post to booking backend");
   assert(context.lastFetch.options.body.includes("Test Client"), "booking backend payload should include client details");
   assert(context.lastFetch.options.body.includes('"time":"11:00"'), "booking backend payload should include selected time");
-  assert(context.lastFetch.options.body.includes("text_email"), "booking backend payload should include preferred contact");
-  assert(context.lastFetch.options.body.includes("smsOptIn"), "booking backend payload should include sms opt-in status");
+  assert(context.lastFetch.options.body.includes('"preferredContact":"email"'), "booking backend payload should default to email contact");
+  assert(context.lastFetch.options.body.includes('"smsOptIn":false'), "booking backend payload should keep SMS opt-in false");
+  assert(!context.lastFetch.options.body.includes("text_email"), "booking backend payload should not include text contact options");
   assert(context.lastFetch.options.body.includes("marketingEmailOptIn"), "booking backend payload should include monthly referral campaign opt-in status");
   assert(context.lastFetch.options.body.includes("referralOptIn"), "booking backend payload should include referral reminder opt-in status");
   assert(context.lastFetch.options.body.includes("1998-07-31"), "booking backend payload should include the guest birthday");
@@ -1180,6 +1152,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("nextAutomaticFriendTest"), "automatic first-ten friend-test assignment missing");
   assert(server.includes("friendTestCampaignLimit = 10"), "friend-test campaign should be limited to ten bookings");
   assert(server.includes("friendTestCheckpoints"), "friend-test checkpoint allowlist missing");
+  assert(server.includes('const required = ["fullName", "email", "date", "time"];'), "booking phone should not be required server-side");
+  assert(server.includes('preferredContact: "email"'), "server should normalize bookings to email contact");
+  assert(server.includes('smsOptIn: false'), "server should not preserve client SMS opt-ins while texting is unavailable");
   assert(server.includes("Website coverage:"), "friend-test owner coverage report missing");
   assert(server.includes("booking.friendTest || null"), "admin booking response should include friend-test coverage");
   assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");

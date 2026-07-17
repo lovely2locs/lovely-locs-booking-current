@@ -312,7 +312,7 @@ test("admin route offers free no-charge test booking", () => {
   context.addAdminTestBooking();
   html = appHtml();
   assert(html.includes("Cart (1)"), "admin test booking should replace cart with one item");
-  assert(html.includes("Deposit Required Before Confirmation: $0"), "admin test deposit should be zero");
+  assert(html.includes("Deposit: $0 due before confirmation"), "admin test deposit should be zero");
   assert(html.includes('name="adminToken"'), "admin no-charge booking should require the owner token");
   assert(html.includes("Submit No-Charge Test Booking"), "admin no-charge submit button missing");
 });
@@ -449,7 +449,7 @@ test("adding a service updates cart and booking modal", () => {
   context.addToCart({ id: "qa-service", type: "service", name: "QA Service", price: 100, duration: "1h" });
   const html = appHtml();
   assert(html.includes("Cart (1)"), "cart count did not update");
-  assert(html.includes("Services: QA Service"), "booking modal did not use selected service");
+  assert(html.includes("<span>Services</span><strong>QA Service"), "booking modal did not use selected service");
   assert(html.includes("Submit Request &amp; View Pay Options"), "pay options button missing");
   assert(!html.includes("I agree to receive text messages from Lovely Locs about my booking"), "booking modal SMS consent wording should be removed");
   assert(html.includes("Continue to Appointment Details"), "cart review CTA missing");
@@ -533,7 +533,7 @@ test("adult retwist advisory can switch overdue clients to overdue retwist", () 
   assert(html.includes("$125"), "overdue retwist price was not applied");
   assert(html.includes("Because your last retwist was 4+ months ago"), "price-change explanation missing");
   assert(html.includes("Base product: Gel"), "base product preference missing from cart");
-  assert(html.includes("Base Product Preferences: Overdue Retwist (4+ Months) - Gel"), "base product preference missing from booking summary");
+  assert(html.includes("<span>Products</span><strong>Overdue Retwist (4+ Months) - Gel"), "base product preference missing from booking summary");
 });
 
 test("maintenance services ask for base product preference before cart", () => {
@@ -617,9 +617,9 @@ test("maintenance services can add Shampoo Service before cart", () => {
     context.finishEnhancementAppointment(false);
     const html = appHtml();
     assert(html.includes("Shampoo Service added to this appointment."), "cart should explain Shampoo Service was added");
-    assert(html.includes("Services: Adult Retwist (Maintenance), Shampoo Service"), "booking summary should show Shampoo Service as a selected cart line");
+    assert(html.includes("<span>Services</span><strong>Adult Retwist (Maintenance), Shampoo Service"), "booking summary should show Shampoo Service as a selected cart line");
     assert(html.includes("Estimated Total: $105"), "booking summary should include Shampoo Service in the total");
-    assert(html.includes("Deposit Required Before Confirmation: $32"), "booking summary should update the deposit after Shampoo Service is added");
+    assert(html.includes("Deposit: $32 due before confirmation"), "booking summary should update the deposit after Shampoo Service is added");
     const summary = context.bookingSummaryFromForm(elements.bookingForm);
     assert(summary.includes("- Shampoo Service ($15 | Time: 30 min)"), "booking form summary should include Shampoo Service price and duration");
     assert(summary.includes("Estimated total: $105"), "booking form summary should include Shampoo Service total");
@@ -638,7 +638,7 @@ test("starter locs ask parting preference and triangle parts add forty dollars",
   assert(!elements.partingPreferenceModal.classList.contains("open"), "parting preference modal did not close");
   assert(html.includes("Medium Adult Starter Locs + Triangle Parts"), "triangle starter service missing from cart");
   assert(html.includes("Parting: Triangle Parts (+$40)"), "triangle parting fee note missing from cart");
-  assert(html.includes("Parting Preferences: Medium Adult Starter Locs + Triangle Parts - Triangle Parts (+$40)"), "parting preference missing from summary");
+  assert(html.includes("<span>Parting</span><strong>Medium Adult Starter Locs + Triangle Parts - Triangle Parts (+$40)"), "parting preference missing from summary");
   assert(html.includes("$190"), "triangle parting total price missing");
 });
 
@@ -671,8 +671,8 @@ test("second service stays in cart with first main service", () => {
   context.window.location.hash = "";
   context.addToCart({ id: "qa-service-2", type: "service", name: "Second QA Service", price: 200, duration: "2h" });
   const html = appHtml();
-  assert(html.includes("Services: QA Service, Overdue Retwist (4+ Months), Children Retwist (Maintenance), Medium Adult Starter Locs + Triangle Parts, Second QA Service"), "services were not preserved together");
-  assert(html.includes("Estimated Service Time: 1h + 4-5 hours + 3h + 6h 30min + 2h"), "combined service time missing");
+  assert(html.includes("<span>Services</span><strong>QA Service, Overdue Retwist (4+ Months), Children Retwist (Maintenance), Medium Adult Starter Locs + Triangle Parts, Second QA Service"), "services were not preserved together");
+  assert(html.includes("<span>Time</span><strong>1h + 4-5 hours + 3h + 6h 30min + 2h"), "combined service time missing");
   assert(html.includes("Cart (5)"), "cart should contain all main services");
 });
 
@@ -720,8 +720,42 @@ test("loc sprinkles collect required preferences from add-ons and recommendation
   context.addServiceFromAdvisory(context.serviceWithSprinklePreferences(directSprinkles, { preferences: ["gold beads", "clear crystals"], notes: "client bringing rose gold cuffs", customJewelryOrder: true }));
   const html = appHtml();
   assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
-  assert(html.includes("Sprinkles Preferences: Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+  assert(html.includes("<span>Sprinkles</span><strong>Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
   assert(html.includes("Estimated Total: $125"), "custom Loc Sprinkles jewelry fee should be included in cart total");
+});
+
+test("loc sprinkles preference save adds direct add-on to cart", () => {
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel" });
+  const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 20, duration: "1h", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
+  context.formValues.set("preferenceOne", "gold beads");
+  context.formValues.set("preferenceTwo", "");
+  context.formValues.set("notes", "client-provided beads");
+  context.formValues.set("customJewelryOrder", "");
+  context.openSprinklePreference(directSprinkles, "cart");
+  context.handleSprinklePreference();
+  const html = appHtml();
+  assert(html.includes("Loc Sprinkles (Add On)"), "direct Loc Sprinkles preference save should add the service to cart");
+  assert(html.includes("Sprinkles: Preferences: gold beads; Notes: client-provided beads"), "direct Loc Sprinkles save should preserve preferences in cart");
+  assert(html.includes("Estimated Total: $110"), "direct Loc Sprinkles add-on should update the cart total");
+});
+
+test("enhancement loc sprinkles preference save carries add-on into cart", () => {
+  context.clearCart();
+  context.openProductPreference({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", includedAddOnIds: ["style-addon"] });
+  context.handleProductPreference("Gel");
+  elements.shampooPreferenceAcknowledgement.checked = true;
+  context.handleShampooPreference("decline");
+  context.formValues.set("preferenceOne", "clear crystals");
+  context.formValues.set("preferenceTwo", "");
+  context.formValues.set("notes", "jewels on hand");
+  context.formValues.set("customJewelryOrder", "");
+  context.toggleEnhancementAddOn("sprinkles-addon");
+  context.handleSprinklePreference();
+  const html = appHtml();
+  assert(html.includes("<strong>Loc Sprinkles (Add On)</strong>"), "enhancement Loc Sprinkles save should carry selected add-on into cart");
+  assert(html.includes("Sprinkles: Preferences: clear crystals; Notes: jewels on hand"), "enhancement Loc Sprinkles cart line should show preferences");
+  assert(html.includes("Estimated Total: $110"), "enhancement Loc Sprinkles add-on should update cart total");
 });
 
 test("cleanse add-ons keep names prices totals and booking summary aligned", () => {
@@ -733,9 +767,9 @@ test("cleanse add-ons keep names prices totals and booking summary aligned", () 
     context.addServiceFromAdvisory({ id: "full-acv-buildup-removal", type: "service", name: "Full ACV Buildup Removal Service", price: 40, duration: "1h", category: "add-ons", description: "Full ACV buildup removal for heavier product buildup, lint, odor, or residue before styling or maintenance begins." });
     context.openBooking();
     const html = appHtml();
-    assert(html.includes("Services: Shampoo Service, ACV Clarifying Wash, Full ACV Buildup Removal Service"), "booking summary should show all cleanse add-ons by approved name");
+    assert(html.includes("<span>Services</span><strong>Shampoo Service, ACV Clarifying Wash, Full ACV Buildup Removal Service"), "booking summary should show all cleanse add-ons by approved name");
     assert(html.includes("Estimated Total: $80"), "booking summary should total the three cleanse add-ons");
-    assert(html.includes("Deposit Required Before Confirmation: $30"), "booking summary should show minimum deposit for cleanse add-ons");
+    assert(html.includes("Deposit: $30 due before confirmation"), "booking summary should show minimum deposit for cleanse add-ons");
     const summary = context.bookingSummaryFromForm(elements.bookingForm);
     assert(summary.includes("- Shampoo Service ($15 | Time: 30 min)"), "summary should include Shampoo Service price and duration");
     assert(summary.includes("- ACV Clarifying Wash ($25 | Time: 45 min)"), "summary should include ACV Clarifying Wash price and duration");
@@ -973,7 +1007,7 @@ test("unfinished booking details persist for refresh and cart changes", () => {
   const html = appHtml();
   assert(html.includes('value="Test Client"'), "saved draft name did not restore");
   assert(html.includes('value="2099-01-01"'), "saved draft date did not restore");
-  assert(html.includes("Saved details restored"), "saved draft restoration notice missing");
+  assert(html.includes("Saved on this device."), "saved draft restoration notice missing");
 });
 
 test("anchor route maps to home for section navigation", () => {

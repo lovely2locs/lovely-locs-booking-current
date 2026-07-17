@@ -85,7 +85,6 @@ const scheduledWorkDates = new Set([
   "2026-07-29",
   "2026-07-30",
 ]);
-const bookingUnavailableFromDate = "2026-08-01";
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const forcedOpenAppointmentTimes = new Map([
   ["2026-07-03", new Set(["11:00", "16:00"])],
@@ -2435,12 +2434,7 @@ function dayOfWeek(date) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
 }
 
-function isOutsidePublicBookingWindow(date) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) && date >= bookingUnavailableFromDate;
-}
-
 function appointmentTimesForDate(date) {
-  if (isOutsidePublicBookingWindow(date)) return [];
   return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
 }
 
@@ -2507,17 +2501,8 @@ function localAvailability(date, bookedTimes = []) {
   const booked = new Set(bookedTimes);
   const holiday = isHolidayDate(date);
   const isSunday = dayOfWeek(date) === 0;
-  const outsidePublicBookingWindow = isOutsidePublicBookingWindow(date);
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
-  if (outsidePublicBookingWindow) {
-    return {
-      date,
-      holiday: false,
-      note: "August dates are not open for booking yet.",
-      slots: []
-    };
-  }
   const forcedOpenTimes = forcedOpenAppointmentTimes.get(date) || new Set();
   const holidayTimes = holidayAppointmentTimesByDate.get(date) || [];
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();

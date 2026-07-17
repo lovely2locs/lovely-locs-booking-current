@@ -531,6 +531,12 @@ function referralShareUrlForCode(code) {
   return `${origin}/?ref=${encodeURIComponent(code)}#services`;
 }
 
+function shareArrowIconMarkup() {
+  return `
+    <svg class="share-arrow-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path d="M4.8 22.8c3.8-8.2 9.5-11.2 16.1-11.2V6l7.1 7.4-7.1 7.4v-5.5c-6.3 0-11.2 2.2-16.1 7.5Z"></path>
+    </svg>`;
+}
 function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview = false } = {}) {
   const referralCode = normalizeReferralCode(code || referralCodeForName(fullName));
   const referralUrl = shareUrl || referralShareUrlForCode(referralCode);
@@ -549,7 +555,7 @@ function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview
         <div class="personal-referral-actions">
           <button type="button" data-copy-personal-referral-code="${escapeAttr(referralCode)}">Copy Code</button>
           <button type="button" data-copy-personal-referral-link="${escapeAttr(referralUrl)}">Copy Link</button>
-          <button type="button" data-share-personal-referral="${escapeAttr(referralUrl)}" data-referral-code="${escapeAttr(referralCode)}">Share</button>
+          <button class="personal-share-btn" type="button" data-share-personal-referral="${escapeAttr(referralUrl)}" data-referral-code="${escapeAttr(referralCode)}">${shareArrowIconMarkup()}<span>Share</span></button>
         </div>
       ` : ""}
       <p class="personal-referral-status" data-referral-action-status aria-live="polite"></p>
@@ -1355,7 +1361,7 @@ function referralShareSection() {
         </div>
         <div class="referral-actions">
           <button class="share-icon-btn" data-share-booking aria-label="Share booking link" title="Share booking link">
-            <span class="ios-share-icon" aria-hidden="true"></span>
+            ${shareArrowIconMarkup()}
           </button>
           <button class="outline-btn" data-copy-booking>Copy Link</button>
           <p id="shareStatus" class="share-status" aria-live="polite"></p>

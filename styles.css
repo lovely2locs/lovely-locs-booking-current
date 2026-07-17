@@ -1988,7 +1988,8 @@ h1, h2, h3,
   background: rgba(75, 51, 44, 0.06);
 }
 
-.time-slot.booked {
+.time-slot.booked,
+.time-slot.unavailable {
   border-color: rgba(92, 84, 88, 0.26);
   background: rgba(92, 84, 88, 0.12);
   color: var(--muted);
@@ -2061,7 +2062,8 @@ h1, h2, h3,
   background: rgba(101, 70, 55, 0.26);
 }
 
-.dark .time-slot.booked {
+.dark .time-slot.booked,
+.dark .time-slot.unavailable {
   border-color: rgba(255, 247, 241, 0.2);
   background: rgba(255, 247, 241, 0.08);
 }
@@ -2653,6 +2655,13 @@ textarea { min-height: 92px; resize: vertical; }
 .appointment-calendar-day.muted {
   color: var(--muted);
   opacity: 0.52;
+}
+
+.appointment-calendar-day.unavailable {
+  background: rgba(92, 84, 88, 0.08);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .appointment-calendar-day.today {

@@ -63,6 +63,12 @@ function paymentOptionHandleMarkup(option = {}) {
 
 const minimumBookingLeadMs = 24 * 60 * 60 * 1000;
 const sprinkleCustomJewelryFee = 15;
+const sprinkleJewelrySourceLabels = {
+  byoj: "BYOJ - Bring Your Own Jewels",
+  "on-hand": "Use On-Hand Beads",
+  custom: "Custom Colors or Styles"
+};
+const sprinkleOnHandAvailabilityNote = "Available colors may vary based on what is currently on hand.";
 const regularAppointmentTimes = ["11:00", "16:00"];
 const scheduledWorkAppointmentTimes = ["19:00"];
 const scheduledWorkDates = new Set([
@@ -749,6 +755,7 @@ let pendingShampooService = null;
 let pendingPartingService = null;
 let pendingSprinkleService = null;
 let pendingSprinkleContext = "cart";
+let pendingSprinkleStep = "choice";
 let activeProductShelf = "All";
 let activeGuideId = "new-locs";
 let serviceQuizAnswers = { stage: "starter", timing: "fresh" };
@@ -1009,14 +1016,19 @@ function normalizeSprinklePreferences(input = {}) {
     .map(cleanSprinklePreference)
     .filter(Boolean);
   const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
-  return { preferences, notes, customJewelryOrder: Boolean(source.customJewelryOrder) };
+  const requestedSource = String(source.jewelrySource || "").trim();
+  const jewelrySource = Object.prototype.hasOwnProperty.call(sprinkleJewelrySourceLabels, requestedSource)
+    ? requestedSource
+    : (source.customJewelryOrder ? "custom" : "");
+  return { preferences, notes, jewelrySource, customJewelryOrder: Boolean(source.customJewelryOrder || jewelrySource === "custom") };
 }
 
 function sprinklePreferencesSummary(item = {}) {
   const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
   const parts = [];
+  if (details.jewelrySource) parts.push(`Jewels: ${sprinkleJewelrySourceLabels[details.jewelrySource]}`);
   if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
-  if (details.customJewelryOrder) parts.push(`Custom jewelry/color order: +${money(sprinkleCustomJewelryFee)} starting price`);
+  if (details.customJewelryOrder) parts.push(`Custom colors/styles: +${money(sprinkleCustomJewelryFee)} starting price`);
   if (details.notes) parts.push(`Notes: ${details.notes}`);
   return parts.join("; ");
 }
@@ -1185,28 +1197,41 @@ function partingPreferenceModal() {
 
 function sprinklePreferenceModal() {
   const serviceName = pendingSprinkleService?.name || "Loc Sprinkles";
+  const customStep = pendingSprinkleStep === "custom";
   return `
     <div class="modal advisory-modal" id="sprinklePreferenceModal">
       <div class="modal-panel advisory-panel">
         <div class="modal-head">
           <div>
-            <h2>Loc Sprinkles Preferences</h2>
-            <p class="duration">Required before ${serviceName} is added.</p>
+            <h2>${customStep ? "Custom Loc Sprinkles" : serviceName}</h2>
+            <p class="duration">${customStep ? "Custom colors or styles add $15 starting price." : "Choose how your jewels will be supplied before this is added."}</p>
           </div>
           <button class="modal-close" data-close-sprinkle-preference>x</button>
         </div>
-        <form class="brand-settings-form sprinkle-preference-form" id="sprinklePreferenceForm">
-          <label>First Color or Preference<input name="preferenceOne" maxlength="60" required placeholder="Example: gold beads"></label>
-          <label>Second Color or Preference <span class="optional-label">(optional)</span><input name="preferenceTwo" maxlength="60" placeholder="Example: clear crystals"></label>
-          <label class="full">Color and Preference Notes <span class="optional-label">(optional)</span><textarea name="notes" maxlength="220" placeholder="Mention in-stock beads, client-provided beads, placement, or style notes."></textarea></label>
-          <label class="full policy-ack"><input name="customJewelryOrder" type="checkbox"><span>Custom jewelry or a very specific color order (+$15 starting price)</span></label>
-          <p class="field-note full">Base price includes up to two color choices. Client-provided beads and beads already on hand have no upcharge. Select the custom option only when jewelry or a specific color must be purchased for your order.</p>
-          <p class="form-error full" id="sprinklePreferenceStatus" aria-live="polite"></p>
-          <div class="advisory-actions full">
-            <button class="primary-btn" type="button" data-save-sprinkle-preference>Save Preferences</button>
-            <button class="outline-btn" type="button" data-close-sprinkle-preference>Cancel</button>
+        <div class="advisory-box">
+          <p class="eyebrow">Loc Sprinkles Add-On</p>
+          <h3>Base price includes up to two locs.</h3>
+          <p>Bring your own jewels or choose from beads already on hand with no upcharge. ${sprinkleOnHandAvailabilityNote}</p>
+        </div>
+        ${customStep ? `
+          <form class="brand-settings-form sprinkle-preference-form" id="sprinklePreferenceForm">
+            <label>First Color or Preference<input name="preferenceOne" maxlength="60" required placeholder="Example: gold beads"></label>
+            <label>Second Color or Preference <span class="optional-label">(optional)</span><input name="preferenceTwo" maxlength="60" placeholder="Example: clear crystals"></label>
+            <label class="full">Color and Preference Notes <span class="optional-label">(optional)</span><textarea name="notes" maxlength="220" placeholder="Mention custom colors, jewelry style, placement, or purchase notes."></textarea></label>
+            <p class="field-note full">Custom colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15. Final availability may vary based on sourcing.</p>
+            <p class="form-error full" id="sprinklePreferenceStatus" aria-live="polite"></p>
+            <div class="advisory-actions full">
+              <button class="primary-btn" type="button" data-save-sprinkle-preference>Save Custom Preferences</button>
+              <button class="outline-btn" type="button" data-sprinkle-back>Back</button>
+            </div>
+          </form>
+        ` : `
+          <div class="advisory-actions product-actions sprinkle-choice-actions">
+            <button class="primary-btn" type="button" data-sprinkle-choice="byoj">BYOJ - Bring Your Own Jewels</button>
+            <button class="outline-btn" type="button" data-sprinkle-choice="on-hand">Use On-Hand Beads</button>
+            <button class="outline-btn" type="button" data-sprinkle-choice="custom">Custom Colors or Styles (+$15)</button>
           </div>
-        </form>
+        `}
       </div>
     </div>
   `;
@@ -3053,6 +3078,7 @@ function closePartingPreference() {
 function openSprinklePreference(service, context = "cart") {
   pendingSprinkleService = service;
   pendingSprinkleContext = context;
+  pendingSprinkleStep = "choice";
   if (context === "enhancement") document.getElementById("enhancementModal")?.classList.remove("open");
   render(currentRoute());
   document.getElementById("sprinklePreferenceModal")?.classList.add("open");
@@ -3061,6 +3087,7 @@ function openSprinklePreference(service, context = "cart") {
 function closeSprinklePreference() {
   pendingSprinkleService = null;
   pendingSprinkleContext = "cart";
+  pendingSprinkleStep = "choice";
   document.getElementById("sprinklePreferenceModal")?.classList.remove("open");
   if (pendingEnhancementService) document.getElementById("enhancementModal")?.classList.add("open");
 }
@@ -3111,6 +3138,39 @@ function toggleEnhancementAddOn(serviceId) {
   document.getElementById("enhancementModal")?.classList.add("open");
 }
 
+function addConfiguredSprinkleService(configuredService) {
+  const context = pendingSprinkleContext;
+  closeSprinklePreference();
+  if (context === "enhancement") {
+    pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== configuredService.id);
+    if (pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service").length < 2) pendingEnhancementAddOns.push(configuredService);
+    finishEnhancementAppointment(true);
+    return;
+  }
+  addServiceFromAdvisory(configuredService);
+}
+
+function handleSprinkleChoice(choice) {
+  const service = pendingSprinkleService;
+  if (!service) return;
+  if (choice === "custom") {
+    pendingSprinkleStep = "custom";
+    render(currentRoute());
+    document.getElementById("sprinklePreferenceModal")?.classList.add("open");
+    return;
+  }
+  const details = choice === "byoj"
+    ? { jewelrySource: "byoj", notes: "Client will bring their own jewels." }
+    : { jewelrySource: "on-hand", notes: sprinkleOnHandAvailabilityNote };
+  addConfiguredSprinkleService(serviceWithSprinklePreferences(service, details));
+}
+
+function handleSprinkleBack() {
+  pendingSprinkleStep = "choice";
+  render(currentRoute());
+  document.getElementById("sprinklePreferenceModal")?.classList.add("open");
+}
+
 function handleSprinklePreference() {
   const service = pendingSprinkleService;
   const form = document.getElementById("sprinklePreferenceForm");
@@ -3121,26 +3181,18 @@ function handleSprinklePreference() {
     preferenceOne: data.get("preferenceOne"),
     preferenceTwo: data.get("preferenceTwo"),
     notes: data.get("notes"),
-    customJewelryOrder: Boolean(data.get("customJewelryOrder"))
+    jewelrySource: "custom",
+    customJewelryOrder: true
   });
   if (!details.preferences.length) {
-    if (status) status.textContent = "Add at least one color or preference before selecting loc sprinkles.";
+    if (status) status.textContent = "Add at least one custom color or style before selecting custom Loc Sprinkles.";
     return;
   }
   if (details.preferences.length > 2) {
     if (status) status.textContent = "The base price includes up to two color or preference choices.";
     return;
   }
-  const configuredService = serviceWithSprinklePreferences(service, details);
-  const context = pendingSprinkleContext;
-  closeSprinklePreference();
-  if (context === "enhancement") {
-    pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== configuredService.id);
-    if (pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service").length < 2) pendingEnhancementAddOns.push(configuredService);
-    finishEnhancementAppointment(true);
-    return;
-  }
-  addServiceFromAdvisory(configuredService);
+  addConfiguredSprinkleService(serviceWithSprinklePreferences(service, details));
 }
 
 function handlePartingPreference(partingPreference, partingFee) {
@@ -3276,6 +3328,8 @@ function bindDynamic() {
   document.querySelectorAll("[data-close-shampoo-preference]").forEach(button => button.addEventListener("click", closeShampooPreference));
   document.querySelectorAll("[data-close-parting-preference]").forEach(button => button.addEventListener("click", closePartingPreference));
   document.querySelectorAll("[data-close-sprinkle-preference]").forEach(button => button.addEventListener("click", closeSprinklePreference));
+  document.querySelectorAll("[data-sprinkle-choice]").forEach(button => button.addEventListener("click", () => handleSprinkleChoice(button.dataset.sprinkleChoice)));
+  document.querySelectorAll("[data-sprinkle-back]").forEach(button => button.addEventListener("click", handleSprinkleBack));
   document.querySelectorAll("[data-save-sprinkle-preference]").forEach(button => button.addEventListener("click", handleSprinklePreference));
   document.querySelectorAll("[data-close-enhancement]").forEach(button => button.addEventListener("click", () => finishEnhancementAppointment(false)));
   document.querySelectorAll("[data-enhancement-add]").forEach(button => button.addEventListener("click", () => toggleEnhancementAddOn(button.dataset.enhancementAdd)));

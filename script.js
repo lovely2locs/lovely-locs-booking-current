@@ -1106,7 +1106,7 @@ function productPreferenceModal() {
         <div class="advisory-box">
           <p class="eyebrow">Maintenance Service Prep</p>
           <h3>Which base product would you prefer?</h3>
-          <p>Your preference helps Lovely Locs prepare with the right product for your scalp, hair texture, and style goals.</p>
+          <p>Your preference helps Lovely Locs prepare with the right product for you.</p>
           <div class="advisory-actions product-actions">
             <button class="primary-btn" data-product-preference="Loctician's Preference">Loctician's Preference</button>
             <button class="outline-btn" data-product-preference="Gel">Gel</button>

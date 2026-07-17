@@ -145,27 +145,28 @@ const context = {
   },
   URLSearchParams,
   setTimeout(fn) { fn(); },
-  alert(message) { context.lastAlert = message; }
+  alert(message) { context.lastAlert = message; },
+  formValues: new Map([
+    ["fullName", "Test Client"],
+    ["email", "client@example.com"],
+    ["phone", "(555) 123-4567"],
+    ["date", "2099-01-01"],
+    ["time", "11:00"],
+    ["birthday", "1998-07-31"],
+    ["adminToken", "OWNER-TEST-TOKEN"],
+    ["referredByCode", "lovelylocs/Test Client"],
+    ["emergencySlot", ""],
+    ["preferredContact", "text_email"],
+    ["smsOptIn", "on"],
+    ["specialRequests", "Test booking notes"],
+    ["shampooDeclineAcknowledgement", "on"],
+    ["policyAcknowledgement", "on"]
+  ])
 };
 context.window.localStorage = context.localStorage;
 context.FormData = class {
   constructor() {
-    this.values = new Map([
-      ["fullName", "Test Client"],
-      ["email", "client@example.com"],
-      ["phone", "(555) 123-4567"],
-      ["date", "2026-06-01"],
-      ["time", "11:00"],
-      ["birthday", "1998-07-31"],
-      ["adminToken", "OWNER-TEST-TOKEN"],
-      ["referredByCode", "lovelylocs/Test Client"],
-      ["emergencySlot", ""],
-      ["preferredContact", "text_email"],
-      ["smsOptIn", "on"],
-      ["specialRequests", "Test booking notes"],
-      ["shampooDeclineAcknowledgement", "on"],
-      ["policyAcknowledgement", "on"]
-    ]);
+    this.values = new Map(context.formValues);
   }
   get(key) {
     return this.values.get(key) || "";
@@ -800,6 +801,8 @@ test("booking form has required client fields", () => {
   assert(html.includes('data-toggle-appointment-calendar'), "appointment date calendar toggle missing");
   assert(html.includes('id="appointmentCalendar"'), "appointment calendar popover missing");
   assert(html.includes('data-calendar-date='), "appointment calendar days missing");
+  assert(html.includes('class="appointment-calendar-day muted unavailable"'), "past calendar days should be disabled");
+  assert(html.includes('title="Choose a future appointment at least 24 hours out."'), "unbookable calendar days should explain the 24-hour booking rule");
   assert(fs.readFileSync("styles.css", "utf8").includes(".appointment-calendar-grid"), "appointment calendar grid styles missing");
   assert(!html.includes("Preferred Date"), "checkout should not show a preferred date label");
   assert(html.includes('name="birthday" type="date"'), "optional guest birthday field missing");
@@ -991,12 +994,12 @@ test("unfinished booking details persist for refresh and cart changes", () => {
   const storedDraft = JSON.parse(localStore.get("lovelyLocsBookingDraft") || "{}");
   assert(storedDraft.fullName === "Test Client", "unfinished client name was not saved");
   assert(storedDraft.birthday === "1998-07-31", "unfinished birthday was not saved");
-  assert(storedDraft.date === "2026-06-01", "unfinished booking date was not saved");
+  assert(storedDraft.date === "2099-01-01", "unfinished booking date was not saved");
   assert(storedDraft.time === "11:00", "unfinished booking time was not saved");
   context.render(context.currentRoute());
   const html = appHtml();
   assert(html.includes('value="Test Client"'), "saved draft name did not restore");
-  assert(html.includes('value="2026-06-01"'), "saved draft date did not restore");
+  assert(html.includes('value="2099-01-01"'), "saved draft date did not restore");
   assert(html.includes("Saved details restored"), "saved draft restoration notice missing");
 });
 
@@ -1065,6 +1068,24 @@ test("booking submission requires shampoo prep acknowledgement when shampoo is d
   await context.submitBooking();
   assert(elements.bookingError.textContent.includes("shampoo preparation requirement"), "shampoo prep acknowledgement error missing");
   assert(!context.lastAlert, "booking should not submit without shampoo prep acknowledgement");
+});
+
+test("booking submission rejects past or too-soon appointment dates before backend post", async () => {
+  const originalDate = context.formValues.get("date");
+  const originalLastFetch = context.lastFetch;
+  try {
+    context.formValues.set("date", "2026-07-09");
+    context.lastFetch = null;
+    elements.bookingForm.reportValidity = () => true;
+    elements.policyAcknowledgement.checked = true;
+    elements.shampooDeclineAcknowledgement.checked = true;
+    await context.submitBooking();
+    assert(elements.bookingError.textContent.includes("future appointment at least 24 hours out"), "past appointment date should show the 24-hour future booking error");
+    assert(!context.lastFetch, "past appointment date should not post to booking backend");
+  } finally {
+    context.formValues.set("date", originalDate);
+    context.lastFetch = originalLastFetch;
+  }
 });
 
 test("booking submission sends booking to backend and shows confirmation", async () => {
@@ -1174,6 +1195,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("smsBlockedReason"), "SMS blocked reason helper missing");
   assert(server.includes("smsReady"), "SMS readiness status missing");
   assert(server.includes("/api/availability"), "availability endpoint missing");
+  assert(server.includes("minimumBookingLeadMs"), "server should enforce a 24-hour booking lead time");
+  assert(server.includes("Appointment must be a future time at least 24 hours away."), "server should reject past or too-soon appointment submissions");
+  assert(server.includes('status: tooSoon ? "unavailable"'), "availability should mark too-soon slots unavailable");
   assert(server.includes('const regularAppointmentTimes = ["11:00", "16:00"];'), "usual availability should allow two regular starts");
   assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00"];'), "scheduled workdays should expose only the 7 PM start");
   assert(server.includes('"2026-06-27"'), "green scheduled June 27 date missing from availability override");

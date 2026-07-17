@@ -1,4 +1,4 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const http = require("http");
 const net = require("net");
 const path = require("path");
@@ -232,27 +232,27 @@ async function main() {
     const promo = await request("POST", "/api/discount/validate", { code: "TEST20" });
     assert(promo.status === 200 && promo.body.percent === 20, "Temporary TEST20 promo validates at 20 percent off.", promo.body);
 
-    const saleClient = client({ fullName: "Sale Tester", email: "sale.tester@example.test", date: "2026-08-05" });
+    const saleClient = client({ fullName: "Sale Tester", email: "sale.tester@example.test", date: "2026-07-22" });
     const saleOne = await createBooking(saleClient, { discountCode: "TEST20" });
     assert(saleOne.discountCode === "TEST20" && saleOne.discountAmount === 18 && saleOne.total === 72, "TEST20 applies once on a booking total.", saleOne);
 
-    const saleTwo = await createBooking({ ...saleClient, date: "2026-08-12", time: "18:30" }, { discountCode: "TEST20" });
+    const saleTwo = await createBooking({ ...saleClient, date: "2026-07-23", time: "" }, { discountCode: "TEST20" });
     assert(saleTwo.discountCode === "TEST20" && saleTwo.discountAmount === 18 && saleTwo.total === 72, "Same client can use TEST20 on another booking before the deadline.", saleTwo);
 
-    const futureBirthdayClient = client({ fullName: "Future Birthday", email: "future.bday@example.test", birthday: "1998-07-31", date: "2026-08-19" });
+    const futureBirthdayClient = client({ fullName: "Future Birthday", email: "future.bday@example.test", birthday: "1998-07-31", date: "2026-07-25" });
     await createBooking(futureBirthdayClient);
     await runBirthdayAutomation();
     const futureBirthdaySettings = await clientSettings(futureBirthdayClient);
     assert(!futureBirthdaySettings.credits.some(credit => credit.type === "birthday"), "July 31 birthday credit is not issued early on June 3.", futureBirthdaySettings.credits);
 
-    const activeBirthdayClient = client({ fullName: "Active Birthday", email: "active.bday@example.test", birthday: "1998-06-17", date: "2026-08-26" });
+    const activeBirthdayClient = client({ fullName: "Active Birthday", email: "active.bday@example.test", birthday: "1998-06-17", date: "2026-07-28" });
     await createBooking(activeBirthdayClient);
     await runBirthdayAutomation();
     const activeBirthdaySettings = await clientSettings(activeBirthdayClient);
     const birthdayCredit = activeBirthdaySettings.credits.find(credit => credit.type === "birthday" && credit.status === "available");
     assert(Boolean(birthdayCredit) && birthdayCredit.amountOff === 15, "Active birthday-window client receives an available annual birthday credit.", activeBirthdaySettings.credits);
 
-    const birthdayRedeem = await createBooking({ ...activeBirthdayClient, date: "2026-09-02" });
+    const birthdayRedeem = await createBooking({ ...activeBirthdayClient, date: "2026-07-29" });
     assert(String(birthdayRedeem.discountCode || "").startsWith("BDAY-") && birthdayRedeem.discountAmount === 15, "Birthday credit automatically applies to the next booking.", birthdayRedeem);
     const birthdayConfirm = await confirmDeposit(birthdayRedeem.id);
     assert(birthdayConfirm.redeemedCredit?.creditType === "birthday", "Birthday credit is redeemed after deposit confirmation.", birthdayConfirm);
@@ -271,7 +271,7 @@ async function main() {
     const returningRebookConfirm = await confirmDeposit(returningRebook.id);
     assert(returningRebookConfirm.redeemedCredit?.creditType === "returning", "Returning client credit is redeemed after the next deposit confirmation.", returningRebookConfirm);
 
-    const referrer = client({ fullName: "Referral Owner", email: "referrer@example.test", phone: "3364711100", date: "2026-09-09" });
+    const referrer = client({ fullName: "Referral Owner", email: "referrer@example.test", phone: "3364711100", date: "2026-07-13" });
     await createBooking(referrer);
     const referrerSettings = await clientSettings(referrer);
     const sharedReferralCode = new URL(referrerSettings.shareUrl).searchParams.get("ref");
@@ -283,7 +283,7 @@ async function main() {
       email: "referred@example.test",
       phone: "3364711101",
       birthday: "1998-10-10",
-      date: "2026-09-16",
+      date: "2026-07-14",
       referredByCode: referrerSettings.referralCode,
     });
     const referredBooking = await createBooking(referred);
@@ -294,7 +294,7 @@ async function main() {
       email: "overdue.referred@example.test",
       phone: "3364711102",
       birthday: "1998-10-11",
-      date: "2026-09-17",
+      date: "2026-07-15",
       referredByCode: referrerSettings.referralCode,
     });
     const overdueReferredBooking = await createBooking(overdueReferred, {
@@ -307,7 +307,7 @@ async function main() {
       email: "children.referred@example.test",
       phone: "3364711103",
       birthday: "1998-10-12",
-      date: "2026-09-18",
+      date: "2026-07-16",
       referredByCode: referrerSettings.referralCode,
     });
     const nonQualifyingReferredBooking = await createBooking(nonQualifyingReferred, {
@@ -330,7 +330,7 @@ async function main() {
       email: "second.referred@example.test",
       phone: "3364711104",
       birthday: "1998-10-13",
-      date: "2026-09-19",
+      date: "2026-07-17",
       referredByCode: referrerSettings.referralCode,
     });
     const secondReferredBooking = await createBooking(secondReferred);
@@ -339,7 +339,7 @@ async function main() {
     const stackedSettings = await clientSettings(referrer);
     assert(stackedSettings.credits.filter(credit => credit.type === "referral" && credit.status === "available").length === 2, "Referrer can stack multiple available referral credits.", stackedSettings.credits);
 
-    const referralRedeem = await createBooking({ ...referrer, date: "2026-09-23" });
+    const referralRedeem = await createBooking({ ...referrer, date: "2026-07-20" });
     assert(referralRedeem.discountCode === "REF-STACK-2" && referralRedeem.discountAmount === 30 && referralRedeem.total === 60, "Stacked referral credits automatically apply to the referrer's next booking.", referralRedeem);
     const referralRedeemConfirm = await confirmDeposit(referralRedeem.id);
     assert(referralRedeemConfirm.redeemedCredit?.creditType === "referral" && referralRedeemConfirm.redeemedCredit?.events?.length === 2, "Stacked referral credits are redeemed after the referrer's deposit confirmation.", referralRedeemConfirm);
@@ -352,7 +352,7 @@ async function main() {
       email: "later.referred@example.test",
       phone: "3364711199",
       birthday: "1998-11-10",
-      date: "2027-03-10",
+      date: "2026-07-30",
       referredByCode: referrerSettings.referralCode,
     });
     const laterReferredBooking = await createBooking(laterReferred);
@@ -360,7 +360,7 @@ async function main() {
       String(laterReferredBooking.discountCode || "").startsWith(`NEW-${referrerSettings.referralCode}`)
       && laterReferredBooking.discountAmount === 15
       && laterReferredBooking.total === 75,
-      "Personal referral codes stay active for future bookings and still apply months later.",
+      "Personal referral codes stay active for later July bookings.",
       laterReferredBooking
     );
 
@@ -387,4 +387,7 @@ main().catch((error) => {
   }, null, 2));
   process.exit(1);
 });
+
+
+
 

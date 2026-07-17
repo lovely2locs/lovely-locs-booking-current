@@ -1,4 +1,4 @@
-﻿const logoUrl = "assets/lovely-locs-logo.jpg";
+const logoUrl = "assets/lovely-locs-logo.jpg";
 const legacyLogoUrls = new Set([
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
 ]);
@@ -2938,7 +2938,7 @@ function addServiceWithProductPreference(service, productPreference) {
   const configuredService = serviceWithCartFields({ ...service, baseProduct: productPreference });
   selectedService = configuredService;
   baseProductMessage = `${service.name} will be prepared with ${productPreference}.`;
-  continueConfiguredMaintenanceService(configuredService);
+  openShampooPreference(configuredService);
 }
 
 function addServiceWithPartingPreference(service, partingPreference, partingFee) {

@@ -62,6 +62,7 @@ function paymentOptionHandleMarkup(option = {}) {
 }
 
 const minimumBookingLeadMs = 24 * 60 * 60 * 1000;
+const sprinkleCustomJewelryFee = 15;
 const regularAppointmentTimes = ["11:00", "16:00"];
 const scheduledWorkAppointmentTimes = ["19:00"];
 const scheduledWorkDates = new Set([
@@ -124,7 +125,7 @@ const services = [
   { id: "medium-adult-starter", duration: "6h 30min", featured: false, price: 150, name: "Medium Adult Starter Locs", description: "Medium-sized starter locs for adults.", category: "starter-locs" },
   { id: "adult-retwist", duration: "3h 30min", featured: false, price: 90, name: "Adult Retwist (Maintenance)", description: "Keep your loc journey beautiful with a fresh retwist focused on neatness and hydration. Includes a complimentary two-strand twist style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", featured: false, price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", description: "Starter locs for children using coils and two-strand twist method.", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Standalone installation starts at $50 and includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
+  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Standalone installation starts at $50 and includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", standaloneAppointment: true, requiresSprinklePreferences: true },
   { id: "children-retwist", duration: "3h", featured: false, price: 75, name: "Children Retwist (Maintenance)", description: "Gentle retwist maintenance designed for children. Complimentary two-strand twist style included.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "adult-instant", duration: "5h 30min", featured: false, price: 125, name: "Adult Instant Locs", description: "Uses 0.5mm and 0.75mm crochet needles for instant loc maintenance. Includes complimentary two-strand twist style.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "child-instant", duration: "3h 30min", featured: false, price: 85, name: "Children's Instant Loc", description: "Starting price for children's instant loc maintenance. Complimentary two-strand twist style included.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
@@ -949,7 +950,7 @@ function servicePriceText(service = {}) {
 }
 
 function isMainAppointmentService(item = {}) {
-  return item.type === "service" && item.category !== "add-ons" && item.id !== adminTestService.id;
+  return item.type === "service" && (item.standaloneAppointment || item.category !== "add-ons") && item.id !== adminTestService.id;
 }
 
 function compatibleMainServicesForAddOn(addOn = {}, items = cart) {
@@ -1008,19 +1009,22 @@ function normalizeSprinklePreferences(input = {}) {
     .map(cleanSprinklePreference)
     .filter(Boolean);
   const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
-  return { preferences, notes };
+  return { preferences, notes, customJewelryOrder: Boolean(source.customJewelryOrder) };
 }
 
 function sprinklePreferencesSummary(item = {}) {
   const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
   const parts = [];
   if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
+  if (details.customJewelryOrder) parts.push(`Custom jewelry/color order: +${money(sprinkleCustomJewelryFee)} starting price`);
   if (details.notes) parts.push(`Notes: ${details.notes}`);
   return parts.join("; ");
 }
 
 function serviceWithSprinklePreferences(service = {}, preferences = {}) {
-  return serviceWithCartFields({ ...service, sprinklePreferences: normalizeSprinklePreferences(preferences) });
+  const details = normalizeSprinklePreferences(preferences);
+  const customFee = details.customJewelryOrder ? sprinkleCustomJewelryFee : 0;
+  return serviceWithCartFields({ ...service, price: Number(service.price || 0) + customFee, sprinklePreferences: details });
 }
 
 const enhancementRecommendationIds = ["loc-trim", "sprinkles-addon", "style-addon", "loc-repair"];
@@ -1042,6 +1046,7 @@ function serviceDetails(service) {
   if (service.category === "loc-maintenance") return ["Wash prep encouraged", "Retwist care", "Style included when noted"];
   if (service.category === "starter-locs") return ["Parting plan", "Starter method", "Aftercare guidance"];
   if (service.category === "instant-crochet") return ["Crochet needle work", "Longer appointment", "Loc shaping"];
+  if (service.standaloneAppointment) return ["Standalone install", "Up to two locs", "Custom notes welcome"];
   return ["Add-on service", "Book with main service", "Custom notes welcome"];
 }
 
@@ -1194,7 +1199,8 @@ function sprinklePreferenceModal() {
           <label>First Color or Preference<input name="preferenceOne" maxlength="60" required placeholder="Example: gold beads"></label>
           <label>Second Color or Preference <span class="optional-label">(optional)</span><input name="preferenceTwo" maxlength="60" placeholder="Example: clear crystals"></label>
           <label class="full">Color and Preference Notes <span class="optional-label">(optional)</span><textarea name="notes" maxlength="220" placeholder="Mention in-stock beads, client-provided beads, placement, or style notes."></textarea></label>
-          <p class="field-note full">Base price includes up to two color choices. Client-provided beads and beads already on hand have no upcharge. Very specific colors, custom jewelry, or jewelry purchased for your order start at an additional $15.</p>
+          <label class="full policy-ack"><input name="customJewelryOrder" type="checkbox"><span>Custom jewelry or a very specific color order (+$15 starting price)</span></label>
+          <p class="field-note full">Base price includes up to two color choices. Client-provided beads and beads already on hand have no upcharge. Select the custom option only when jewelry or a specific color must be purchased for your order.</p>
           <p class="form-error full" id="sprinklePreferenceStatus" aria-live="polite"></p>
           <div class="advisory-actions full">
             <button class="primary-btn" type="button" data-save-sprinkle-preference>Save Preferences</button>
@@ -3105,7 +3111,8 @@ function handleSprinklePreference() {
   const details = normalizeSprinklePreferences({
     preferenceOne: data.get("preferenceOne"),
     preferenceTwo: data.get("preferenceTwo"),
-    notes: data.get("notes")
+    notes: data.get("notes"),
+    customJewelryOrder: Boolean(data.get("customJewelryOrder"))
   });
   if (!details.preferences.length) {
     if (status) status.textContent = "Add at least one color or preference before selecting loc sprinkles.";

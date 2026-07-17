@@ -78,7 +78,7 @@ const serviceCatalog = [
   { id: "medium-adult-starter", duration: "6h 30min", price: 150, name: "Medium Adult Starter Locs", category: "starter-locs" },
   { id: "adult-retwist", duration: "3h 30min", price: 90, name: "Adult Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Standalone installation starts at $50 and includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
+  { id: "sprinkle-install", duration: "2h 15min", price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Standalone installation starts at $50 and includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", standaloneAppointment: true, requiresSprinklePreferences: true },
   { id: "children-retwist", duration: "3h", price: 75, name: "Children Retwist (Maintenance)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "adult-instant", duration: "5h 30min", price: 125, name: "Adult Instant Locs", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "child-instant", duration: "3h 30min", price: 85, name: "Children's Instant Loc", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
@@ -106,6 +106,7 @@ const allowedBaseProducts = new Set([
   "Bring Your Own Product",
 ]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
+const sprinkleCustomJewelryFee = 15;
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
   ["Natural C Parts", 0],
@@ -1760,7 +1761,7 @@ function nextAutomaticFriendTest() {
 }
 
 function isMainAppointmentService(item = {}) {
-  return item.type === "service" && item.category !== "add-ons" && item.category !== "admin-test";
+  return item.type === "service" && (item.standaloneAppointment || item.category !== "add-ons") && item.category !== "admin-test";
 }
 
 function cleanSprinklePreference(value = "") {
@@ -1773,7 +1774,7 @@ function normalizeSprinklePreferences(input = {}) {
     .map(cleanSprinklePreference)
     .filter(Boolean);
   const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
-  return { preferences, notes };
+  return { preferences, notes, customJewelryOrder: Boolean(source.customJewelryOrder) };
 }
 
 function validatedSprinklePreferences(input = {}, serviceName = "Loc Sprinkles") {
@@ -1787,6 +1788,7 @@ function sprinklePreferencesSummary(item = {}) {
   const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
   const parts = [];
   if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
+  if (details.customJewelryOrder) parts.push(`Custom jewelry/color order: +${sprinkleCustomJewelryFee} starting price`);
   if (details.notes) parts.push(`Notes: ${details.notes}`);
   return parts.join("; ");
 }
@@ -1825,9 +1827,11 @@ function pricedCartItem(item = {}) {
     const sprinklePreferences = exactService.requiresSprinklePreferences
       ? validatedSprinklePreferences(item.sprinklePreferences, exactService.name)
       : undefined;
+    const sprinkleCustomFee = sprinklePreferences?.customJewelryOrder ? sprinkleCustomJewelryFee : 0;
     return {
       ...exactService,
       type: "service",
+      price: exactService.price + sprinkleCustomFee,
       baseProduct: allowedBaseProducts.has(item.baseProduct) ? item.baseProduct : undefined,
       ...(item.shampooDeclined ? { shampooDeclined: true } : {}),
       ...(item.shampooDeclineAcknowledgement ? { shampooDeclineAcknowledgement: true } : {}),

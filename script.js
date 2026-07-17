@@ -1980,7 +1980,7 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>Client Accuracy &amp; Service Fit</h2>
-          <p>Clients are responsible for providing accurate hair history, timing, contact information, preferred dates, product preferences, and service notes. Please disclose scalp irritation, open areas, allergies, sensitivities, recent chemical services, product buildup, tension concerns, or anything that may affect whether a loc service is appropriate.</p>
+          <p>Clients are responsible for providing accurate hair history, timing, contact information, preferred dates, product preferences, and service notes. Allergies, sensitivities, scalp irritation, open areas, product restrictions, recent chemical services, product buildup, tension concerns, or anything that may affect whether a loc service is appropriate must be disclosed before services begin. Lovely Locs is not responsible for reactions, irritation, damage, or other issues caused by information that was not shared before the appointment or before products are applied.</p>
           <p>Lovely Locs provides listed natural-hair and loc grooming/styling services only. Lovely Locs does not provide medical care, scalp diagnosis, chemical services, cutting, coloring, relaxing, or any service outside the listed appointment scope unless it is separately confirmed and legally available. Lovely Locs may adjust, postpone, decline, or refer out a service if the selected booking does not match the condition, timing, safety, or needs of the client's hair/scalp.</p>
         </div>
         <div class="policy-box">
@@ -2821,7 +2821,7 @@ function bookingModal() {
               <label class="policy-ack"><input id="shampooDeclineAcknowledgement" name="shampooDeclineAcknowledgement" type="checkbox" ${profile.shampooDeclineAcknowledgement ? "checked" : ""}><span>${shampooDeclineAcknowledgement}</span></label>
             </div>
           ` : ""}
-          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
+          <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and allergies, sensitivities, scalp concerns, or product restrictions must be shared before services begin. Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
         <div id="bookingReferralPreview">
           ${personalReferralCard({ fullName: profile.fullName, preview: true })}

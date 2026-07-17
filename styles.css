@@ -990,9 +990,9 @@ h1, h2, h3,
 .share-icon-btn {
   width: 52px;
   height: 52px;
-  border: 1px solid var(--brown);
+  border: 1px solid color-mix(in srgb, var(--brown) 72%, var(--plum));
   border-radius: 14px;
-  background: var(--brown);
+  background: linear-gradient(135deg, var(--brown), var(--plum));
   color: var(--cream);
   display: inline-grid;
   place-items: center;
@@ -1000,46 +1000,25 @@ h1, h2, h3,
 }
 
 .share-icon-btn:hover {
-  background: var(--dark-brown);
+  background: linear-gradient(135deg, var(--dark-brown), var(--plum));
   transform: translateY(-1px);
 }
 
-.ios-share-icon {
-  position: relative;
-  width: 25px;
-  height: 27px;
+.share-arrow-icon {
+  width: 28px;
+  height: 28px;
   display: block;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
-.ios-share-icon:before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  bottom: 0;
-  width: 15px;
-  height: 15px;
-  border: 2px solid currentColor;
-  border-top: 0;
-  border-radius: 4px;
+.share-arrow-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-
-.ios-share-icon:after {
-  content: "";
-  position: absolute;
-  left: 11px;
-  top: 3px;
-  width: 2px;
-  height: 15px;
-  background: currentColor;
-  box-shadow: 0 0 0 currentColor;
-}
-
-.share-icon-btn .ios-share-icon {
-  background:
-    linear-gradient(135deg, transparent 47%, currentColor 48% 56%, transparent 57%) 6px 0 / 9px 9px no-repeat,
-    linear-gradient(45deg, transparent 47%, currentColor 48% 56%, transparent 57%) 11px 0 / 9px 9px no-repeat;
-}
-
 .share-status {
   width: 100%;
   color: var(--brown);
@@ -2844,11 +2823,19 @@ textarea { min-height: 92px; resize: vertical; }
   font-weight: 850;
 }
 
-.personal-referral-actions button:last-child {
+.personal-referral-actions .personal-share-btn {
   background: var(--plum);
   color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
+.personal-referral-actions .personal-share-btn .share-arrow-icon {
+  width: 21px;
+  height: 21px;
+}
 .personal-referral-status {
   min-height: 20px;
   color: var(--plum) !important;
@@ -2878,11 +2865,10 @@ textarea { min-height: 92px; resize: vertical; }
   color: #f2d8eb;
 }
 
-.dark .personal-referral-actions button:last-child {
+.dark .personal-referral-actions .personal-share-btn {
   background: #b995c8;
   color: #241916;
 }
-
 .advisory-panel {
   max-width: 620px;
 }

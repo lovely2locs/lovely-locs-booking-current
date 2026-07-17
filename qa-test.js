@@ -195,8 +195,11 @@ test("home renders core client sections", () => {
   assert(html.includes("Service Menu"), "service menu missing");
   assert(html.includes("Add-Ons & More"), "Add-Ons category should remain available in the main services area");
   assert(html.includes("Shampoo Service"), "Shampoo Service add-on missing");
-  assert(html.includes("ACV Deep Cleanse"), "ACV Deep Cleanse add-on missing");
-  assert(html.includes("Add-on service"), "shampoo add-on should no longer show eligibility confirmed copy");
+  assert(html.includes("ACV Clarifying Wash"), "ACV Clarifying Wash add-on missing");
+  assert(html.includes("Full ACV Buildup Removal Service"), "Full ACV Buildup Removal Service add-on missing");
+  assert(html.includes("$15"), "Shampoo Service price missing");
+  assert(html.includes("$25"), "ACV Clarifying Wash price missing");
+  assert(html.includes("$40"), "Full ACV Buildup Removal Service price missing");
   assert(!html.includes("Eligibility confirmed"), "old shampoo eligibility text should not render");
   assert(html.includes("Loc Trim"), "Loc Trim add-on missing");
   assert(html.includes("Loc Sprinkles Installation"), "Loc Sprinkles Installation add-on missing");
@@ -630,6 +633,11 @@ test("maintenance services can add Shampoo Service before cart", () => {
     const html = appHtml();
     assert(html.includes("Shampoo Service added to this appointment."), "cart should explain Shampoo Service was added");
     assert(html.includes("Services: Adult Retwist (Maintenance), Shampoo Service"), "booking summary should show Shampoo Service as a selected cart line");
+    assert(html.includes("Estimated Total: $105"), "booking summary should include Shampoo Service in the total");
+    assert(html.includes("Deposit Required Before Confirmation: $32"), "booking summary should update the deposit after Shampoo Service is added");
+    const summary = context.bookingSummaryFromForm(elements.bookingForm);
+    assert(summary.includes("- Shampoo Service ($15 | Time: 30 min)"), "booking form summary should include Shampoo Service price and duration");
+    assert(summary.includes("Estimated total: $105"), "booking form summary should include Shampoo Service total");
     assert(!html.includes('name="shampooDeclineAcknowledgement"'), "checkout should not request no-shampoo acknowledgement when Shampoo Service is selected");
   } finally {
     localStore.set("lovelyLocsCart", originalCart);
@@ -725,6 +733,34 @@ test("loc sprinkles collect required preferences from add-ons and recommendation
   const html = appHtml();
   assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
   assert(html.includes("Sprinkles Preferences: Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+});
+
+test("cleanse add-ons keep names prices totals and booking summary aligned", () => {
+  const originalCart = localStore.get("lovelyLocsCart") || "[]";
+  try {
+    context.clearCart();
+    context.addServiceFromAdvisory({ id: "shampoo-service", type: "service", name: "Shampoo Service", price: 15, duration: "30 min", category: "add-ons", description: "Standard shampoo cleanse add-on for clients who want Lovely Locs to shampoo their scalp and locs before the booked service." });
+    context.addServiceFromAdvisory({ id: "acv-clarifying-wash", type: "service", name: "ACV Clarifying Wash", price: 25, duration: "45 min", category: "add-ons", description: "Apple cider vinegar clarifying wash for light buildup, oils, or product residue that needs a deeper cleanse than a standard shampoo." });
+    context.addServiceFromAdvisory({ id: "full-acv-buildup-removal", type: "service", name: "Full ACV Buildup Removal Service", price: 40, duration: "1h", category: "add-ons", description: "Full ACV buildup removal for heavier product buildup, lint, odor, or residue before styling or maintenance begins." });
+    context.openBooking();
+    const html = appHtml();
+    assert(html.includes("Services: Shampoo Service, ACV Clarifying Wash, Full ACV Buildup Removal Service"), "booking summary should show all cleanse add-ons by approved name");
+    assert(html.includes("Estimated Total: $80"), "booking summary should total the three cleanse add-ons");
+    assert(html.includes("Deposit Required Before Confirmation: $30"), "booking summary should show minimum deposit for cleanse add-ons");
+    const summary = context.bookingSummaryFromForm(elements.bookingForm);
+    assert(summary.includes("- Shampoo Service ($15 | Time: 30 min)"), "summary should include Shampoo Service price and duration");
+    assert(summary.includes("- ACV Clarifying Wash ($25 | Time: 45 min)"), "summary should include ACV Clarifying Wash price and duration");
+    assert(summary.includes("- Full ACV Buildup Removal Service ($40 | Time: 1h)"), "summary should include Full ACV Buildup Removal Service price and duration");
+    assert(summary.includes("Estimated total: $80"), "summary should include cleanse add-on total");
+    const payload = context.bookingPayloadFromForm(elements.bookingForm);
+    assert(payload.selectedServices.map(item => item.name).join(", ") === "Shampoo Service, ACV Clarifying Wash, Full ACV Buildup Removal Service", "payload selected services should preserve cleanse add-on names");
+    assert(payload.selectedServices.map(item => item.price).join(",") === "15,25,40", "payload selected services should preserve cleanse add-on prices");
+    assert(payload.total === 80, "payload total should include all cleanse add-ons");
+    assert(payload.deposit === 30, "payload deposit should keep the minimum deposit");
+  } finally {
+    localStore.set("lovelyLocsCart", originalCart);
+    vm.runInContext("cart = loadCart(); render(currentRoute());", context);
+  }
 });
 
 test("direct add-on selection requires a compatible maintenance service", () => {

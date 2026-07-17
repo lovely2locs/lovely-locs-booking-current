@@ -1,4 +1,4 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const vm = require("vm");
 
 class FakeClassList {
@@ -662,8 +662,8 @@ test("starter locs ask parting preference and triangle parts add forty dollars",
 test("top booking buttons route clients to services instead of default checkout", () => {
   const script = fs.readFileSync("script.js", "utf8");
   assert(script.includes("function goToServices()"), "service routing helper missing");
-  assert(script.includes('document.querySelector("[data-header-booking]").addEventListener("click", () => {\n  goToServices();'), "header booking should route to services");
-  assert(script.includes('document.querySelector("[data-drawer-booking]").addEventListener("click", () => {\n  goToServices();'), "drawer booking should route to services");
+  assert(/document\.querySelector\("\[data-header-booking\]"\)\.addEventListener\("click", \(\) => \{\r?\n\s*goToServices\(\);/.test(script), "header booking should route to services");
+  assert(/document\.querySelector\("\[data-drawer-booking\]"\)\.addEventListener\("click", \(\) => \{\r?\n\s*goToServices\(\);/.test(script), "drawer booking should route to services");
   const modalStart = script.indexOf("function bookingModal()");
   const modalEnd = script.indexOf("function render", modalStart);
   const modal = script.slice(modalStart, modalEnd);
@@ -1163,9 +1163,14 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/availability"), "availability endpoint missing");
   assert(server.includes('const regularAppointmentTimes = ["11:00", "16:00"];'), "usual availability should allow two regular starts");
   assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00"];'), "scheduled workdays should expose only the 7 PM start");
-  assert(server.includes('"2026-06-24"'), "green scheduled June 24 date missing from availability override");
-  assert(server.includes('"2026-07-02"'), "green scheduled July 2 date missing from availability override");
-  assert(server.includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
+  assert(server.includes('"2026-06-27"'), "green scheduled June 27 date missing from availability override");
+  const scheduledWorkDatesBlock = server.match(/const scheduledWorkDates = new Set\(\[([\s\S]*?)\]\);/);
+  assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-01"'), "green scheduled July 1 date missing from availability override");
+  assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-10"'), "green scheduled July 10 date missing from availability override");
+  assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-16"'), "selected scheduled July 16 date missing from availability override");
+  assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-21"'), "July scheduled work availability should include the 21st");
+  assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-30"'), "July scheduled work availability should include later green July dates");
+  assert(server.includes('"7:00 PM - 10:30 PM"'), "scheduled workday label should show the 7 PM to 10:30 PM window");
   const holidayDatesBlock = server.match(/const holidayDates = new Set\(\[([\s\S]*?)\]\);/);
   assert(holidayDatesBlock && !holidayDatesBlock[1].includes('"2026-07-03"'), "July 3 should stay open for normal 11 AM or 4 PM availability");
   assert(server.includes('["2026-07-03", new Set(["11:00", "16:00"])]'), "July 3 should force both 11 AM and 4 PM open");
@@ -1177,6 +1182,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
     assert(server.includes(`"${date}"`), `major holiday emergency date missing: ${date}`);
   });
   assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
+  assert(server.includes('const bookingUnavailableFromDate = "2026-08-01";'), "August and later booking cutoff missing");
+  assert(server.includes("August dates are not open for booking yet."), "August cutoff message missing");
+  assert(server.includes("isOutsidePublicBookingWindow"), "public booking window guard missing");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
   assert(server.includes("emailReadyForClients"), "client email readiness status missing");
@@ -1379,6 +1387,7 @@ test("redesigned hero is proof-led instead of abstract art-led", () => {
   }
   console.log(`${passed}/${tests.length} tests passed`);
 })();
+
 
 
 

@@ -1060,6 +1060,9 @@ test("booking submission rejects past or too-soon appointment dates before backe
 });
 
 test("booking submission sends booking to backend and shows confirmation", async () => {
+  context.formValues.set("date", "2099-01-01");
+  context.formValues.set("time", "11:00");
+  elements.bookingTime.value = "11:00";
   context.lastAlert = "";
   context.window.location.href = "";
   elements.bookingError.textContent = "previous error";
@@ -1099,9 +1102,11 @@ test("admin no-charge booking submission does not require pay options URL", asyn
     username: "LOVELY2LOCS",
     email: "lovely2locs@gmail.com",
     referralCode: "LOVELYLOCS/LOVELY2LOCS"
-  });
-  context.window.location.hash = "#admin";
+  });  context.window.location.hash = "#admin";
   context.window.location.href = "";
+  context.formValues.set("date", "2099-01-01");
+  context.formValues.set("time", "11:00");
+  elements.bookingTime.value = "11:00";
   context.addAdminTestBooking();
   elements.policyAcknowledgement.checked = true;
   elements.shampooDeclineAcknowledgement.checked = true;

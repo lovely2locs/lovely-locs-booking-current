@@ -537,18 +537,18 @@ function shareArrowIconMarkup() {
       <path d="M4.8 22.8c3.8-8.2 9.5-11.2 16.1-11.2V6l7.1 7.4-7.1 7.4v-5.5c-6.3 0-11.2 2.2-16.1 7.5Z"></path>
     </svg>`;
 }
-function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview = false } = {}) {
+function personalReferralCard({ fullName = "", code = "", shareUrl = "", preview = false, compact = false } = {}) {
   const referralCode = normalizeReferralCode(code || referralCodeForName(fullName));
   const referralUrl = shareUrl || referralShareUrlForCode(referralCode);
   const codeMarkup = referralCode
     ? `<strong class="personal-referral-code">${escapeAttr(referralCode)}</strong>`
     : `<strong class="personal-referral-code muted">Enter your name above to create your code</strong>`;
   return `
-    <div class="personal-referral-card ${preview ? "preview" : ""}" data-personal-referral-card>
+    <div class="personal-referral-card ${preview ? "preview" : ""} ${compact ? "compact" : ""}" data-personal-referral-card>
       <div>
         <p class="eyebrow">Good People Know Good People</p>
         <h3>Your Personal Referral</h3>
-        <p>Share your code or link in seconds. Your personal referral code stays active for future bookings, and your referral reward becomes available after the new client's deposit is confirmed.</p>
+        <p>${compact ? "Your personal referral code stays active for future bookings." : "Share your code or link in seconds. Your personal referral code stays active for future bookings, and your referral reward becomes available after the new client's deposit is confirmed."}</p>
       </div>
       ${codeMarkup}
       ${referralCode ? `
@@ -2774,6 +2774,13 @@ function bookingModal() {
   const adminTest = isAdminTestBooking(cart);
   const showShampooDeclineAck = requiresShampooDeclineAcknowledgement(cart);
   const emergencySubmitHidden = profile.emergencySlot ? "" : " hidden";
+  const servicesSummary = selectedServices.length ? selectedServices.map(item => item.name).join(", ") : "No service selected yet. Please choose from the service menu before submitting.";
+  const durationSummary = selectedServices.length ? selectedServices.map(item => item.duration).join(" + ") : "";
+  const baseProductSummary = selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ");
+  const shampooPrepSummary = selectedServices.some(item => item.shampooDeclined) ? "Client will arrive freshly shampooed." : "";
+  const partingSummary = selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ");
+  const sprinklesSummary = selectedServices.filter(item => sprinklePreferencesSummary(item)).map(item => `${item.name} - ${sprinklePreferencesSummary(item)}`).join(", ");
+  const addOnsSummary = addOns.map(item => item.name).join(", ");
   const confirmationMarkup = bookingConfirmation ? `
         <div class="confirmation-panel">
           <strong>${adminTest ? "Test booking saved" : "Payment step ready"}</strong>
@@ -2781,35 +2788,37 @@ function bookingModal() {
         </div>
   ` : "";
   return `
-    <div class="modal" id="bookingModal">
-      <div class="modal-panel">
+    <div class="modal booking-modal" id="bookingModal">
+      <div class="modal-panel booking-modal-panel">
         <div class="modal-head">
           <div><h2>Appointment Request</h2><p class="duration">Review your service and send your details</p></div>
           <button class="modal-close" data-close-booking>x</button>
         </div>
         <div class="progress"><div></div></div>
-        <div class="modal-summary">
+        <div class="modal-summary booking-summary-compact">
           <strong>Booking Summary</strong>
           ${advisoryMessage ? `<p class="advisory-copy">${advisoryMessage}</p>` : ""}
           ${baseProductMessage ? `<p class="advisory-copy">${baseProductMessage}</p>` : ""}
           ${shampooMessage ? `<p class="advisory-copy">${shampooMessage}</p>` : ""}
           ${partingMessage ? `<p class="advisory-copy">${partingMessage}</p>` : ""}
-          ${selectedServices.length ? `<p>Services: ${selectedServices.map(item => item.name).join(", ")}</p>` : `<p>No service selected yet. Please choose from the service menu before submitting.</p>`}
-          ${selectedServices.length ? `<p>Estimated Service Time: ${selectedServices.map(item => item.duration).join(" + ")}</p>` : ""}
-          ${selectedServices.some(item => item.baseProduct) ? `<p>Base Product Preferences: ${selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ")}</p>` : ""}
-          ${selectedServices.some(item => item.shampooDeclined) ? `<p>Shampoo Preparation: Client will arrive freshly shampooed.</p>` : ""}
-          ${selectedServices.some(item => item.partingPreference) ? `<p>Parting Preferences: ${selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ")}</p>` : ""}
-          ${selectedServices.some(item => sprinklePreferencesSummary(item)) ? `<p>Sprinkles Preferences: ${selectedServices.filter(item => sprinklePreferencesSummary(item)).map(item => `${item.name} - ${sprinklePreferencesSummary(item)}`).join(", ")}</p>` : ""}
-          <p id="bookingAddOnsText">${addOns.length ? `Add-ons / products: ${addOns.map(item => item.name).join(", ")}` : ""}</p>
-          ${discountAmount ? `<p>Subtotal: ${money(subtotal)}</p>` : ""}
+          <div class="summary-line"><span>Services</span><strong>${servicesSummary}</strong></div>
+          ${durationSummary ? `<div class="summary-line"><span>Time</span><strong>${durationSummary}</strong></div>` : ""}
+          ${baseProductSummary ? `<div class="summary-line"><span>Products</span><strong>${baseProductSummary}</strong></div>` : ""}
+          ${shampooPrepSummary ? `<div class="summary-line"><span>Shampoo</span><strong>${shampooPrepSummary}</strong></div>` : ""}
+          ${partingSummary ? `<div class="summary-line"><span>Parting</span><strong>${partingSummary}</strong></div>` : ""}
+          ${sprinklesSummary ? `<div class="summary-line"><span>Sprinkles</span><strong>${sprinklesSummary}</strong></div>` : ""}
+          <p id="bookingAddOnsText">${addOnsSummary ? `Add-ons / products: ${addOnsSummary}` : ""}</p>
+          ${discountAmount ? `<div class="summary-line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>` : ""}
           <p id="bookingDiscountText">${discountAmount ? `Promo Discount (${appliedDiscountCodeLabel()}): -${money(discountAmount)}` : ""}</p>
-          <p id="bookingTotalText">Estimated Total: ${money(total)}</p>
-          <p id="bookingDepositText">Deposit Required Before Confirmation: ${money(deposit)}. Your appointment is not finalized until Lovely Locs confirms the deposit was received.</p>
+          <div class="summary-total-row">
+            <span id="bookingTotalText">Estimated Total: ${money(total)}</span>
+            <span id="bookingDepositText">Deposit: ${money(deposit)} due before confirmation</span>
+          </div>
           ${adminTest ? `<p class="advisory-copy">Admin test mode: no deposit payment will be requested for this booking.</p>` : ""}
         </div>
-        <div class="booking-save-note">
+        <div class="booking-save-note compact">
           <strong>Your details save automatically</strong>
-          <p id="bookingDraftStatus">${bookingDraft ? "Saved details restored. You can refresh or add another item without starting over." : "As you type, this unfinished booking will be saved on this device."}</p>
+          <p id="bookingDraftStatus">Saved on this device.</p>
         </div>
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
@@ -2844,11 +2853,11 @@ function bookingModal() {
           <label class="full policy-ack"><input id="policyAcknowledgement" name="policyAcknowledgement" type="checkbox" ${profile.policyAcknowledgement ? "checked" : ""}><span>I have read and agree to the Lovely Locs <a href="#policies" data-route="policies">booking policies</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>. I understand deposits are non-refundable, appointment times are estimates, quality work cannot be rushed, and allergies, sensitivities, scalp concerns, or product restrictions must be shared before services begin. Lovely Locs may adjust or decline services that are outside the listed loc/natural-hair scope or unsafe based on hair/scalp condition.</span></label>
         </form>
         <div id="bookingReferralPreview">
-          ${personalReferralCard({ fullName: profile.fullName, preview: true })}
+          ${personalReferralCard({ fullName: profile.fullName, preview: true, compact: true })}
         </div>
         <p class="form-error" id="bookingError" aria-live="polite"></p>
         ${confirmationMarkup}
-        <div class="modal-summary">
+        <div class="modal-summary before-submit-summary">
           <strong>Before You Submit</strong>
           ${adminTest
             ? `<p>This is an admin-only test booking. It saves the request and tests confirmation messages without creating a deposit payment step.</p>`
@@ -3128,8 +3137,7 @@ function handleSprinklePreference() {
   if (context === "enhancement") {
     pendingEnhancementAddOns = pendingEnhancementAddOns.filter(item => item.id !== configuredService.id);
     if (pendingEnhancementAddOns.filter(item => item.id !== "shampoo-service").length < 2) pendingEnhancementAddOns.push(configuredService);
-    render(currentRoute());
-    document.getElementById("enhancementModal")?.classList.add("open");
+    finishEnhancementAppointment(true);
     return;
   }
   addServiceFromAdvisory(configuredService);
@@ -3720,7 +3728,7 @@ function bindPersonalReferralActions(root = document) {
 function updateBookingReferralPreview(fullName) {
   const target = document.getElementById("bookingReferralPreview");
   if (!target) return;
-  target.innerHTML = personalReferralCard({ fullName, preview: true });
+  target.innerHTML = personalReferralCard({ fullName, preview: true, compact: true });
   bindPersonalReferralActions(target);
 }
 

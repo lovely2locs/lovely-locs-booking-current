@@ -701,7 +701,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   assert(html.includes("Loc Trim"), "Loc Trim should be recommended when compatible");
   assert(html.includes("Loc Sprinkles (Add On)"), "Loc Sprinkles add-on should be recommended when compatible");
   assert(html.includes("1h | $20"), "Loc Sprinkles maintenance add-on should show 1h and $20 in recommendations");
-  assert(html.includes("Custom jewelry or a very specific color order (+$15 starting price)"), "custom jewelry fee checkbox should be shown before adding sprinkles");
+  assert(html.includes("Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15"), "custom jewelry fee wording should be shown before adding sprinkles");
   assert(!html.includes("2h 15min | Starting at $50"), "standalone Loc Sprinkles install should not be recommended as a maintenance add-on");
   assert(!html.includes("Shampoo Service</h3>"), "Shampoo should not be recommended after maintenance configuration");
   assert(!html.includes("Basic Style</h3>"), "included Basic Style should not be recommended");
@@ -716,11 +716,16 @@ test("loc sprinkles collect required preferences from add-ons and recommendation
   const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 20, duration: "1h", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
   context.openSprinklePreference(directSprinkles, "cart");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
+  let html = appHtml();
+  assert(html.includes("BYOJ - Bring Your Own Jewels"), "sprinkles choice step should offer BYOJ");
+  assert(html.includes("Use On-Hand Beads"), "sprinkles choice step should offer on-hand beads");
+  assert(html.includes("Custom Colors or Styles (+$15)"), "sprinkles choice step should offer custom colors/styles");
+  assert(html.includes("Available colors may vary based on what is currently on hand."), "sprinkles choice step should show availability disclaimer");
   context.closeSprinklePreference();
   context.addServiceFromAdvisory(context.serviceWithSprinklePreferences(directSprinkles, { preferences: ["gold beads", "clear crystals"], notes: "client bringing rose gold cuffs", customJewelryOrder: true }));
-  const html = appHtml();
-  assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
-  assert(html.includes("<span>Sprinkles</span><strong>Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+  html = appHtml();
+  assert(html.includes("Sprinkles: Jewels: Custom Colors or Styles; Preferences: gold beads, clear crystals; Custom colors/styles: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
+  assert(html.includes("<span>Sprinkles</span><strong>Loc Sprinkles (Add On) - Jewels: Custom Colors or Styles; Preferences: gold beads, clear crystals; Custom colors/styles: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
   assert(html.includes("Estimated Total: $125"), "custom Loc Sprinkles jewelry fee should be included in cart total");
 });
 
@@ -728,15 +733,11 @@ test("loc sprinkles preference save adds direct add-on to cart", () => {
   context.clearCart();
   context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel" });
   const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 20, duration: "1h", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
-  context.formValues.set("preferenceOne", "gold beads");
-  context.formValues.set("preferenceTwo", "");
-  context.formValues.set("notes", "client-provided beads");
-  context.formValues.set("customJewelryOrder", "");
   context.openSprinklePreference(directSprinkles, "cart");
-  context.handleSprinklePreference();
+  context.handleSprinkleChoice("byoj");
   const html = appHtml();
-  assert(html.includes("Loc Sprinkles (Add On)"), "direct Loc Sprinkles preference save should add the service to cart");
-  assert(html.includes("Sprinkles: Preferences: gold beads; Notes: client-provided beads"), "direct Loc Sprinkles save should preserve preferences in cart");
+  assert(html.includes("Loc Sprinkles (Add On)"), "direct Loc Sprinkles choice should add the service to cart");
+  assert(html.includes("Sprinkles: Jewels: BYOJ - Bring Your Own Jewels; Notes: Client will bring their own jewels."), "direct Loc Sprinkles should preserve BYOJ choice in cart");
   assert(html.includes("Estimated Total: $110"), "direct Loc Sprinkles add-on should update the cart total");
 });
 
@@ -749,15 +750,32 @@ test("enhancement loc sprinkles preference save carries add-on into cart", () =>
   context.formValues.set("preferenceOne", "clear crystals");
   context.formValues.set("preferenceTwo", "");
   context.formValues.set("notes", "jewels on hand");
-  context.formValues.set("customJewelryOrder", "");
   context.toggleEnhancementAddOn("sprinkles-addon");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "enhancement Loc Sprinkles should open the preference modal");
   assert(!elements.enhancementModal.classList.contains("open"), "enhancement modal should not cover the Loc Sprinkles preference modal");
-  context.handleSprinklePreference();
+  assert(appHtml().includes("Use On-Hand Beads"), "enhancement Loc Sprinkles should open choice options first");
+  context.handleSprinkleChoice("on-hand");
   const html = appHtml();
   assert(html.includes("<strong>Loc Sprinkles (Add On)</strong>"), "enhancement Loc Sprinkles save should carry selected add-on into cart");
-  assert(html.includes("Sprinkles: Preferences: clear crystals; Notes: jewels on hand"), "enhancement Loc Sprinkles cart line should show preferences");
+  assert(html.includes("Sprinkles: Jewels: Use On-Hand Beads; Notes: Available colors may vary based on what is currently on hand."), "enhancement Loc Sprinkles cart line should show on-hand bead choice");
   assert(html.includes("Estimated Total: $110"), "enhancement Loc Sprinkles add-on should update cart total");
+});
+
+
+test("loc sprinkles custom choice opens details and adds custom fee", () => {
+  context.clearCart();
+  context.addToCart({ id: "adult-retwist", type: "service", name: "Adult Retwist (Maintenance)", price: 90, duration: "3h 30min", category: "loc-maintenance", baseProduct: "Gel" });
+  const directSprinkles = { id: "sprinkles-addon", type: "service", name: "Loc Sprinkles (Add On)", price: 20, duration: "1h", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true };
+  context.openSprinklePreference(directSprinkles, "cart");
+  context.handleSprinkleChoice("custom");
+  assert(appHtml().includes("First Color or Preference"), "custom Loc Sprinkles should open the detailed preference form");
+  context.formValues.set("preferenceOne", "emerald green");
+  context.formValues.set("preferenceTwo", "gold cuffs");
+  context.formValues.set("notes", "custom jewelry style");
+  context.handleSprinklePreference();
+  const html = appHtml();
+  assert(html.includes("Sprinkles: Jewels: Custom Colors or Styles; Preferences: emerald green, gold cuffs; Custom colors/styles: +$15 starting price; Notes: custom jewelry style"), "custom Loc Sprinkles should save detailed custom preferences");
+  assert(html.includes("Estimated Total: $125"), "custom Loc Sprinkles should add the $15 starting custom fee");
 });
 
 test("cleanse add-ons keep names prices totals and booking summary aligned", () => {
@@ -1351,12 +1369,14 @@ test("manual deposit confirmation preloads booking details from owner email link
 test("server validates loc sprinkles preference rules", () => {
   const server = fs.readFileSync("local-server.js", "utf8");
   assert(server.includes("requiresSprinklePreferences: true"), "sprinkles services should require preferences server-side");
-  assert(server.includes("Color and preference notes are required"), "server should reject sprinkles without preferences");
+  assert(server.includes("Choose BYOJ, on-hand beads, or custom colors/styles"), "server should require a sprinkles jewelry source choice");
+  assert(server.includes("Custom colors or styles require at least one color or preference"), "server should require custom colors/styles details only for custom sprinkles");
   assert(server.includes("includes up to two color or preference choices"), "server should cap base sprinkles preferences at two");
   assert(server.includes('id: "sprinkles-addon", duration: "1h", price: 20'), "server should trust the $20 one-hour Loc Sprinkles add-on");
   assert(server.includes("jewelry purchased specifically for your order start at an additional $15"), "server should mirror custom jewelry fee wording");
   assert(server.includes("const sprinkleCustomJewelryFee = 15"), "server should define trusted custom jewelry fee");
   assert(server.includes("price: exactService.price + sprinkleCustomFee"), "server should price custom Loc Sprinkles jewelry from trusted catalog data");
+  assert(server.includes("sprinkleJewelrySourceLabels"), "server should preserve the trusted sprinkles jewelry source labels");
   assert(server.includes("standaloneAppointment: true"), "standalone Loc Sprinkles installation should not require a maintenance service");
   assert(server.includes('priceLabel: "$3 per loc"'), "server loc repair should use $3 per loc label");
 });

@@ -436,6 +436,8 @@ test("privacy and terms routes render SMS safeguards", () => {
   assert(html.includes("Referral Rewards"), "referral reward safeguards missing");
   assert(html.includes("not guaranteed for every client"), "non-guarantee terms missing");
   assert(html.includes("Lovely Locs does not provide medical care"), "service-scope terms missing");
+  assert(html.includes("must be disclosed before services begin"), "pre-service allergy disclosure terms missing");
+  assert(html.includes("not responsible for reactions, irritation, damage, or other issues caused by information that was not shared"), "undisclosed allergy liability terms missing");
   assert(html.includes("quality work cannot be rushed"), "unrushed timing terms missing");
   assert(html.includes("including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates"), "terms transactional SMS scope missing");
   assert(!html.includes("campaign messages"), "terms should not include SMS campaign consent");

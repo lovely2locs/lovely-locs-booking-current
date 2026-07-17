@@ -135,7 +135,6 @@ const scheduledWorkDates = new Set([
   "2026-07-29",
   "2026-07-30",
 ]);
-const bookingUnavailableFromDate = "2026-08-01";
 const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"];
 const friendTestCampaign = "friends-booking-test-2026-06";
 const friendTestCampaignLimit = 10;
@@ -1478,12 +1477,7 @@ function dayOfWeek(date) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.getDay();
 }
 
-function isOutsidePublicBookingWindow(date) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) && date >= bookingUnavailableFromDate;
-}
-
 function appointmentTimesForDate(date) {
-  if (isOutsidePublicBookingWindow(date)) return [];
   return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
 }
 
@@ -1507,18 +1501,8 @@ function availabilityForDate(date) {
   const booked = bookedTimesForDate(date);
   const holiday = isHoliday(date);
   const isSunday = dayOfWeek(date) === 0;
-  const outsidePublicBookingWindow = isOutsidePublicBookingWindow(date);
   const scheduledWorkDate = scheduledWorkDates.has(date);
   const appointmentTimes = appointmentTimesForDate(date);
-  if (outsidePublicBookingWindow) {
-    return {
-      date,
-      holiday: false,
-      regularHours: "July dates only",
-      note: "August dates are not open for booking yet.",
-      slots: [],
-    };
-  }
   const forcedOpenTimes = forcedOpenAppointmentTimes.get(date) || new Set();
   const holidayTimes = holidayAppointmentTimesByDate.get(date) || [];
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();

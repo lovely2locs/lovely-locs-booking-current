@@ -257,7 +257,7 @@ async function main() {
     const birthdayConfirm = await confirmDeposit(birthdayRedeem.id);
     assert(birthdayConfirm.redeemedCredit?.creditType === "birthday", "Birthday credit is redeemed after deposit confirmation.", birthdayConfirm);
 
-    const returningFirstVisitDate = await firstOpenDate(["2026-06-18", "2026-06-17", "2026-06-16"]);
+    const returningFirstVisitDate = await firstOpenDate(["2026-09-23", "2026-09-24", "2026-09-25"]);
     const returningClient = client({ fullName: "Returning Client", email: "returning.client@example.test", phone: "3364711105", date: returningFirstVisitDate });
     const returningFirstVisit = await createBooking(returningClient);
     await confirmDeposit(returningFirstVisit.id);
@@ -266,7 +266,7 @@ async function main() {
     const returningCredit = returningSettings.credits.find(credit => credit.type === "returning" && credit.status === "available");
     assert(Boolean(returningCredit) && returningCredit.amountOff === 5, "Returning client receives the one-time $5 credit after the first completed visit.", returningSettings.credits);
     assert(returningSettings.pastVisits.some(visit => visit.bookingId === returningFirstVisit.id), "Past Visits lists the completed first appointment.", returningSettings.pastVisits);
-    const returningRebook = await createBooking({ ...returningClient, date: "2026-07-10" });
+    const returningRebook = await createBooking({ ...returningClient, date: "2026-09-30" });
     assert(String(returningRebook.discountCode || "").startsWith("RETURN5-") && returningRebook.discountAmount === 5 && returningRebook.total === 85, "Returning client credit automatically applies to the next booking.", returningRebook);
     const returningRebookConfirm = await confirmDeposit(returningRebook.id);
     assert(returningRebookConfirm.redeemedCredit?.creditType === "returning", "Returning client credit is redeemed after the next deposit confirmation.", returningRebookConfirm);

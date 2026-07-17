@@ -469,8 +469,6 @@ function saveBookingDraft(form) {
     birthday: data.get("birthday") || "",
     referredByCode: data.get("referredByCode") || "",
     emergencySlot: Boolean(data.get("emergencySlot")),
-    preferredContact: data.get("preferredContact") || "email",
-    smsOptIn: Boolean(data.get("smsOptIn")),
     specialRequests: data.get("specialRequests") || "",
     shampooDeclineAcknowledgement: Boolean(data.get("shampooDeclineAcknowledgement")),
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
@@ -646,8 +644,8 @@ function saveClientProfile(profile = {}) {
     locJourneyLength: profile.locJourneyLength || "",
     onboardingCompleted: Boolean(profile.onboardingCompleted),
     googleLinked: Boolean(profile.googleLinked),
-    preferredContact: profile.preferredContact || "email",
-    smsOptIn: Boolean(profile.smsOptIn),
+    preferredContact: "email",
+    smsOptIn: false,
     marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
     referralOptIn: Boolean(profile.referralOptIn),
     referralCode: profile.referralCode || "",
@@ -822,7 +820,6 @@ const friendTestCheckpoints = [
   { id: "policies", label: "Policies & FAQ" },
   { id: "contact", label: "Contact" },
   { id: "privacy", label: "Privacy" },
-  { id: "sms-opt-in", label: "SMS Opt-In" },
   { id: "terms", label: "Terms" }
 ];
 
@@ -1392,7 +1389,7 @@ function googleSignupFormMarkup() {
       <form class="form-grid" id="googleSignupForm">
         <label>Full Name<input name="fullName" required autocomplete="name" value="${escapeAttr(saved.fullName || googleSignupState.fullName)}"></label>
         <label>Google Email<input name="email" type="email" readonly value="${escapeAttr(googleSignupState.email)}"></label>
-        <label>Phone Number<input name="phone" required autocomplete="tel" placeholder="(555) 123-4567" value="${escapeAttr(saved.phone)}"></label>
+        <label>Phone Number <span class="optional-label">(optional)</span><input name="phone" autocomplete="tel" placeholder="(555) 123-4567" value="${escapeAttr(saved.phone)}"></label>
         <label>Birthday <span class="optional-label">(optional)</span><input name="birthday" type="date" autocomplete="bday" value="${escapeAttr(saved.birthday)}"></label>
         <label class="full">How long have you been on your loc journey? <span class="optional-label">(optional)</span>
           <select name="locJourneyLength">
@@ -1452,10 +1449,10 @@ function clientSettingsPage() {
   const authMode = clientSettingsMode();
   const authHeading = authMode === "signup" ? "Sign Up" : authMode === "account" ? "Account" : "Login";
   const authSubtitle = authMode === "signup"
-    ? "Create your Lovely Locs profile with Google, or use your booking email and phone after your first appointment."
+    ? "Create your Lovely Locs profile with Google, or use your booking email after your first appointment."
     : authMode === "account"
       ? "Manage your referral code, Past Visits, earned credits, and saved sign-in details."
-      : "Use the same email and phone number from your booking to see your referral code, Past Visits, and earned credits.";
+      : "Use the same email from your booking to see your referral code, Past Visits, and earned credits.";
   const creditRows = result?.credits?.length
     ? result.credits.map(credit => {
       const dates = credit.type === "birthday" && credit.validFrom && credit.expiresAt ? ` (${credit.validFrom} - ${credit.expiresAt})` : "";
@@ -1492,14 +1489,14 @@ function clientSettingsPage() {
                  <a class="${authMode === "login" ? "primary-btn" : "outline-btn"}" href="#${clientSettingsRoute("login")}" data-route="client-settings">Login</a>`
             }
           </div>
-          <p class="past-visit-meta">${savedClientProfile ? "Log out when you are done on a shared device." : "New clients can sign up with Google. Returning clients can log in with Google or the same booking email and phone number."}</p>
+          <p class="past-visit-meta">${savedClientProfile ? "Log out when you are done on a shared device." : "New clients can sign up with Google. Returning clients can log in with Google or the same booking email."}</p>
         </div>
         <div class="policy-box">
           <h2>${authMode === "signup" ? "Already Booked? Log In Here" : "Look Up Your Settings"}</h2>
           ${savedClientProfile ? `<p class="promo-status success">Saved profile: ${escapeAttr(savedClientProfile.email || savedClientProfile.phone)}</p>` : ""}
           <form class="form-grid" id="clientSettingsForm">
             <label>Booking Email<input name="email" type="email" required placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
-            <label>Booking Phone<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
+            <label>Booking Phone <span class="optional-label">(optional)</span><input name="phone" placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
             <p class="form-error" id="clientSettingsStatus" aria-live="polite"></p>
             <button class="primary-btn" type="button" data-client-settings-login>${savedClientProfile ? "Refresh My Settings" : "Log In"}</button>
           </form>
@@ -1926,18 +1923,18 @@ function privacyPage() {
   return `
     <section class="hero route-page" id="privacy-page">
       <h1>Privacy Policy</h1>
-      <p class="subtitle">How Lovely Locs handles booking, contact, and SMS information.</p>
+      <p class="subtitle">How Lovely Locs handles booking and contact information.</p>
     </section>
     <section class="section">
       <div class="narrow legal-stack">
         <div class="policy-box">
           <p class="eyebrow">Effective Date</p>
           <h2>Lovely Locs Privacy Policy</h2>
-          <p>This Privacy Policy explains how Lovely Locs collects, uses, and protects information provided through this booking website, appointment forms, text messages, emails, and direct client communication.</p>
+          <p>This Privacy Policy explains how Lovely Locs collects, uses, and protects information provided through this booking website, appointment forms, emails, and direct client communication.</p>
         </div>
         <div class="policy-box">
           <h2>Information We Collect</h2>
-          <p>Lovely Locs may collect your name, email address, phone number, preferred appointment date, selected services, product or parting preferences, special requests, referral notes, opt-in status, and message history related to your appointment.</p>
+          <p>Lovely Locs may collect your name, email address, optional phone number, preferred appointment date, selected services, product or parting preferences, special requests, referral notes, and message history related to your appointment.</p>
         </div>
         <div class="policy-box">
           <h2>How We Use Information</h2>
@@ -1945,17 +1942,8 @@ function privacyPage() {
           <p>Referral rewards are not guaranteed and may vary based on availability, eligibility, timing, and active campaign rules.</p>
         </div>
         <div class="policy-box">
-          <h2>SMS Privacy &amp; Consent</h2>
-          <p>By choosing to receive texts from Lovely Locs, you consent to receive booking-related text messages, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help.</p>
-          <p><strong>Lovely Locs does not sell, rent, or share SMS opt-in data, phone numbers, or text messaging consent with third parties for their own marketing or promotional purposes.</strong></p>
-        </div>
-        <div class="policy-box">
-          <h2>Opt-Out &amp; Help</h2>
-          <p>You can opt out of SMS messages at any time by replying STOP. You can request help by replying HELP. After opting out, you may receive one final message confirming your opt-out.</p>
-        </div>
-        <div class="policy-box">
           <h2>Service Providers</h2>
-          <p>Lovely Locs may use trusted service providers, such as SMS, email, hosting, booking, or payment processors, only as needed to operate the booking process and client communication. These providers are not authorized to use your information for their own unrelated marketing.</p>
+          <p>Lovely Locs may use trusted service providers, such as email, hosting, booking, or payment processors, only as needed to operate the booking process and client communication. These providers are not authorized to use your information for their own unrelated marketing.</p>
         </div>
         <div class="policy-box">
           <h2>Data Care</h2>
@@ -1963,7 +1951,7 @@ function privacyPage() {
         </div>
         <div class="policy-box">
           <h2>Contact</h2>
-          <p>Questions about this Privacy Policy can be sent to <a href="mailto:${business.email}">${business.email}</a> or by contacting Lovely Locs at ${business.phone}.</p>
+          <p>Questions about this Privacy Policy can be sent to <a href="mailto:${business.email}">${business.email}</a>.</p>
         </div>
       </div>
     </section>
@@ -1976,14 +1964,14 @@ function termsPage() {
   return `
     <section class="hero route-page" id="terms-page">
       <h1>Terms &amp; Conditions</h1>
-      <p class="subtitle">Booking, payment, cancellation, and SMS terms for Lovely Locs clients.</p>
+      <p class="subtitle">Booking, payment, and cancellation terms for Lovely Locs clients.</p>
     </section>
     <section class="section">
       <div class="narrow legal-stack">
         <div class="policy-box">
           <p class="eyebrow">Effective Date</p>
           <h2>Lovely Locs Terms &amp; Conditions</h2>
-          <p>By submitting an appointment request, using this website, or opting in to Lovely Locs messages, you agree to these Terms &amp; Conditions and the Lovely Locs Privacy Policy.</p>
+          <p>By submitting an appointment request or using this website, you agree to these Terms &amp; Conditions and the Lovely Locs Privacy Policy.</p>
         </div>
         <div class="policy-box">
           <h2>Appointment Requests</h2>
@@ -2006,11 +1994,6 @@ function termsPage() {
           <p>Results vary by hair history, density, length, product buildup, maintenance routine, scalp condition, and the service selected. Lovely Locs will use care and clear communication, but no style, parting, timing, longevity, repair, or transformation result is guaranteed.</p>
         </div>
         <div class="policy-box">
-          <h2>SMS Terms</h2>
-          <p>By checking the optional SMS consent box, you agree to receive Lovely Locs text messages about your booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message frequency varies. Message and data rates may apply.</p>
-          <p>Reply STOP to opt out of texts. Reply HELP for help. Opting out may limit text-based updates, but you may still contact Lovely Locs directly by email or other available methods.</p>
-        </div>
-        <div class="policy-box">
           <h2>Referral Rewards</h2>
           <p>Referral rewards are occasional opportunities only. They are not guaranteed for every client, service, booking, referral, or opt-in. Referral rules may vary based on availability, eligibility, timing, campaign rules, and Lovely Locs discretion.</p>
         </div>
@@ -2020,40 +2003,7 @@ function termsPage() {
         </div>
         <div class="policy-box">
           <h2>Contact</h2>
-          <p>Questions about these Terms can be sent to <a href="mailto:${business.email}">${business.email}</a> or by contacting Lovely Locs at ${business.phone}.</p>
-        </div>
-      </div>
-    </section>
-    ${cartMarkup()}
-    ${bookingModal()}
-  `;
-}
-
-function smsOptInPage() {
-  return `
-    <section class="hero route-page" id="sms-opt-in-page">
-      <h1>SMS Opt-In</h1>
-      <p class="subtitle">Text messaging is coming soon. You can provide consent now for future booking confirmations, payment updates, appointment reminders, and service-related text updates.</p>
-    </section>
-    <section class="section">
-      <div class="narrow legal-stack">
-        <div class="policy-box sms-optin-proof">
-          <p class="eyebrow">Consent Form</p>
-          <h2>Lovely Locs Text Message Opt-In <span class="coming-soon-badge">Coming Soon</span></h2>
-          <p class="coming-soon-notice"><strong>Text service is not active yet.</strong> Email confirmations remain available while Lovely Locs completes carrier approval.</p>
-          <p>Complete this form if you would like to receive booking-related text messages from Lovely Locs. Texts may include appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates.</p>
-          <form class="sms-optin-form">
-            <label>Full Name<input name="smsOptInName" placeholder="Your name"></label>
-            <label>Mobile Number<input name="smsOptInPhone" placeholder="(555) 123-4567"></label>
-            <label class="full policy-ack sms-consent"><input name="smsConsent" type="checkbox"><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. I agree to the <a href="#privacy" data-route="privacy">Privacy Policy</a> and <a href="#terms" data-route="terms">Terms &amp; Conditions</a>.</span></label>
-            <button class="primary-btn" type="button" data-copy-optin-proof>Copy Opt-In Link</button>
-          </form>
-          <p class="duration">This opt-in checkbox is intentionally not preselected. Clients must choose it themselves.</p>
-        </div>
-        <div class="policy-box">
-          <h2>For Twilio Proof of Consent</h2>
-          <p>Use this page as the consent form URL for Lovely Locs. You can also screenshot this form showing the unchecked consent box and disclosures.</p>
-          <p>Public opt-in URL: <strong>https://lovelylocsnc.com/#sms-opt-in</strong></p>
+          <p>Questions about these Terms can be sent to <a href="mailto:${business.email}">${business.email}</a>.</p>
         </div>
       </div>
     </section>
@@ -2070,7 +2020,6 @@ function contactCard() {
       <p>Send a quick note and Lovely Locs will help you choose the service that fits your hair, timing, and style goals.</p>
       <div class="contact-actions">
         <a class="contact-pill" href="mailto:${business.email}">Email Lovely Locs</a>
-        <a class="contact-pill" href="sms:${business.phone.replace(/[^0-9]/g, "")}">Text ${business.phone}</a>
       </div>
       <p class="contact-foot">${business.area} | In-home studio by appointment only</p>
     </div>
@@ -2859,7 +2808,7 @@ function bookingModal() {
         <form class="form-grid" id="bookingForm">
           <label>Full Name<input name="fullName" required placeholder="Your name" value="${escapeAttr(profile.fullName)}"></label>
           <label>Email Address<input name="email" required type="email" placeholder="you@example.com" value="${escapeAttr(profile.email)}"></label>
-          <label>Phone Number<input name="phone" required placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"></label>
+          <label>Phone Number <span class="optional-label">(optional)</span><input name="phone" placeholder="(555) 123-4567" value="${escapeAttr(profile.phone)}"><span class="field-note">Email is the active confirmation method. Phone is optional.</span></label>
           <div class="appointment-date-field">
             <span class="appointment-date-label">Appointment Date</span>
             <div class="appointment-date-picker">
@@ -2879,14 +2828,6 @@ function bookingModal() {
           <label>Were You Referred? <span class="optional-label">(optional)</span><input name="referredByCode" value="${escapeAttr(profile.referredByCode || referredByCodeFromUrl())}" placeholder="LOVELYLOCS/FRIENDNAME"><span class="field-note">Enter the personal code shared by the client who referred you.</span></label>
           ${adminTest ? `<label class="full">Admin Token<input name="adminToken" type="password" required placeholder="Private owner token" autocomplete="current-password"><span class="field-note">Required for no-charge owner test bookings.</span></label>` : ""}
           ${slotPickerMarkup(profile)}
-          <fieldset class="full contact-preference">
-            <legend>Preferred Point of Contact</legend>
-            <label><input name="preferredContact" type="radio" value="text_email" ${profile.preferredContact === "text_email" ? "checked" : ""}><span class="contact-option-text">Text + Email</span><span class="coming-soon-label">Coming Soon</span></label>
-            <label><input name="preferredContact" type="radio" value="text" ${profile.preferredContact === "text" ? "checked" : ""}><span class="contact-option-text">Text</span><span class="coming-soon-label">Coming Soon</span></label>
-            <label><input name="preferredContact" type="radio" value="email" ${!profile.preferredContact || profile.preferredContact === "email" ? "checked" : ""}><span class="contact-option-text">Email</span></label>
-            <p>Text messaging is coming soon while carrier approval is completed. Choose Email for active confirmations. You may still provide optional text-message consent now.</p>
-          </fieldset>
-          <label class="full policy-ack sms-consent"><input name="smsOptIn" type="checkbox" ${profile.smsOptIn ? "checked" : ""}><span>I agree to receive text messages from Lovely Locs about my booking, including appointment confirmations, deposit/payment updates, appointment reminders, and service-related updates. Message and data rates may apply. Message frequency varies. Reply STOP to opt out and HELP for help. See our <a href="#sms-opt-in" data-route="sms-opt-in">SMS Opt-In</a>, <a href="#privacy" data-route="privacy">Privacy Policy</a>, and <a href="#terms" data-route="terms">Terms</a>.</span></label>
           <label class="full">Special Requests<textarea name="specialRequests" placeholder="Retwist product preference, style ideas, hair history, or notes...">${escapeAttr(profile.specialRequests)}</textarea></label>
           ${showShampooDeclineAck ? `
             <div class="full shampoo-prep-ack">
@@ -2927,7 +2868,6 @@ function render(route = currentRoute()) {
   if (route === "policies") app.innerHTML = policiesPage();
   else if (route === "products") app.innerHTML = productsPage();
   else if (route === "contact") app.innerHTML = contactPage();
-  else if (route === "sms-opt-in") app.innerHTML = smsOptInPage();
   else if (route === "privacy") app.innerHTML = privacyPage();
   else if (route === "terms") app.innerHTML = termsPage();
   else if (route === "payment-options") app.innerHTML = paymentOptionsPage();
@@ -2953,8 +2893,8 @@ function scrollRouteToTop(route) {
 
 function currentRoute() {
   const hash = window.location.hash.replace("#", "").split("?")[0];
-  const route = ["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "client-settings", "admin", "admin-confirm-deposit", "versions"].includes(hash) ? hash : "home";
-  if (!["policies", "products", "contact", "sms-opt-in", "privacy", "terms", "payment-options", "payment-success", "admin", "admin-confirm-deposit", "versions", "home", ""].includes(hash)) {
+  const route = ["policies", "products", "contact", "privacy", "terms", "payment-options", "payment-success", "client-settings", "admin", "admin-confirm-deposit", "versions"].includes(hash) ? hash : "home";
+  if (!["policies", "products", "contact", "privacy", "terms", "payment-options", "payment-success", "admin", "admin-confirm-deposit", "versions", "home", ""].includes(hash)) {
     pendingAnchor = hash;
   }
   if ((route === "admin" || route === "admin-confirm-deposit") && !isOwnerAccount()) {
@@ -3375,7 +3315,6 @@ function bindDynamic() {
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
   document.querySelectorAll("[data-copy-booking]").forEach(button => button.addEventListener("click", copyBookingLink));
-  document.querySelectorAll("[data-copy-optin-proof]").forEach(button => button.addEventListener("click", copySmsOptInLink));
   document.getElementById("cartButton")?.addEventListener("click", openCart);
   document.querySelectorAll("[data-close-cart]").forEach(item => item.addEventListener("click", closeCart));
   document.querySelectorAll(".faq-item button").forEach(button => button.addEventListener("click", () => button.parentElement.classList.toggle("open")));
@@ -3815,17 +3754,6 @@ async function shareBookingSite() {
   await copyBookingLink();
 }
 
-async function copySmsOptInLink() {
-  const origin = window.location.origin || "http://127.0.0.1:4175";
-  const url = `${origin}/#sms-opt-in`;
-  try {
-    await navigator.clipboard?.writeText(url);
-    setShareStatus("SMS opt-in link copied.");
-  } catch {
-    setShareStatus(`Copy this SMS opt-in link: ${url}`);
-  }
-}
-
 function logoSettingsFromForm() {
   const form = document.getElementById("brandSettingsForm");
   const data = new FormData(form);
@@ -4219,13 +4147,11 @@ function bookingSummaryFromForm(form) {
     "",
     `Client: ${client.fullName}`,
     `Email: ${client.email}`,
-    `Phone: ${client.phone}`,
+    client.phone ? `Phone: ${client.phone}` : "",
     `Appointment date: ${client.date}`,
     `Appointment time: ${timeLabel(client.time)}`,
     client.birthday ? `Birthday credit date: ${client.birthday}` : "",
     `Appointment type: ${client.emergencySlot ? "Emergency proposal" : "Regular appointment"}`,
-    `Preferred contact: ${contactPreferenceLabel(client.preferredContact)}`,
-    `Optional communications opt-in: ${client.smsOptIn ? "Yes" : "No"}`,
     client.referredByCode ? `Referred by code: ${client.referredByCode}` : "",
     "",
     "Services:",
@@ -4250,7 +4176,6 @@ function bookingPayloadFromForm(form) {
   const addOns = cart.filter(item => item.type !== "service");
   const total = discountedCartTotal();
   const deposit = bookingDeposit(total, cart);
-  const communicationsOptIn = Boolean(data.get("smsOptIn"));
   const cartShampooDeclineAcknowledged = shampooDeclineAcknowledged(cart);
   return {
     ...(isAdminTestBooking(cart) ? { adminToken: data.get("adminToken") || "" } : {}),
@@ -4264,8 +4189,8 @@ function bookingPayloadFromForm(form) {
       date: data.get("date") || "",
       time: data.get("time") || "",
       emergencySlot: Boolean(data.get("emergencySlot")),
-      preferredContact: data.get("preferredContact") || "email",
-      smsOptIn: communicationsOptIn,
+      preferredContact: "email",
+      smsOptIn: false,
       marketingEmailOptIn: false,
       referralOptIn: false,
       referredByCode: normalizeReferralCode(data.get("referredByCode") || ""),
@@ -4280,22 +4205,6 @@ function bookingPayloadFromForm(form) {
     policyAcknowledgement: Boolean(data.get("policyAcknowledgement")),
     shampooDeclineAcknowledgement: requiresShampooDeclineAcknowledgement(cart) ? Boolean(data.get("shampooDeclineAcknowledgement")) : cartShampooDeclineAcknowledged,
     friendTest: friendTestSnapshot(true)
-  };
-}
-
-function contactPreferenceLabel(value) {
-  if (value === "text") return "Text";
-  if (value === "email") return "Email";
-  return "Text + Email";
-}
-
-function confirmationLinks(summary) {
-  const subject = encodeURIComponent("Lovely Locs Appointment Request");
-  const body = encodeURIComponent(summary);
-  const phone = business.phone.replace(/[^0-9]/g, "");
-  return {
-    mailto: `mailto:${business.email}?subject=${subject}&body=${body}`,
-    sms: `sms:${phone}?&body=${body}`
   };
 }
 

@@ -107,6 +107,11 @@ const allowedBaseProducts = new Set([
 ]);
 const allowedLocJourneyLengths = new Set(["", "exploring", "under_1_year", "1_to_3_years", "3_to_5_years", "5_plus_years"]);
 const sprinkleCustomJewelryFee = 15;
+const sprinkleJewelrySourceLabels = {
+  byoj: "BYOJ - Bring Your Own Jewels",
+  "on-hand": "Use On-Hand Beads",
+  custom: "Custom Colors or Styles"
+};
 const allowedPartingFees = new Map([
   ["Brick Layered Parts", 0],
   ["Natural C Parts", 0],
@@ -1774,12 +1779,17 @@ function normalizeSprinklePreferences(input = {}) {
     .map(cleanSprinklePreference)
     .filter(Boolean);
   const notes = cleanSprinklePreference(source.notes || "").slice(0, 220);
-  return { preferences, notes, customJewelryOrder: Boolean(source.customJewelryOrder) };
+  const requestedSource = String(source.jewelrySource || "").trim();
+  const jewelrySource = Object.prototype.hasOwnProperty.call(sprinkleJewelrySourceLabels, requestedSource)
+    ? requestedSource
+    : (source.customJewelryOrder ? "custom" : "");
+  return { preferences, notes, jewelrySource, customJewelryOrder: Boolean(source.customJewelryOrder || jewelrySource === "custom") };
 }
 
 function validatedSprinklePreferences(input = {}, serviceName = "Loc Sprinkles") {
   const details = normalizeSprinklePreferences(input);
-  if (!details.preferences.length) throw new Error(`Color and preference notes are required for ${serviceName}.`);
+  if (!details.jewelrySource) throw new Error(`Choose BYOJ, on-hand beads, or custom colors/styles for ${serviceName}.`);
+  if (details.customJewelryOrder && !details.preferences.length) throw new Error(`Custom colors or styles require at least one color or preference for ${serviceName}.`);
   if (details.preferences.length > 2) throw new Error(`The base price for ${serviceName} includes up to two color or preference choices.`);
   return details;
 }
@@ -1787,8 +1797,9 @@ function validatedSprinklePreferences(input = {}, serviceName = "Loc Sprinkles")
 function sprinklePreferencesSummary(item = {}) {
   const details = normalizeSprinklePreferences(item.sprinklePreferences || {});
   const parts = [];
+  if (details.jewelrySource) parts.push(`Jewels: ${sprinkleJewelrySourceLabels[details.jewelrySource]}`);
   if (details.preferences.length) parts.push(`Preferences: ${details.preferences.slice(0, 2).join(", ")}`);
-  if (details.customJewelryOrder) parts.push(`Custom jewelry/color order: +${sprinkleCustomJewelryFee} starting price`);
+  if (details.customJewelryOrder) parts.push(`Custom colors/styles: +$${sprinkleCustomJewelryFee} starting price`);
   if (details.notes) parts.push(`Notes: ${details.notes}`);
   return parts.join("; ");
 }

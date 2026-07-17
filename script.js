@@ -61,6 +61,7 @@ function paymentOptionHandleMarkup(option = {}) {
   return escapeAttr(handle);
 }
 
+const minimumBookingLeadMs = 24 * 60 * 60 * 1000;
 const regularAppointmentTimes = ["11:00", "16:00"];
 const scheduledWorkAppointmentTimes = ["19:00"];
 const scheduledWorkDates = new Set([
@@ -117,13 +118,13 @@ const services = [
   { id: "acv-clarifying-wash", duration: "45 min", featured: false, price: 25, name: "ACV Clarifying Wash", description: "Apple cider vinegar clarifying wash for light buildup, oils, or product residue that needs a deeper cleanse than a standard shampoo.", category: "add-ons" },
   { id: "full-acv-buildup-removal", duration: "1h", featured: false, price: 40, name: "Full ACV Buildup Removal Service", description: "Full ACV buildup removal for heavier product buildup, lint, odor, or residue before styling or maintenance begins.", category: "add-ons" },
   { id: "loc-trim", duration: "20 min", featured: false, price: 10, name: "Loc Trim", description: "Light loc end trim for maintenance clients when the trim is compatible with the selected appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
-  { id: "sprinkles-addon", duration: "30 min", featured: false, price: 15, name: "Loc Sprinkles (Add On)", description: "Base $15 option covers up to two locs and includes only in-stock beads unless you bring your own beads. Add color and preference notes before it is added.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
+  { id: "sprinkles-addon", duration: "1h", featured: false, price: 20, name: "Loc Sprinkles (Add On)", description: "Maintenance add-on includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true, requiresSprinklePreferences: true },
   { id: "emergency-fee", duration: "3h", featured: false, price: 45, name: "Emergency Fee", description: "Additional fee for emergency bookings. Applies to same-day, within 24 hours, and major holiday appointments.", category: "add-ons" },
   { id: "children-instant-starter", duration: "5h", featured: false, price: 150, name: "Children Instant Starter Locs", description: "Instant starter locs for children. Ask about children's bundle services.", category: "starter-locs" },
   { id: "medium-adult-starter", duration: "6h 30min", featured: false, price: 150, name: "Medium Adult Starter Locs", description: "Medium-sized starter locs for adults.", category: "starter-locs" },
   { id: "adult-retwist", duration: "3h 30min", featured: false, price: 90, name: "Adult Retwist (Maintenance)", description: "Keep your loc journey beautiful with a fresh retwist focused on neatness and hydration. Includes a complimentary two-strand twist style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "child-starter-coils", duration: "3h 30min", featured: false, price: 75, name: "Children's Starter Locs Coils & Two Strand Twist", description: "Starter locs for children using coils and two-strand twist method.", category: "starter-locs" },
-  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Starting at $50. Base installation covers up to two locs and includes only in-stock beads unless you bring your own beads. Add up to two color or preference notes before it is added.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true, requiresSprinklePreferences: true },
+  { id: "sprinkle-install", duration: "2h 15min", featured: true, price: 50, priceLabel: "Starting at $50", name: "Loc Sprinkles Installation", description: "Standalone installation starts at $50 and includes up to two locs with jewels on hand or jewels provided by the client, with up to two color choices. There is no upcharge for client-provided beads or beads already on hand. Very specific colors, custom jewelry, or jewelry purchased specifically for your order start at an additional $15.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], requiresSprinklePreferences: true },
   { id: "children-retwist", duration: "3h", featured: false, price: 75, name: "Children Retwist (Maintenance)", description: "Gentle retwist maintenance designed for children. Complimentary two-strand twist style included.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "adult-instant", duration: "5h 30min", featured: false, price: 125, name: "Adult Instant Locs", description: "Uses 0.5mm and 0.75mm crochet needles for instant loc maintenance. Includes complimentary two-strand twist style.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
   { id: "child-instant", duration: "3h 30min", featured: false, price: 85, name: "Children's Instant Loc", description: "Starting price for children's instant loc maintenance. Complimentary two-strand twist style included.", category: "instant-crochet", includedAddOnIds: ["style-addon"] },
@@ -352,8 +353,8 @@ const serviceGuide = [
   {
     id: "extra-style",
     label: "I want accessories or a style",
-    recommendation: "Add Style, Loc Sprinkle Installation, or Loc Sprinkles alongside your main service. Sprinkles selections ask for color and preference notes before they are added.",
-    serviceIds: ["style-addon", "sprinkle-install", "sprinkles-addon"]
+    recommendation: "Add Style or the Loc Sprinkles add-on alongside your main service. Sprinkles selections ask for color and preference notes before they are added.",
+    serviceIds: ["style-addon", "sprinkles-addon", "sprinkle-install"]
   }
 ];
 
@@ -1025,7 +1026,7 @@ function serviceWithSprinklePreferences(service = {}, preferences = {}) {
   return serviceWithCartFields({ ...service, sprinklePreferences: normalizeSprinklePreferences(preferences) });
 }
 
-const enhancementRecommendationIds = ["loc-trim", "sprinkle-install", "style-addon", "loc-repair"];
+const enhancementRecommendationIds = ["loc-trim", "sprinkles-addon", "style-addon", "loc-repair"];
 
 function enhancementRecommendations(mainService, selectedAddOns = pendingEnhancementAddOns) {
   if (!mainService || mainService.category !== "loc-maintenance") return [];
@@ -1196,7 +1197,7 @@ function sprinklePreferenceModal() {
           <label>First Color or Preference<input name="preferenceOne" maxlength="60" required placeholder="Example: gold beads"></label>
           <label>Second Color or Preference <span class="optional-label">(optional)</span><input name="preferenceTwo" maxlength="60" placeholder="Example: clear crystals"></label>
           <label class="full">Color and Preference Notes <span class="optional-label">(optional)</span><textarea name="notes" maxlength="220" placeholder="Mention in-stock beads, client-provided beads, placement, or style notes."></textarea></label>
-          <p class="field-note full">Base price includes up to two preferences. In-stock beads are used unless you bring your own beads.</p>
+          <p class="field-note full">Base price includes up to two color choices. Client-provided beads and beads already on hand have no upcharge. Very specific colors, custom jewelry, or jewelry purchased for your order start at an additional $15.</p>
           <p class="form-error full" id="sprinklePreferenceStatus" aria-live="polite"></p>
           <div class="advisory-actions full">
             <button class="primary-btn" type="button" data-save-sprinkle-preference>Save Preferences</button>

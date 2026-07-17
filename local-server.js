@@ -136,7 +136,7 @@ const scheduledWorkDates = new Set([
   "2026-07-29",
   "2026-07-30",
 ]);
-const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "sms-opt-in", "terms"];
+const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "terms"];
 const friendTestCampaign = "friends-booking-test-2026-06";
 const friendTestCampaignLimit = 10;
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
@@ -227,13 +227,11 @@ function bookingText(booking) {
     "",
     `Client: ${booking.client?.fullName || ""}`,
     `Email: ${booking.client?.email || ""}`,
-    `Phone: ${booking.client?.phone || ""}`,
+    booking.client?.phone ? `Phone: ${booking.client.phone}` : "",
     `Appointment date: ${booking.client?.date || ""}`,
     `Appointment time: ${timeLabel(booking.client?.time)}`,
     booking.client?.birthday ? `Birthday: ${booking.client.birthday}` : "",
     `Appointment type: ${booking.client?.appointmentType || "standard"}`,
-    `Preferred contact: ${contactPreferenceLabel(booking.client?.preferredContact)}`,
-    `Optional communications opt-in: ${booking.client?.smsOptIn ? "Yes" : "No"}`,
     booking.client?.referralCode ? `Client referral code: ${booking.client.referralCode}` : "",
     booking.client?.referredByCode ? `Referred by code: ${booking.client.referredByCode}` : "",
     booking.friendTest ? `Friend website test: ${booking.friendTest.code}` : "",
@@ -520,12 +518,6 @@ function timeLabel(value) {
   const period = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
-}
-
-function contactPreferenceLabel(value) {
-  if (value === "text") return "Text";
-  if (value === "email") return "Email";
-  return "Text + Email";
 }
 
 async function postJson(url, body, headers = {}) {
@@ -1053,9 +1045,7 @@ function phoneDigits(phone) {
 
 function clientIdentityKey(client = {}) {
   const email = String(client.email || "").trim().toLowerCase();
-  const phone = phoneDigits(client.phone);
-  if (!email || !phone) return "";
-  return `${email}|${phone}`;
+  return email || "";
 }
 
 function referralCodeForClient(client = {}) {
@@ -1708,8 +1698,8 @@ function sanitizeClient(client = {}) {
     appointmentType: slot.type,
     emergencySlot: slot.emergency,
     emergencyReason: slot.reason,
-    preferredContact: ["text", "email", "text_email"].includes(client.preferredContact) ? client.preferredContact : "text_email",
-    smsOptIn: Boolean(client.smsOptIn),
+    preferredContact: "email",
+    smsOptIn: false,
     marketingEmailOptIn: Boolean(client.marketingEmailOptIn),
     referralOptIn: Boolean(client.referralOptIn),
     referralCode: referralCodeForClient(client) || normalizeReferralCode(client.referralCode),
@@ -1871,7 +1861,7 @@ function pricedCartItem(item = {}) {
 
 function priceBooking(booking) {
   const client = sanitizeClient(booking.client);
-  const required = ["fullName", "email", "phone", "date", "time"];
+  const required = ["fullName", "email", "date", "time"];
   const missing = required.filter(field => !client[field]);
   if (missing.length) throw new Error(`Missing required booking fields: ${missing.join(", ")}.`);
   if (!appointmentBookable(client.date, client.time)) throw new Error("Appointment must be a future time at least 24 hours away.");
@@ -2986,8 +2976,8 @@ function clientSettingsFor(client, req) {
       locJourneyLength: profile.locJourneyLength || "",
       onboardingCompleted: Boolean(profile.onboardingCompleted || savedProfile),
       googleLinked: Boolean(savedProfile?.googleSubject),
-      preferredContact: profile.preferredContact || "text_email",
-      smsOptIn: Boolean(profile.smsOptIn),
+      preferredContact: "email",
+      smsOptIn: false,
       marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
       referralOptIn: Boolean(profile.referralOptIn),
       specialRequests: profile.specialRequests || "",
@@ -3035,8 +3025,8 @@ async function handleClientSettings(req, res) {
       date: "2099-01-01",
       time: "11:00",
     });
-    if (!client.email || !client.phone) {
-      sendJson(res, 400, { ok: false, error: "Enter the email and phone number used for booking." });
+    if (!client.email) {
+      sendJson(res, 400, { ok: false, error: "Enter the email used for booking." });
       return;
     }
     sendJson(res, 200, clientSettingsFor(client, req));
@@ -3159,8 +3149,8 @@ async function handleGoogleSignup(req, res) {
       date: "2099-01-01",
       time: "11:00",
     });
-    if (!client.fullName || phoneDigits(client.phone).length < 10) {
-      sendJson(res, 400, { ok: false, error: "Enter your full name and a valid phone number." });
+    if (!client.fullName) {
+      sendJson(res, 400, { ok: false, error: "Enter your full name." });
       return;
     }
     client.referralCode = referralCodeForClient(client);

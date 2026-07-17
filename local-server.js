@@ -41,6 +41,7 @@ const legacyLogoUrls = new Set([
   "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6978dfbb416a772de9813cbb/da2605355_ModernBeigeBuyOneCoffeeGetOneFreeHalfPageAd.png"
 ]);
 const dayMs = 24 * 60 * 60 * 1000;
+const minimumBookingLeadMs = 24 * 60 * 60 * 1000;
 const referralCreditAmount = Number(process.env.REFERRAL_CREDIT_AMOUNT || 15);
 const referredNewClientCreditAmount = Number(process.env.REFERRED_NEW_CLIENT_CREDIT_AMOUNT || 15);
 const birthdayCreditAmount = Number(process.env.BIRTHDAY_CREDIT_AMOUNT || 15);
@@ -1567,6 +1568,16 @@ function regularHoursLabelForDate(date) {
   return scheduledWorkDates.has(date) ? "7:00 PM - 10:30 PM" : "11:00 AM - 3:00 PM or 4:00 PM - 7:00 PM";
 }
 
+function appointmentDateTime(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) || !/^\d{2}:\d{2}$/.test(String(time || ""))) return null;
+  const parsed = new Date(`${date}T${time}:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function appointmentBookable(date, time, now = new Date()) {
+  const appointment = appointmentDateTime(date, time);
+  return Boolean(appointment && appointment.getTime() - now.getTime() >= minimumBookingLeadMs);
+}
 function classifyAppointmentTime(date, time) {
   const weekday = dayOfWeek(date);
   const holiday = isHoliday(date);
@@ -1590,21 +1601,25 @@ function availabilityForDate(date) {
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
   const holidaySlots = holiday ? holidayTimes.map(time => {
     const isBooked = holidayBookedTimes.has(time) || booked.has(time);
+    const tooSoon = !appointmentBookable(date, time);
     return {
       time,
       label: timeLabel(time),
       type: "emergency",
-      status: isBooked ? "booked" : "open",
-      note: isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee.",
+      status: tooSoon ? "unavailable" : isBooked ? "booked" : "open",
+      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee.",
     };
   }) : [];
-  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "standard",
-    status: booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
-    note: scheduledWorkDate ? "Scheduled workday opening from 7:00 PM - 10:30 PM." : "Open appointment time.",
-  }));
+  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => {
+    const tooSoon = !appointmentBookable(date, time);
+    return {
+      time,
+      label: timeLabel(time),
+      type: "standard",
+      status: tooSoon ? "unavailable" : booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
+      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : scheduledWorkDate ? "Scheduled workday opening from 7:00 PM - 10:30 PM." : "Open appointment time.",
+    };
+  });
   const emergencySlots = [];
   return {
     date,
@@ -1859,6 +1874,7 @@ function priceBooking(booking) {
   const required = ["fullName", "email", "phone", "date", "time"];
   const missing = required.filter(field => !client[field]);
   if (missing.length) throw new Error(`Missing required booking fields: ${missing.join(", ")}.`);
+  if (!appointmentBookable(client.date, client.time)) throw new Error("Appointment must be a future time at least 24 hours away.");
   const slot = availabilityForDate(client.date).slots.find(item => item.time === client.time);
   if (!slot) throw new Error("Selected appointment time is not available.");
   if (slot.status === "booked") throw new Error("That appointment time was just booked. Please choose another time.");

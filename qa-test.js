@@ -751,6 +751,8 @@ test("enhancement loc sprinkles preference save carries add-on into cart", () =>
   context.formValues.set("notes", "jewels on hand");
   context.formValues.set("customJewelryOrder", "");
   context.toggleEnhancementAddOn("sprinkles-addon");
+  assert(elements.sprinklePreferenceModal.classList.contains("open"), "enhancement Loc Sprinkles should open the preference modal");
+  assert(!elements.enhancementModal.classList.contains("open"), "enhancement modal should not cover the Loc Sprinkles preference modal");
   context.handleSprinklePreference();
   const html = appHtml();
   assert(html.includes("<strong>Loc Sprinkles (Add On)</strong>"), "enhancement Loc Sprinkles save should carry selected add-on into cart");

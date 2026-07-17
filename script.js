@@ -3053,8 +3053,8 @@ function closePartingPreference() {
 function openSprinklePreference(service, context = "cart") {
   pendingSprinkleService = service;
   pendingSprinkleContext = context;
+  if (context === "enhancement") document.getElementById("enhancementModal")?.classList.remove("open");
   render(currentRoute());
-  if (context === "enhancement") document.getElementById("enhancementModal")?.classList.add("open");
   document.getElementById("sprinklePreferenceModal")?.classList.add("open");
 }
 

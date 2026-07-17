@@ -1,4 +1,4 @@
-﻿const fs = require("fs");
+const fs = require("fs");
 const http = require("http");
 const net = require("net");
 const path = require("path");
@@ -191,8 +191,8 @@ async function runAutomation(type, now = "") {
   return response.body;
 }
 
-async function runBirthdayAutomation() {
-  return runAutomation("birthday");
+async function runBirthdayAutomation(now = "") {
+  return runAutomation("birthday", now);
 }
 
 async function main() {
@@ -241,13 +241,13 @@ async function main() {
 
     const futureBirthdayClient = client({ fullName: "Future Birthday", email: "future.bday@example.test", birthday: "1998-07-31", date: "2026-08-19" });
     await createBooking(futureBirthdayClient);
-    await runBirthdayAutomation();
+    await runBirthdayAutomation("2026-06-03T12:00:00");
     const futureBirthdaySettings = await clientSettings(futureBirthdayClient);
     assert(!futureBirthdaySettings.credits.some(credit => credit.type === "birthday"), "July 31 birthday credit is not issued early on June 3.", futureBirthdaySettings.credits);
 
     const activeBirthdayClient = client({ fullName: "Active Birthday", email: "active.bday@example.test", birthday: "1998-06-17", date: "2026-08-26" });
     await createBooking(activeBirthdayClient);
-    await runBirthdayAutomation();
+    await runBirthdayAutomation("2026-06-17T12:00:00");
     const activeBirthdaySettings = await clientSettings(activeBirthdayClient);
     const birthdayCredit = activeBirthdaySettings.credits.find(credit => credit.type === "birthday" && credit.status === "available");
     assert(Boolean(birthdayCredit) && birthdayCredit.amountOff === 15, "Active birthday-window client receives an available annual birthday credit.", activeBirthdaySettings.credits);

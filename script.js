@@ -3991,7 +3991,8 @@ async function releaseUnpaidHold() {
     const heading = result.alreadyReleased
       ? `${escapeAttr(booking)} was already released as unpaid.`
       : `${escapeAttr(booking)} was released as unpaid.`;
-    if (status) status.textContent = `${heading}${appointment}`;
+    const notifications = notificationResultsHtml(result.notificationResults);
+    if (status) status.innerHTML = `${heading}${appointment}<br>${notifications}`;
   } catch (error) {
     if (status) status.textContent = error.message;
   } finally {

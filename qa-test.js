@@ -1,4 +1,4 @@
-﻿const fs = require("fs");
+const fs = require("fs");
 const vm = require("vm");
 
 class FakeClassList {
@@ -218,7 +218,7 @@ test("home renders core client sections", () => {
   assert(!html.includes("Style or sparkle too"), "outdated style-or-sparkle quiz option still shown");
   assert(html.includes("Referral Rewards"), "referral share section missing");
   assert(html.includes("data-share-booking"), "share booking button missing");
-  assert(html.includes("ios-share-icon"), "iphone-style share icon missing");
+  assert(html.includes("share-arrow-icon"), "curved share arrow icon missing");
   assert(html.includes("data-copy-booking"), "copy booking button missing");
 });
 
@@ -521,6 +521,7 @@ test("referral codes use the LOVELYLOCS username format", () => {
   const card = context.personalReferralCard({ fullName: "Fatima Diallo", preview: true });
   assert(card.includes("LOVELYLOCS/FATIMADIALLO"), "personal referral preview should plug in the supplied client name");
   assert(card.includes("Copy Code") && card.includes("Copy Link") && card.includes("Share"), "personal referral preview should offer one-click sharing controls");
+  assert(card.includes("share-arrow-icon"), "personal referral share button should include the curved share arrow icon");
   assert(card.includes("stays active for future bookings"), "personal referral card should explain that referral codes do not expire");
 });
 

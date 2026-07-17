@@ -701,6 +701,7 @@ test("maintenance selection shows Enhance Your Appointment without replacing Add
   assert(html.includes("Loc Trim"), "Loc Trim should be recommended when compatible");
   assert(html.includes("Loc Sprinkles (Add On)"), "Loc Sprinkles add-on should be recommended when compatible");
   assert(html.includes("1h | $20"), "Loc Sprinkles maintenance add-on should show 1h and $20 in recommendations");
+  assert(html.includes("Custom jewelry or a very specific color order (+$15 starting price)"), "custom jewelry fee checkbox should be shown before adding sprinkles");
   assert(!html.includes("2h 15min | Starting at $50"), "standalone Loc Sprinkles install should not be recommended as a maintenance add-on");
   assert(!html.includes("Shampoo Service</h3>"), "Shampoo should not be recommended after maintenance configuration");
   assert(!html.includes("Basic Style</h3>"), "included Basic Style should not be recommended");
@@ -716,10 +717,11 @@ test("loc sprinkles collect required preferences from add-ons and recommendation
   context.openSprinklePreference(directSprinkles, "cart");
   assert(elements.sprinklePreferenceModal.classList.contains("open"), "sprinkles preference modal did not open");
   context.closeSprinklePreference();
-  context.addServiceFromAdvisory(context.serviceWithSprinklePreferences(directSprinkles, { preferences: ["gold beads", "clear crystals"], notes: "client bringing rose gold cuffs" }));
+  context.addServiceFromAdvisory(context.serviceWithSprinklePreferences(directSprinkles, { preferences: ["gold beads", "clear crystals"], notes: "client bringing rose gold cuffs", customJewelryOrder: true }));
   const html = appHtml();
-  assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
-  assert(html.includes("Sprinkles Preferences: Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+  assert(html.includes("Sprinkles: Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in cart");
+  assert(html.includes("Sprinkles Preferences: Loc Sprinkles (Add On) - Preferences: gold beads, clear crystals; Custom jewelry/color order: +$15 starting price; Notes: client bringing rose gold cuffs"), "sprinkles preferences should show in booking summary");
+  assert(html.includes("Estimated Total: $125"), "custom Loc Sprinkles jewelry fee should be included in cart total");
 });
 
 test("cleanse add-ons keep names prices totals and booking summary aligned", () => {
@@ -1317,6 +1319,9 @@ test("server validates loc sprinkles preference rules", () => {
   assert(server.includes("includes up to two color or preference choices"), "server should cap base sprinkles preferences at two");
   assert(server.includes('id: "sprinkles-addon", duration: "1h", price: 20'), "server should trust the $20 one-hour Loc Sprinkles add-on");
   assert(server.includes("jewelry purchased specifically for your order start at an additional $15"), "server should mirror custom jewelry fee wording");
+  assert(server.includes("const sprinkleCustomJewelryFee = 15"), "server should define trusted custom jewelry fee");
+  assert(server.includes("price: exactService.price + sprinkleCustomFee"), "server should price custom Loc Sprinkles jewelry from trusted catalog data");
+  assert(server.includes("standaloneAppointment: true"), "standalone Loc Sprinkles installation should not require a maintenance service");
   assert(server.includes('priceLabel: "$3 per loc"'), "server loc repair should use $3 per loc label");
 });
 

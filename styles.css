@@ -2395,6 +2395,16 @@ h1, h2, h3,
   margin: 18px 0;
 }
 
+.booking-save-note.compact {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  justify-content: space-between;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+}
+
 .promo-box {
   border-top: 1px solid var(--border);
   display: grid;
@@ -2828,6 +2838,55 @@ textarea { min-height: 92px; resize: vertical; }
   margin: 22px 0;
   color: var(--muted);
 }
+
+.booking-summary-compact {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 12px;
+  padding: 14px;
+}
+
+.summary-line {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.summary-line span {
+  color: var(--brown);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.summary-line strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.summary-total-row {
+  border-top: 1px solid rgba(91, 57, 41, 0.16);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  justify-content: space-between;
+  padding-top: 10px;
+  color: var(--brown);
+  font-weight: 850;
+}
+
+.before-submit-summary {
+  margin: 14px 0;
+  padding: 14px;
+}
+
+.before-submit-summary p {
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+
 .modal-actions { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 .confirmation-panel {
@@ -2938,6 +2997,40 @@ textarea { min-height: 92px; resize: vertical; }
   font-size: 0.88rem;
   font-weight: 800;
   text-align: center;
+}
+
+.personal-referral-card.compact {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px;
+  box-shadow: none;
+}
+
+.personal-referral-card.compact h3 {
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+
+.personal-referral-card.compact p {
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.personal-referral-card.compact .personal-referral-code {
+  padding: 10px 12px;
+  font-size: 0.98rem;
+}
+
+.personal-referral-card.compact .personal-referral-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.personal-referral-card.compact .personal-referral-actions button {
+  min-height: 38px;
+  padding: 8px 10px;
 }
 
 .dark .personal-referral-card {
@@ -3062,6 +3155,43 @@ textarea { min-height: 92px; resize: vertical; }
 
 @media (max-width: 640px) {
   .nav { padding: 0 16px; }
+  .modal { padding: 10px; }
+  .booking-modal-panel {
+    max-height: 94vh;
+    padding: 18px;
+  }
+  .modal-head { margin-bottom: 12px; }
+  .modal-head h2 { font-size: 1.9rem; }
+  .progress { margin-bottom: 14px; }
+  .form-grid { gap: 10px; }
+  input, textarea {
+    margin-top: 4px;
+    padding: 10px 12px;
+  }
+  textarea { min-height: 82px; }
+  .field-note { font-size: 0.8rem; }
+  .policy-ack {
+    gap: 8px;
+    padding: 10px;
+  }
+  .shampoo-prep-ack {
+    padding: 10px;
+  }
+  .shampoo-prep-ack p {
+    font-size: 0.86rem;
+    line-height: 1.38;
+    margin-bottom: 8px;
+  }
+  .summary-line {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .summary-total-row {
+    display: grid;
+  }
+  .personal-referral-card.compact .personal-referral-actions {
+    grid-template-columns: 1fr;
+  }
   .brand { font-size: 1.5rem; }
   .nav-link { display: none; }
   .text-button { padding: 8px 12px; }

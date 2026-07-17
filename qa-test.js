@@ -1182,9 +1182,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
     assert(server.includes(`"${date}"`), `major holiday emergency date missing: ${date}`);
   });
   assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
-  assert(server.includes('const bookingUnavailableFromDate = "2026-08-01";'), "August and later booking cutoff missing");
-  assert(server.includes("August dates are not open for booking yet."), "August cutoff message missing");
-  assert(server.includes("isOutsidePublicBookingWindow"), "public booking window guard missing");
+  assert(!server.includes("bookingUnavailableFromDate"), "future months should not be blocked by a hard cutoff");
+  assert(!server.includes("August dates are not open for booking yet."), "August and future listed months should stay eligible for the normal availability workflow");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");
   assert(server.includes("emailConfigured"), "email configuration status helper missing");
   assert(server.includes("emailReadyForClients"), "client email readiness status missing");

@@ -2476,6 +2476,24 @@ function validAppointmentDateValue(value) {
   return !Number.isNaN(new Date(`${value}T12:00:00`).getTime());
 }
 
+function appointmentDateTime(date, time) {
+  if (!validAppointmentDateValue(date) || !/^\d{2}:\d{2}$/.test(String(time || ""))) return null;
+  const parsed = new Date(`${date}T${time}:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function appointmentBookable(date, time, now = new Date()) {
+  const appointment = appointmentDateTime(date, time);
+  return Boolean(appointment && appointment.getTime() - now.getTime() >= minimumBookingLeadMs);
+}
+
+function dateHasBookableAppointmentTime(date) {
+  if (!validAppointmentDateValue(date)) return false;
+  const holidayTimes = isHolidayDate(date) ? holidayAppointmentTimesByDate.get(date) || [] : [];
+  const standardTimes = isHolidayDate(date) || dayOfWeek(date) === 0 ? [] : appointmentTimesForDate(date);
+  return [...holidayTimes, ...standardTimes].some(time => appointmentBookable(date, time));
+}
+
 function calendarDateKey(date) {
   return [
     date.getFullYear(),
@@ -2500,15 +2518,17 @@ function appointmentCalendarMarkup(value = "", monthValue = "") {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
     const key = calendarDateKey(day);
+    const unavailable = !dateHasBookableAppointmentTime(key);
     const classes = [
       "appointment-calendar-day",
       day.getMonth() === viewMonth.getMonth() ? "" : "muted",
       key === selectedDate ? "selected" : "",
       key === todayKey ? "today" : "",
+      unavailable ? "unavailable" : "",
       isHolidayDate(key) ? "holiday" : ""
     ].filter(Boolean).join(" ");
     return `
-      <button type="button" class="${classes}" data-calendar-date="${key}" aria-pressed="${key === selectedDate ? "true" : "false"}" aria-label="${escapeAttr(day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }))}">
+      <button type="button" class="${classes}" data-calendar-date="${key}" aria-pressed="${key === selectedDate ? "true" : "false"}" aria-label="${escapeAttr(day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }))}" ${unavailable ? 'disabled aria-disabled="true" title="Choose a future appointment at least 24 hours out."' : ""}>
         <span>${day.getDate()}</span>
       </button>
     `;
@@ -2541,23 +2561,33 @@ function localAvailability(date, bookedTimes = []) {
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
   const holidaySlots = holiday ? holidayTimes.map(time => {
     const isBooked = holidayBookedTimes.has(time) || booked.has(time);
+    const tooSoon = !appointmentBookable(date, time);
     return {
       time,
       label: timeLabel(time),
       type: "emergency",
-      status: isBooked ? "booked" : "open",
-      note: isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee."
+      status: tooSoon ? "unavailable" : isBooked ? "booked" : "open",
+      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee."
     };
   }) : [];
-  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => ({
-    time,
-    label: timeLabel(time),
-    type: "standard",
-    status: booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
-    note: scheduledWorkDate ? "Scheduled workday opening from 7:00 PM - 10:30 PM." : "Open appointment time."
-  }));
+  const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => {
+    const tooSoon = !appointmentBookable(date, time);
+    return {
+      time,
+      label: timeLabel(time),
+      type: "standard",
+      status: tooSoon ? "unavailable" : booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
+      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : scheduledWorkDate ? "Scheduled workday opening from 7:00 PM - 10:30 PM." : "Open appointment time."
+    };
+  });
   const emergencySlots = [];
   return { date, holiday, slots: [...holidaySlots, ...regularSlots, ...emergencySlots] };
+}
+
+function slotStatusLabel(slot) {
+  if (slot.status === "booked") return "Booked";
+  if (slot.status === "unavailable") return "Too soon";
+  return slot.type === "emergency" ? "Emergency +$45" : "Open";
 }
 
 function slotPickerMarkup(profile = {}) {
@@ -2635,7 +2665,7 @@ function renderTimeSlots(availability, preferredSlot = null) {
     preferredSlot
     && preferredSlot.date === availability.date
     && preferredSlot.time === slot.time
-    && slot.status !== "booked"
+    && slot.status === "open"
   ));
   if (!availability.slots.length) {
     grid.innerHTML = `<p class="time-slot-placeholder">No appointment times are open for this date.</p>`;
@@ -2647,9 +2677,9 @@ function renderTimeSlots(availability, preferredSlot = null) {
     return;
   }
   grid.innerHTML = availability.slots.map(slot => `
-    <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" aria-pressed="${restoredSlot?.time === slot.time ? "true" : "false"}" ${slot.status === "booked" ? "disabled" : ""}>
+    <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" aria-pressed="${restoredSlot?.time === slot.time ? "true" : "false"}" ${slot.status !== "open" ? "disabled" : ""}>
       <strong>${slot.label}</strong>
-      <span>${slot.status === "booked" ? "Booked" : slot.type === "emergency" ? "Emergency +$45" : "Open"}</span>
+      <span>${slotStatusLabel(slot)}</span>
     </button>
   `).join("");
   const restoredType = restoredSlot?.type || "";
@@ -4315,6 +4345,11 @@ async function submitBooking() {
     if (error) error.textContent = "Please choose an open appointment time before submitting your request.";
     return;
   }
+  const bookingPayload = bookingPayloadFromForm(form);
+  if (!appointmentBookable(bookingPayload.client.date, bookingPayload.client.time)) {
+    if (error) error.textContent = "Please choose a future appointment at least 24 hours out.";
+    return;
+  }
   if (error) error.textContent = "";
   if (submitButton) {
     submitButton.disabled = true;
@@ -4322,7 +4357,7 @@ async function submitBooking() {
     submitButton.textContent = isAdminTestBooking(cart) ? "Saving Test Booking..." : "Opening Pay Options...";
   }
   try {
-    const bookingPayload = bookingPayloadFromForm(form);
+    
     const response = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

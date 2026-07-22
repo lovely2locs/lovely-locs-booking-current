@@ -1351,6 +1351,8 @@ h1, h2, h3,
   font-size: 0.86rem;
 }
 
+.admin-appointments-access,.admin-appointment-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.admin-appointment-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.admin-appointment-tabs button{border:1px solid var(--border);border-radius:999px;padding:10px;font-weight:900}.admin-appointment-tabs button.active{background:var(--brown);color:#fff}.admin-appointments-list{display:grid;gap:10px}.admin-appointment-card{background:var(--white);border:1px solid var(--border);border-left:5px solid var(--gold);border-radius:10px;padding:14px}.admin-appointment-card p{margin:5px 0}@media(max-width:640px){.admin-appointments-access,.admin-appointment-card{grid-template-columns:1fr}}
+
 .readiness-list {
   display: grid;
   gap: 10px;

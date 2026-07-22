@@ -2209,6 +2209,8 @@ function adminPage() {
           <h2>How to use it</h2>
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
         </div>
+        <div class="policy-box brand-settings-box admin-appointments-box">
+<p class="eyebrow">Client Appointments</p><h2>Select an Appointment</h2><p>View upcoming or previous client appointments, then select one to fill the existing admin forms.</p><form id="adminAppointmentsForm" class="admin-appointments-access"><label>Admin Token<input name="token" type="password" required></label><button class="outline-btn">Load Appointments</button></form><div class="admin-appointment-tabs"><button class="active" type="button" data-appointment-view="upcoming">Upcoming <span data-upcoming-count>0</span></button><button type="button" data-appointment-view="previous">Previous <span data-previous-count>0</span></button></div><p id="adminAppointmentsStatus" class="form-error"></p><div id="adminAppointmentsList" class="admin-appointments-list"></div></div>
         <div class="policy-box brand-settings-box" id="manual-deposit-confirm-panel">
           <p class="eyebrow">Launch Readiness</p>
           <h2>Notification Status</h2>
@@ -3380,6 +3382,9 @@ function bindDynamic() {
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
   document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
+  document.getElementById("adminAppointmentsForm")?.addEventListener("submit", loadAdminAppointments);
+  document.querySelectorAll("[data-appointment-view]").forEach(button => button.addEventListener("click", () => { adminAppointmentView = button.dataset.appointmentView; renderAdminAppointments(); }));
+
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
   document.querySelectorAll("[data-share-booking]").forEach(button => button.addEventListener("click", shareBookingSite));
@@ -4135,6 +4140,12 @@ async function sendNotificationTest() {
 function readinessLine(label, ready, detail) {
   return `<div class="readiness-line ${ready ? "ready" : "blocked"}"><strong>${label}</strong><span>${ready ? "Ready" : "Needs attention"}</span><p>${escapeAttr(detail || "")}</p></div>`;
 }
+
+let adminAppointments = [], adminAppointmentView = "upcoming";
+function adminAppointmentTime(b){const n=new Date((b.appointment?.date||"")+"T"+(b.appointment?.time||"23:59")).getTime();return Number.isFinite(n)?n:0}
+function selectAdminAppointment(id){const b=adminAppointments.find(x=>x.id===id),t=document.querySelector("#adminAppointmentsForm input").value,d=document.getElementById("manualDepositConfirmForm"),r=document.getElementById("confirmationResendForm");if(!b)return;d.elements.token.value=t;d.elements.booking.value=b.id;r.elements.token.value=t;r.elements.bookingId.value=b.id;r.elements.email.value=b.client?.email||"";r.elements.fullName.value=b.client?.fullName||"";r.elements.date.value=b.appointment?.date||"";r.elements.time.value=b.appointment?.time||"";document.getElementById("adminAppointmentsStatus").textContent=(b.client?.fullName||"Client")+" appointment selected."}
+function renderAdminAppointments(){const now=Date.now(),up=adminAppointments.filter(b=>adminAppointmentTime(b)>=now).sort((a,b)=>adminAppointmentTime(a)-adminAppointmentTime(b)),old=adminAppointments.filter(b=>adminAppointmentTime(b)<now).sort((a,b)=>adminAppointmentTime(b)-adminAppointmentTime(a)),items=adminAppointmentView==="previous"?old:up,list=document.getElementById("adminAppointmentsList");document.querySelector("[data-upcoming-count]").textContent=up.length;document.querySelector("[data-previous-count]").textContent=old.length;document.querySelectorAll("[data-appointment-view]").forEach(x=>x.classList.toggle("active",x.dataset.appointmentView===adminAppointmentView));list.innerHTML=items.length?items.map(b=>"<article class=\"admin-appointment-card\"><div><strong>"+escapeAttr(b.client?.fullName||"Unnamed client")+"</strong><p>"+escapeAttr(b.appointment?.date||"Date unavailable")+" "+escapeAttr(timeLabel(b.appointment?.time||""))+"</p><small>"+escapeAttr(b.id)+" - "+escapeAttr(b.status||"unknown")+"</small></div><button class=\"outline-btn\" data-select-admin-appointment=\""+escapeAttr(b.id)+"\">Select Appointment</button></article>").join(""):"<p>No "+adminAppointmentView+" appointments found.</p>";list.querySelectorAll("[data-select-admin-appointment]").forEach(x=>x.onclick=()=>selectAdminAppointment(x.dataset.selectAdminAppointment))}
+async function loadAdminAppointments(e){e.preventDefault();const t=new FormData(e.currentTarget).get("token"),s=document.getElementById("adminAppointmentsStatus");try{s.textContent="Loading appointments...";const r=await fetch("/api/admin/bookings?limit=100&token="+encodeURIComponent(t)),j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||"Appointments could not load.");adminAppointments=j.bookings||[];s.textContent=adminAppointments.length+" appointments loaded.";renderAdminAppointments()}catch(x){s.textContent=x.message}}
 
 async function loadAdminNotificationStatus() {
   const target = document.getElementById("adminNotificationStatus");

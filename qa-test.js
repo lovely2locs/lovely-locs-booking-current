@@ -299,6 +299,8 @@ test("admin route offers free no-charge test booking", () => {
   assert(html.includes("data-save-logo-settings"), "admin logo save control missing");
   assert(html.includes("Discount Code Settings"), "admin discount settings section missing");
   assert(html.includes("data-save-discount-settings"), "admin discount save control missing");
+  assert(html.includes("Add or Edit Products and Services"), "admin product and service editor missing");
+  assert(html.includes("data-save-catalog-item"), "admin catalog save control missing");
   assert(html.includes("Notification Status"), "launch readiness notification status missing");
   assert(html.includes("data-refresh-notification-status"), "notification status refresh control missing");
   assert(html.includes("Confirm a Client Deposit"), "manual deposit confirmation section missing");
@@ -1274,6 +1276,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/site-settings"), "site settings endpoint missing");
   assert(server.includes("sanitizeLogoSettings"), "logo settings sanitizer missing");
   assert(server.includes("sanitizeDiscountSettings"), "discount settings sanitizer missing");
+  assert(server.includes("sanitizeCatalog"), "catalog sanitizer missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Shop Product"), "affiliate product link missing");
   assert(server.includes("/api/discount/validate"), "discount validation endpoint missing");
   assert(server.includes("/api/discount/email"), "discount email endpoint missing");
   assert(server.includes("activeDiscountForCode"), "server discount validator missing");

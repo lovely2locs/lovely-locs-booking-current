@@ -1207,6 +1207,12 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("handleAdminRecentBookings"), "protected recent bookings handler missing");
   assert(fs.readFileSync("script.js", "utf8").includes("Client Appointments"), "admin client appointments area missing");
   assert(fs.readFileSync("script.js", "utf8").includes("loadAdminAppointments"), "admin appointment loader missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Future Bookings"), "future bookings column missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Previous Bookings"), "previous bookings column missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Payment received by"), "appointment payment method detail missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Choose payment method"), "admin confirmation should ask how payment was received");
+  assert(fs.readFileSync("local-server.js", "utf8").includes("ownerSessionCookieName"), "verified owner session support missing");
+  assert(fs.readFileSync("local-server.js", "utf8").includes("manualPayment: record.manualPayment"), "admin appointment payment method event missing");
   assert(fs.readFileSync("script.js", "utf8").includes("selectAdminAppointment"), "admin appointment selector missing");
   assert(fs.readFileSync("styles.css", "utf8").includes(".admin-appointment-card"), "admin appointment styles missing");
   assert(server.includes("booking ID is captured automatically"), "owner confirmation fallback should mention automatic booking ID capture from email link");

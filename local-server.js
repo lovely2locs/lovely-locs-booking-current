@@ -65,6 +65,7 @@ const defaultSiteSettings = {
     enabled: false,
     expiresAt: "",
   },
+  catalog: [],
 };
 
 const serviceCatalog = [
@@ -1208,6 +1209,24 @@ function sanitizeDiscountSettings(discount = {}) {
   };
 }
 
+function sanitizeCatalog(catalog = []) {
+  if (!Array.isArray(catalog)) return [];
+  const used = new Set(serviceCatalog.map(item => item.id));
+  return catalog.slice(0, 100).map((item, index) => {
+    const type = item?.type === "service" ? "service" : "product";
+    const clean = (value, max) => String(value || "").trim().slice(0, max);
+    const name = clean(item?.name, 120);
+    if (!name) return null;
+    const id = (clean(item.id, 100).toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")) || `custom-${type}-${index + 1}`;
+    if (used.has(id)) return null;
+    used.add(id);
+    const validUrl = value => !value || /^https:\/\/[^\s"'<>]+$/i.test(value);
+    const url = clean(item.url, 2000);
+    const imageUrl = clean(item.imageUrl, 2000);
+    return { id, type, name, price: clampNumber(item.price, 0, 10000, 0), description: clean(item.description, 800), duration: type === "service" ? clean(item.duration, 60) : "", category: type === "service" && ["loc-maintenance", "starter-locs", "instant-crochet", "add-ons"].includes(item.category) ? item.category : type === "service" ? "add-ons" : "", url: type === "product" && validUrl(url) ? url : "", imageUrl: type === "product" && validUrl(imageUrl) ? imageUrl : "", enabled: item.enabled !== false };
+  }).filter(Boolean);
+}
+
 function readSiteSettings() {
   if (!fs.existsSync(settingsFile)) return defaultSiteSettings;
   try {
@@ -1217,6 +1236,7 @@ function readSiteSettings() {
       ...saved,
       logo: sanitizeLogoSettings(saved.logo || {}),
       discount: sanitizeDiscountSettings(saved.discount || {}),
+      catalog: sanitizeCatalog(saved.catalog || []),
     };
   } catch {
     return defaultSiteSettings;
@@ -1230,6 +1250,7 @@ function saveSiteSettings(settings = {}) {
     ...current,
     logo: sanitizeLogoSettings(settings.logo || current.logo),
     discount: sanitizeDiscountSettings(settings.discount || current.discount),
+    catalog: sanitizeCatalog(settings.catalog === undefined ? current.catalog : settings.catalog),
   };
   fs.writeFileSync(settingsFile, JSON.stringify(clean, null, 2), "utf8");
   return clean;
@@ -1879,7 +1900,7 @@ function requiresShampooDeclineAcknowledgement(cart = []) {
 }
 
 function pricedCartItem(item = {}) {
-  const exactService = serviceCatalog.find(service => service.id === item.id);
+  const exactService = [...serviceCatalog, ...readSiteSettings().catalog.filter(entry => entry.type === "service" && entry.enabled)].find(service => service.id === item.id);
   if (exactService) {
     if (exactService.category === "starter-locs") throw new Error(`Parting preference is required for ${exactService.name}.`);
     if (exactService.category === "loc-maintenance" && !allowedBaseProducts.has(item.baseProduct)) {
@@ -3405,7 +3426,7 @@ const server = http.createServer((req, res) => {
         sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
         return;
       }
-      const settings = saveSiteSettings({ logo: body.logo, discount: body.discount });
+      const settings = saveSiteSettings({ logo: body.logo, discount: body.discount, catalog: body.catalog });
       sendJson(res, 200, { ok: true, settings });
     }).catch(error => {
       sendJson(res, 400, { ok: false, error: error.message });

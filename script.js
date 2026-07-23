@@ -160,6 +160,15 @@ const products = [
   { name: "Custom Color Sprinkles", price: 15, description: "Choose your custom color to match your unique style." }
 ];
 
+const builtInServiceIds = new Set(services.map(item => item.id));
+const builtInProductNames = new Set(products.map(item => item.name));
+let customCatalog = [];
+function applyCatalogSettings(items = []) {
+  customCatalog = Array.isArray(items) ? items : [];
+  services.splice(0, services.length, ...services.filter(item => builtInServiceIds.has(item.id)), ...customCatalog.filter(item => item.type === "service" && item.enabled !== false));
+  products.splice(0, products.length, ...products.filter(item => builtInProductNames.has(item.name)), ...customCatalog.filter(item => item.type === "product" && item.enabled !== false).map(item => ({ ...item, affiliate: true })));
+}
+
 const recommendedHairProducts = [
   {
     name: "Made For Locs Vegan Apple Cider Vinegar Shampoo",
@@ -737,6 +746,10 @@ async function fetchLogoSettings() {
     const result = await response.json();
     if (result.ok && result.settings?.logo) {
       saveLogoSettingsLocal(result.settings.logo);
+    }
+    if (result.ok && Array.isArray(result.settings?.catalog)) {
+      applyCatalogSettings(result.settings.catalog);
+      render(currentRoute());
     }
     if (result.ok && result.settings?.discount) {
       saveDiscountSettingsLocal(result.settings.discount);
@@ -1934,12 +1947,11 @@ function productsPage() {
         <div class="products-grid">
           ${products.map(product => `
             <article class="card product-card accessory-card">
+              ${product.imageUrl ? `<img class="admin-product-image" src="${escapeAttr(product.imageUrl)}" alt="${escapeAttr(product.name)}">` : ""}
               <h3>${product.name}</h3>
               <p>${product.description}</p>
               <p class="price">${money(product.price)}</p>
-              <button class="book-small ${cart.some(item => item.id === `product-${product.name}`) ? "added" : ""}" data-add-product="${product.name}">
-                ${cart.some(item => item.id === `product-${product.name}`) ? "Added" : "Add to Cart"}
-              </button>
+              ${product.affiliate && product.url ? `<a class="book-small affiliate-product-link" href="${escapeAttr(product.url)}" target="_blank" rel="noopener sponsored">Shop Product</a>` : `<button class="book-small ${cart.some(item => item.id === `product-${product.name}`) ? "added" : ""}" data-add-product="${product.name}">${cart.some(item => item.id === `product-${product.name}`) ? "Added" : "Add to Cart"}</button>`}
             </article>
           `).join("")}
         </div>
@@ -2204,6 +2216,17 @@ function adminPage() {
               ${alreadyAdded ? "Test Service Selected" : "Add Free Test Booking"}
             </button>
           </div>
+        </div>
+        <div class="policy-box brand-settings-box">
+          <p class="eyebrow">Products &amp; Services</p><h2>Add or Edit Products and Services</h2>
+          <p>Add Locsanity affiliate products or new Lovely Locs services here. Affiliate links open the product store in a new tab; services appear in the selected booking category.</p>
+          <form class="brand-settings-form" id="catalogEditorForm"><input name="id" type="hidden">
+            <label>Item Type<select name="type"><option value="product">Affiliate Product</option><option value="service">Bookable Service</option></select></label>
+            <label>Name<input name="name" maxlength="120" required placeholder="Locsanity product name"></label><label>Price<input name="price" type="number" min="0" max="10000" step="0.01" required></label>
+            <label data-catalog-service-field hidden>Duration<input name="duration" maxlength="60" placeholder="1h 30min"></label><label data-catalog-service-field hidden>Service Category<select name="category"><option value="loc-maintenance">Loc Maintenance</option><option value="starter-locs">Starter Locs</option><option value="instant-crochet">Instant / Crochet</option><option value="add-ons">Add-Ons &amp; More</option></select></label>
+            <label class="full">Description<textarea name="description" maxlength="800" rows="3" required></textarea></label><label class="full" data-catalog-product-field>Affiliate Link<input name="url" type="url" placeholder="https://locsanity.com/..."></label><label class="full" data-catalog-product-field>Product Image Link<input name="imageUrl" type="url" placeholder="https://..."></label>
+            <label class="full toggle-line"><input name="enabled" type="checkbox" checked> Show this item on the website</label><label class="full">Admin Token (only needed if owner sign-in is unavailable)<input name="token" type="password" autocomplete="current-password"></label><p class="form-error" id="catalogEditorStatus" aria-live="polite"></p><button class="primary-btn" type="button" data-save-catalog-item>Save Item</button><button class="outline-btn" type="button" data-cancel-catalog-edit>Clear Form</button>
+          </form><div class="admin-catalog-list">${customCatalog.length ? customCatalog.map(item => `<article class="admin-catalog-row"><div><strong>${escapeAttr(item.name)}</strong><span>${item.type === "service" ? "Service" : "Product"} · ${money(item.price)}${item.enabled === false ? " · Hidden" : ""}</span></div><div><button class="outline-btn" type="button" data-edit-catalog="${escapeAttr(item.id)}">Edit</button><button class="outline-btn danger-btn" type="button" data-delete-catalog="${escapeAttr(item.id)}">Delete</button></div></article>`).join("") : "<p>No custom products or services have been added yet.</p>"}</div>
         </div>
         <div class="policy-box">
           <h2>How to use it</h2>
@@ -3377,6 +3400,11 @@ function bindDynamic() {
   });
   document.querySelectorAll("[data-save-logo-settings]").forEach(button => button.addEventListener("click", saveLogoSettings));
   document.querySelectorAll("[data-save-discount-settings]").forEach(button => button.addEventListener("click", saveDiscountSettings));
+  document.querySelectorAll("[data-save-catalog-item]").forEach(button => button.addEventListener("click", saveCatalogItem));
+  document.querySelectorAll("[data-cancel-catalog-edit]").forEach(button => button.addEventListener("click", resetCatalogForm));
+  document.querySelectorAll("[data-edit-catalog]").forEach(button => button.addEventListener("click", () => editCatalogItem(button.dataset.editCatalog)));
+  document.querySelectorAll("[data-delete-catalog]").forEach(button => button.addEventListener("click", () => deleteCatalogItem(button.dataset.deleteCatalog)));
+  document.querySelector("#catalogEditorForm [name='type']")?.addEventListener("change", syncCatalogFormFields);
   document.querySelectorAll("[data-confirm-manual-deposit]").forEach(button => button.addEventListener("click", confirmManualDeposit));
   document.querySelectorAll("[data-release-unpaid-hold]").forEach(button => button.addEventListener("click", releaseUnpaidHold));
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
@@ -3946,6 +3974,13 @@ async function saveDiscountSettings() {
     if (status) status.textContent = error.message;
   }
 }
+
+function syncCatalogFormFields(){const f=document.getElementById("catalogEditorForm"),service=f?.elements?.type?.value==="service";document.querySelectorAll("[data-catalog-service-field]").forEach(n=>n.hidden=!service);document.querySelectorAll("[data-catalog-product-field]").forEach(n=>n.hidden=service)}
+function resetCatalogForm(){const f=document.getElementById("catalogEditorForm");f?.reset();if(f?.elements?.id)f.elements.id.value="";if(f?.elements?.enabled)f.elements.enabled.checked=true;syncCatalogFormFields()}
+function editCatalogItem(id){const f=document.getElementById("catalogEditorForm"),item=customCatalog.find(x=>x.id===id);if(!f||!item)return;["id","type","name","price","duration","category","description","url","imageUrl"].forEach(k=>{if(f.elements[k])f.elements[k].value=item[k]??""});f.elements.enabled.checked=item.enabled!==false;syncCatalogFormFields()}
+async function persistCatalog(catalog,token=""){const response=await fetch("/api/site-settings",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({token,catalog})}),result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Products and services could not be saved.");applyCatalogSettings(result.settings.catalog||[])}
+async function saveCatalogItem(){const f=document.getElementById("catalogEditorForm"),status=document.getElementById("catalogEditorStatus");if(!f||!f.reportValidity())return;const d=new FormData(f),item={id:d.get("id")||`custom-${d.get("type")}-${Date.now()}`,type:d.get("type"),name:d.get("name"),price:Number(d.get("price")),duration:d.get("duration"),category:d.get("category"),description:d.get("description"),url:d.get("url"),imageUrl:d.get("imageUrl"),enabled:Boolean(d.get("enabled"))},next=customCatalog.map(x=>({...x})),i=next.findIndex(x=>x.id===item.id);if(i>=0)next[i]=item;else next.push(item);if(status)status.textContent="Saving item...";try{await persistCatalog(next,d.get("token")||"");render("admin");document.getElementById("catalogEditorStatus").textContent="Item saved. Public products and services now use this catalog."}catch(e){if(status)status.textContent=e.message}}
+async function deleteCatalogItem(id){const item=customCatalog.find(x=>x.id===id);if(!item||(window.confirm&&!window.confirm(`Delete ${item.name}?`)))return;try{await persistCatalog(customCatalog.filter(x=>x.id!==id));render("admin");document.getElementById("catalogEditorStatus").textContent="Item deleted."}catch(e){const s=document.getElementById("catalogEditorStatus");if(s)s.textContent=e.message}}
 
 async function confirmManualDeposit() {
   const form = document.getElementById("manualDepositConfirmForm");

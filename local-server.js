@@ -189,11 +189,12 @@ const types = {
   ".md": "text/markdown; charset=utf-8",
 };
 
-function sendJson(res, status, body) {
+function sendJson(res, status, body, extraHeaders = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...extraHeaders,
   });
   res.end(payload);
 }
@@ -726,6 +727,7 @@ function bookingEventSummary(record = {}) {
     receivedAt: record.receivedAt || record.sentAt || record.approvedAt || record.createdAt || "",
     notificationResults: Array.isArray(record.notificationResults) ? record.notificationResults : [],
     delivery: record.delivery || null,
+    manualPayment: record.manualPayment || null,
   };
 }
 
@@ -919,6 +921,7 @@ function sendHtml(res, status, html) {
   res.writeHead(status, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
+    ...extraHeaders,
   });
   res.end(html);
 }
@@ -1234,6 +1237,53 @@ function saveSiteSettings(settings = {}) {
 
 function tokenIsValid(token) {
   return automationTokenIsValid(token);
+}
+
+const ownerSessionCookieName = "lovely_locs_owner";
+
+function ownerSessionSecret() {
+  return String(process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN || "").trim();
+}
+
+function ownerGoogleAccount(claims = {}) {
+  const email = String(claims.email || "").trim().toLowerCase();
+  const configured = String(process.env.OWNER_GOOGLE_EMAIL || ownerEmail || "").trim().toLowerCase();
+  const localPart = email.split("@")[0].replace(/[^a-z0-9]/g, "");
+  return Boolean(email && (email === configured || localPart === "lovely2locs"));
+}
+
+function ownerSessionValue(claims = {}) {
+  const secret = ownerSessionSecret();
+  if (!secret || !ownerGoogleAccount(claims)) return "";
+  const payload = Buffer.from(JSON.stringify({
+    sub: String(claims.sub || ""),
+    email: String(claims.email || "").trim().toLowerCase(),
+    exp: Date.now() + (7 * 24 * 60 * 60 * 1000),
+  })).toString("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  return payload + "." + signature;
+}
+
+function ownerSessionIsValid(req) {
+  const secret = ownerSessionSecret();
+  if (!secret) return false;
+  const cookieHeader = String(req.headers.cookie || "");
+  const encoded = cookieHeader.split(";").map(part => part.trim()).find(part => part.startsWith(ownerSessionCookieName + "="));
+  const value = decodeURIComponent(String(encoded || "").slice(ownerSessionCookieName.length + 1));
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return false;
+  const expected = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
+  try {
+    const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return Number(session.exp) > Date.now() && ownerGoogleAccount(session);
+  } catch {
+    return false;
+  }
+}
+
+function ownerRequestIsValid(req, token = "") {
+  return tokenIsValid(token) || ownerSessionIsValid(req);
 }
 
 function discountIsExpired(discount) {
@@ -2515,7 +2565,7 @@ async function handleManualPaymentConfirm(req, res) {
     const method = url.searchParams.get("method") || "manual";
     const adminUrl = `${siteUrl}/?booking=${encodeURIComponent(bookingId)}&method=${encodeURIComponent(method)}#admin-confirm-deposit`;
     wantsJson = url.searchParams.get("format") === "json";
-    if (!tokenIsValid(token)) {
+    if (!ownerRequestIsValid(req, token)) {
       if (wantsJson) {
         sendJson(res, 403, { ok: false, error: "The owner confirmation token is missing or invalid." });
         return;
@@ -2565,6 +2615,11 @@ async function handleManualPaymentConfirm(req, res) {
       return;
     }
 
+    const allowedMethods = new Set(["venmo", "cash-app", "apple-pay", "cash", "other"]);
+    if (!allowedMethods.has(method)) {
+      sendJson(res, 400, { ok: false, error: "Choose how the payment was received before confirming the deposit." });
+      return;
+    }
     const notificationResults = await notifyManualDepositPaid(booking, method);
     const referralReward = approveReferralReward(booking);
     const referralRewardNotification = referralReward
@@ -2610,7 +2665,7 @@ async function handleManualPaymentRelease(req, res) {
   try {
     const raw = await readBody(req);
     const body = JSON.parse(raw || "{}");
-    if (!tokenIsValid(body.token || "")) {
+    if (!ownerRequestIsValid(req, body.token || "")) {
       sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
       return;
     }
@@ -2679,7 +2734,7 @@ function handleAdminBookingLookup(req, res) {
     const url = new URL(req.url || "/", publicSiteUrl(req));
     const token = url.searchParams.get("token") || "";
     const bookingId = String(url.searchParams.get("booking") || "").trim();
-    if (!tokenIsValid(token)) {
+    if (!ownerRequestIsValid(req, token)) {
       sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
       return;
     }
@@ -2707,6 +2762,14 @@ function handleAdminBookingLookup(req, res) {
           date: booking.client?.date || "",
           time: booking.client?.time || "",
         },
+        services: (booking.cart || []).map(item => ({
+          name: item.name || item.title || "Service",
+          type: item.type || "service",
+          price: Number(item.price || 0),
+          duration: item.duration || "",
+        })),
+        total: Number(booking.total || 0),
+        deposit: Number(booking.deposit || 0),
         friendTest: booking.friendTest || null,
       },
       initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
@@ -2721,7 +2784,7 @@ function handleAdminRecentBookings(req, res) {
   try {
     const url = new URL(req.url || "/", publicSiteUrl(req));
     const token = url.searchParams.get("token") || "";
-    if (!tokenIsValid(token)) {
+    if (!ownerRequestIsValid(req, token)) {
       sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
       return;
     }
@@ -2744,6 +2807,14 @@ function handleAdminRecentBookings(req, res) {
           date: booking.client?.date || "",
           time: booking.client?.time || "",
         },
+        services: (booking.cart || []).map(item => ({
+          name: item.name || item.title || "Service",
+          type: item.type || "service",
+          price: Number(item.price || 0),
+          duration: item.duration || "",
+        })),
+        total: Number(booking.total || 0),
+        deposit: Number(booking.deposit || 0),
         friendTest: booking.friendTest || null,
         initialNotificationResults: Array.isArray(booking.notificationResults) ? booking.notificationResults : [],
         events: records
@@ -2760,7 +2831,7 @@ async function handleAdminConfirmationResend(req, res) {
   try {
     const raw = await readBody(req);
     const body = JSON.parse(raw || "{}");
-    if (!tokenIsValid(body.token || "")) {
+    if (!ownerRequestIsValid(req, body.token || "")) {
       sendJson(res, 403, { ok: false, error: "The owner token is missing or invalid." });
       return;
     }
@@ -3122,13 +3193,14 @@ async function handleGoogleSignIn(req, res) {
       });
       return;
     }
+    const session = ownerSessionValue(claims);
     sendJson(res, 200, {
       ...clientSettingsFor(savedProfile?.client || booking.client, req),
       auth: {
         provider: "google",
         email: String(claims.email).trim().toLowerCase(),
       },
-    });
+    }, session ? { "Set-Cookie": ownerSessionCookieName + "=" + encodeURIComponent(session) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800" } : {});
   } catch (error) {
     sendJson(res, 401, { ok: false, error: error.message });
   }
@@ -3192,7 +3264,7 @@ async function handleNotificationTest(req, res) {
   try {
     const raw = await readBody(req);
     const body = JSON.parse(raw || "{}");
-    if (!tokenIsValid(body.token || "")) {
+    if (!ownerRequestIsValid(req, body.token || "")) {
       sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
       return;
     }
@@ -3329,7 +3401,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && (req.url || "").split("?")[0] === "/api/site-settings") {
     readBody(req).then(raw => {
       const body = JSON.parse(raw || "{}");
-      if (!tokenIsValid(body.token || "")) {
+      if (!ownerRequestIsValid(req, body.token || "")) {
         sendJson(res, 403, { ok: false, error: "Admin token is missing or invalid." });
         return;
       }
@@ -3441,6 +3513,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, {
     "Content-Type": types[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Cache-Control": "no-store",
+    ...extraHeaders,
   });
 
   if (req.method === "HEAD") {

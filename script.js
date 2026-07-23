@@ -2155,7 +2155,7 @@ function paymentSuccessPage() {
 function manualDepositConfirmParams() {
   const params = new URLSearchParams(window.location.search || "");
   const booking = String(params.get("booking") || "").trim();
-  const method = String(params.get("method") || "manual").trim();
+  const method = String(params.get("method") || "").trim();
   const token = String(params.get("token") || "").trim();
   const active = currentRoute() === "admin-confirm-deposit" || Boolean(booking || token);
   return { active, booking, method, token };
@@ -2178,8 +2178,8 @@ function adminPage() {
   const adminSubtitle = confirmParams.active
     ? "Confirm a verified manual deposit, then send the client their official Lovely Locs confirmation."
     : "Run a no-charge booking test without sending the client to the pay options page.";
-  const methodOptions = ["venmo", "cash-app", "apple-pay", "manual"].map(method => `
-                <option value="${method}" ${confirmParams.method === method ? "selected" : ""}>${method === "apple-pay" ? "Apple Pay" : method === "cash-app" ? "Cash App" : method === "venmo" ? "Venmo" : "Manual"}</option>
+  const methodOptions = ["", "venmo", "cash-app", "apple-pay", "cash", "other"].map(method => `
+                <option value="${method}" ${confirmParams.method === method ? "selected" : ""}>${method === "apple-pay" ? "Apple Pay" : method === "cash-app" ? "Cash App" : method === "venmo" ? "Venmo" : method === "cash" ? "Cash" : method === "other" ? "Other" : "Choose payment method"}</option>
               `).join("");
   return `
     <section class="hero route-page" id="admin-page">
@@ -2210,7 +2210,7 @@ function adminPage() {
           <p>Add the free test booking, open the cart, then finalize like a normal client. The submit button will say "Submit No-Charge Test Booking" and no payment portal should open.</p>
         </div>
         <div class="policy-box brand-settings-box admin-appointments-box">
-<p class="eyebrow">Client Appointments</p><h2>Select an Appointment</h2><p>View upcoming or previous client appointments, then select one to fill the existing admin forms.</p><form id="adminAppointmentsForm" class="admin-appointments-access"><label>Admin Token<input name="token" type="password" required></label><button class="outline-btn">Load Appointments</button></form><div class="admin-appointment-tabs"><button class="active" type="button" data-appointment-view="upcoming">Upcoming <span data-upcoming-count>0</span></button><button type="button" data-appointment-view="previous">Previous <span data-previous-count>0</span></button></div><p id="adminAppointmentsStatus" class="form-error"></p><div id="adminAppointmentsList" class="admin-appointments-list"></div></div>
+<p class="eyebrow">Client Appointments</p><h2>Appointment History</h2><p>Appointments load automatically for the signed-in Lovely2Locs owner account. Select a client name and date to view the services, deposit, final total, and payment method.</p><p id="adminAppointmentsStatus" class="form-error" aria-live="polite">Loading appointments...</p><div class="admin-appointment-columns"><section><h3>Future Bookings <span data-upcoming-count>0</span></h3><div id="adminUpcomingAppointments" class="admin-appointments-list"></div></section><section><h3>Previous Bookings <span data-previous-count>0</span></h3><div id="adminPreviousAppointments" class="admin-appointments-list"></div></section></div></div>
         <div class="policy-box brand-settings-box" id="manual-deposit-confirm-panel">
           <p class="eyebrow">Launch Readiness</p>
           <h2>Notification Status</h2>
@@ -2230,7 +2230,7 @@ function adminPage() {
             <label class="full">Admin Token<input name="token" type="password" placeholder="Manual deposit confirm token" autocomplete="current-password" value="${escapeAttr(confirmParams.token)}"></label>
             <label>Booking ID<input name="booking" placeholder="LL-1780438950711" value="${escapeAttr(confirmParams.booking)}"></label>
             <label>Payment Method
-              <select name="method">
+              <select name="method" required>
                 ${methodOptions}
               </select>
             </label>
@@ -3382,8 +3382,6 @@ function bindDynamic() {
   document.querySelectorAll("[data-resend-client-confirmation]").forEach(button => button.addEventListener("click", resendClientConfirmation));
   document.querySelectorAll("[data-send-notification-test]").forEach(button => button.addEventListener("click", sendNotificationTest));
   document.querySelectorAll("[data-refresh-notification-status]").forEach(button => button.addEventListener("click", loadAdminNotificationStatus));
-  document.getElementById("adminAppointmentsForm")?.addEventListener("submit", loadAdminAppointments);
-  document.querySelectorAll("[data-appointment-view]").forEach(button => button.addEventListener("click", () => { adminAppointmentView = button.dataset.appointmentView; renderAdminAppointments(); }));
 
   document.querySelectorAll("[data-apply-promo]").forEach(button => button.addEventListener("click", applyPromoCode));
   document.querySelectorAll("[data-clear-promo]").forEach(button => button.addEventListener("click", clearPromoCode));
@@ -3433,7 +3431,10 @@ function bindDynamic() {
     openCart();
   }));
   if (currentRoute() === "client-settings") initializeGoogleSignIn();
-  if (currentRoute() === "admin" || currentRoute() === "admin-confirm-deposit") loadAdminNotificationStatus();
+  if (currentRoute() === "admin" || currentRoute() === "admin-confirm-deposit") {
+    loadAdminNotificationStatus();
+    loadAdminAppointments();
+  }
   if (currentRoute() === "admin-confirm-deposit") {
     setTimeout(() => {
       document.getElementById("manual-deposit-confirm-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3955,8 +3956,8 @@ async function confirmManualDeposit() {
   const booking = String(data.get("booking") || "").trim();
   const token = String(data.get("token") || "").trim();
   const method = String(data.get("method") || "manual").trim();
-  if (!booking || !token) {
-    if (status) status.textContent = "Enter the booking ID and admin token.";
+  if (!booking) {
+    if (status) status.textContent = "Choose the appointment first.";
     return;
   }
   if (status) status.textContent = `Confirming deposit for ${booking}...`;
@@ -3997,8 +3998,8 @@ async function releaseUnpaidHold() {
   const data = new FormData(form);
   const booking = String(data.get("booking") || "").trim();
   const token = String(data.get("token") || "").trim();
-  if (!booking || !token) {
-    if (status) status.textContent = "Enter the booking ID and admin token.";
+  if (!booking) {
+    if (status) status.textContent = "Choose the appointment first.";
     return;
   }
   if (status) status.textContent = `Releasing unpaid hold for ${booking}...`;
@@ -4141,12 +4142,91 @@ function readinessLine(label, ready, detail) {
   return `<div class="readiness-line ${ready ? "ready" : "blocked"}"><strong>${label}</strong><span>${ready ? "Ready" : "Needs attention"}</span><p>${escapeAttr(detail || "")}</p></div>`;
 }
 
-let adminAppointments = [], adminAppointmentView = "upcoming";
-function adminAppointmentTime(b){const n=new Date((b.appointment?.date||"")+"T"+(b.appointment?.time||"23:59")).getTime();return Number.isFinite(n)?n:0}
-function selectAdminAppointment(id){const b=adminAppointments.find(x=>x.id===id),t=document.querySelector("#adminAppointmentsForm input").value,d=document.getElementById("manualDepositConfirmForm"),r=document.getElementById("confirmationResendForm");if(!b)return;d.elements.token.value=t;d.elements.booking.value=b.id;r.elements.token.value=t;r.elements.bookingId.value=b.id;r.elements.email.value=b.client?.email||"";r.elements.fullName.value=b.client?.fullName||"";r.elements.date.value=b.appointment?.date||"";r.elements.time.value=b.appointment?.time||"";document.getElementById("adminAppointmentsStatus").textContent=(b.client?.fullName||"Client")+" appointment selected."}
-function renderAdminAppointments(){const now=Date.now(),up=adminAppointments.filter(b=>adminAppointmentTime(b)>=now).sort((a,b)=>adminAppointmentTime(a)-adminAppointmentTime(b)),old=adminAppointments.filter(b=>adminAppointmentTime(b)<now).sort((a,b)=>adminAppointmentTime(b)-adminAppointmentTime(a)),items=adminAppointmentView==="previous"?old:up,list=document.getElementById("adminAppointmentsList");document.querySelector("[data-upcoming-count]").textContent=up.length;document.querySelector("[data-previous-count]").textContent=old.length;document.querySelectorAll("[data-appointment-view]").forEach(x=>x.classList.toggle("active",x.dataset.appointmentView===adminAppointmentView));list.innerHTML=items.length?items.map(b=>"<article class=\"admin-appointment-card\"><div><strong>"+escapeAttr(b.client?.fullName||"Unnamed client")+"</strong><p>"+escapeAttr(b.appointment?.date||"Date unavailable")+" "+escapeAttr(timeLabel(b.appointment?.time||""))+"</p><small>"+escapeAttr(b.id)+" - "+escapeAttr(b.status||"unknown")+"</small></div><button class=\"outline-btn\" data-select-admin-appointment=\""+escapeAttr(b.id)+"\">Select Appointment</button></article>").join(""):"<p>No "+adminAppointmentView+" appointments found.</p>";list.querySelectorAll("[data-select-admin-appointment]").forEach(x=>x.onclick=()=>selectAdminAppointment(x.dataset.selectAdminAppointment))}
-async function loadAdminAppointments(e){e.preventDefault();const t=new FormData(e.currentTarget).get("token"),s=document.getElementById("adminAppointmentsStatus");try{s.textContent="Loading appointments...";const r=await fetch("/api/admin/bookings?limit=100&token="+encodeURIComponent(t)),j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||"Appointments could not load.");adminAppointments=j.bookings||[];s.textContent=adminAppointments.length+" appointments loaded.";renderAdminAppointments()}catch(x){s.textContent=x.message}}
+let adminAppointments = [];
 
+function adminAppointmentTime(booking) {
+  const value = new Date((booking.appointment?.date || "") + "T" + (booking.appointment?.time || "23:59")).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function adminPaymentMethod(booking) {
+  const event = [...(booking.events || [])].reverse().find(item => item.manualPayment?.method);
+  const labels = { "venmo": "Venmo", "cash-app": "Cash App", "apple-pay": "Apple Pay", "cash": "Cash", "other": "Other" };
+  return labels[event?.manualPayment?.method] || (booking.status === "deposit_paid" ? "Recorded as paid (method unavailable)" : "Not received");
+}
+
+function adminAppointmentCard(booking) {
+  const paid = ["deposit_paid", "no_charge_test"].includes(booking.status);
+  const services = (booking.services || []).map(item =>
+    "<li><strong>" + escapeAttr(item.name) + "</strong>" +
+    (item.duration ? " · " + escapeAttr(item.duration) : "") +
+    " · " + money(item.price) + "</li>"
+  ).join("") || "<li>No service details were saved.</li>";
+  const received = booking.receivedAt ? new Date(booking.receivedAt).toLocaleString() : "Time unavailable";
+  return "<article class=\"admin-appointment-card\">" +
+    "<button type=\"button\" class=\"admin-appointment-summary\" data-toggle-admin-appointment=\"" + escapeAttr(booking.id) + "\" aria-expanded=\"false\">" +
+      "<span><strong>" + escapeAttr(booking.client?.fullName || "Unnamed client") + "</strong><small>Received " + escapeAttr(received) + "</small></span>" +
+      "<span><strong>" + escapeAttr(booking.appointment?.date || "Date unavailable") + "</strong><small>" + escapeAttr(timeLabel(booking.appointment?.time || "")) + "</small></span>" +
+    "</button>" +
+    "<div class=\"admin-appointment-details\" data-admin-appointment-details=\"" + escapeAttr(booking.id) + "\" hidden>" +
+      "<dl><div><dt>Services</dt><dd><ul>" + services + "</ul></dd></div>" +
+      "<div><dt>Deposit</dt><dd>" + (paid ? "Paid · " + money(booking.deposit) : "Not paid · " + money(booking.deposit) + " due") + "</dd></div>" +
+      "<div><dt>Final total</dt><dd>" + money(booking.total) + "</dd></div>" +
+      "<div><dt>Payment received by</dt><dd>" + escapeAttr(adminPaymentMethod(booking)) + "</dd></div>" +
+      "<div><dt>Booking ID</dt><dd>" + escapeAttr(booking.id) + "</dd></div></dl>" +
+      "<button class=\"outline-btn\" type=\"button\" data-select-admin-appointment=\"" + escapeAttr(booking.id) + "\">Use This Appointment</button>" +
+    "</div></article>";
+}
+
+function selectAdminAppointment(id) {
+  const booking = adminAppointments.find(item => item.id === id);
+  const depositForm = document.getElementById("manualDepositConfirmForm");
+  const resendForm = document.getElementById("confirmationResendForm");
+  if (!booking) return;
+  depositForm.elements.booking.value = booking.id;
+  resendForm.elements.bookingId.value = booking.id;
+  resendForm.elements.email.value = booking.client?.email || "";
+  resendForm.elements.fullName.value = booking.client?.fullName || "";
+  resendForm.elements.date.value = booking.appointment?.date || "";
+  resendForm.elements.time.value = booking.appointment?.time || "";
+  document.getElementById("adminAppointmentsStatus").textContent = (booking.client?.fullName || "Client") + " appointment selected below.";
+}
+
+function renderAdminAppointments() {
+  const now = Date.now();
+  const future = adminAppointments.filter(item => adminAppointmentTime(item) >= now);
+  const previous = adminAppointments.filter(item => adminAppointmentTime(item) < now);
+  const upcomingList = document.getElementById("adminUpcomingAppointments");
+  const previousList = document.getElementById("adminPreviousAppointments");
+  document.querySelector("[data-upcoming-count]").textContent = future.length;
+  document.querySelector("[data-previous-count]").textContent = previous.length;
+  upcomingList.innerHTML = future.length ? future.map(adminAppointmentCard).join("") : "<p>No future bookings found.</p>";
+  previousList.innerHTML = previous.length ? previous.map(adminAppointmentCard).join("") : "<p>No previous bookings found.</p>";
+  document.querySelectorAll("[data-toggle-admin-appointment]").forEach(button => button.addEventListener("click", () => {
+    const details = document.querySelector("[data-admin-appointment-details=\"" + button.dataset.toggleAdminAppointment + "\"]");
+    const opening = details.hidden;
+    details.hidden = !opening;
+    button.setAttribute("aria-expanded", String(opening));
+  }));
+  document.querySelectorAll("[data-select-admin-appointment]").forEach(button => button.addEventListener("click", () => selectAdminAppointment(button.dataset.selectAdminAppointment)));
+}
+
+async function loadAdminAppointments() {
+  const status = document.getElementById("adminAppointmentsStatus");
+  if (!status) return;
+  const token = manualDepositConfirmParams().token;
+  try {
+    status.textContent = "Loading appointments...";
+    const response = await fetch("/api/admin/bookings?limit=100&token=" + encodeURIComponent(token), { credentials: "same-origin" });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Appointments could not load.");
+    adminAppointments = result.bookings || [];
+    status.textContent = adminAppointments.length + " appointments loaded in received order.";
+    renderAdminAppointments();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
 async function loadAdminNotificationStatus() {
   const target = document.getElementById("adminNotificationStatus");
   if (!target) return;

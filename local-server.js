@@ -382,7 +382,16 @@ function confirmationEmail(booking, { test = false } = {}) {
       referralCode,
       `Share link: ${referralShareUrl}`,
       "",
-      "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
+      "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise.",
+      "",
+      "Hey, and here’s the location details.",
+      "",
+      "📍 Address: 4018 McIntosh Street, Unit K",
+      "Greensboro, NC 27407",
+      "",
+      "🚗 Parking: Please park in the visitor spots or along the side of the parking lot.",
+      "",
+      "📲 Upon Arrival: Just text me or knock and I’ll meet you at the door!",
       "",
       bookingText(booking),
     ].join("\n"),
@@ -393,7 +402,7 @@ function confirmationEmail(booking, { test = false } = {}) {
       rows,
       services: serviceSummaryHtml(booking),
       referral: { code: referralCode, shareUrl: referralShareUrl },
-      note: "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise. The private studio address is shared after confirmation.",
+      note: "Please arrive with your hair ready for the service unless Lovely Locs has told you otherwise.<br><br>Hey, and here’s the location details.<br><br>📍 <strong>Address:</strong> 4018 McIntosh Street, Unit K<br>Greensboro, NC 27407<br><br>🚗 <strong>Parking:</strong> Please park in the visitor spots or along the side of the parking lot.<br><br>📲 <strong>Upon Arrival:</strong> Just text me or knock and I’ll meet you at the door!",
     }),
   };
 }
@@ -2232,7 +2241,7 @@ async function runAppointmentReminderAutomation(booking, records, now) {
   if (!["deposit_paid", "no_charge_test"].includes(status)) return [];
   const daysOut = daysUntilDate(booking.client?.date, now);
   const windows = [
-    { days: 3, type: "appointment_reminder_3_day", label: "3-day" },
+    { days: 2, type: "appointment_reminder_2_day", label: "2-day" },
     { days: 1, type: "appointment_reminder_1_day", label: "1-day" },
   ];
   const sent = [];
@@ -2241,9 +2250,20 @@ async function runAppointmentReminderAutomation(booking, records, now) {
     const text = [
       `Hi ${clientFirstName(booking)}, your Lovely Locs appointment is coming up ${booking.client.date} at ${timeLabel(booking.client.time)}.`,
       "Please arrive with your hair ready for the service you selected unless Lovely Locs has told you otherwise.",
-      "The private studio address is shared after confirmation. Reply if you need to update your appointment details.",
+      "",
+      "Hey, and here’s the location details.",
+      "",
+      "📍 Address: 4018 McIntosh Street, Unit K",
+      "Greensboro, NC 27407",
+      "",
+      "🚗 Parking: Please park in the visitor spots or along the side of the parking lot.",
+      "",
+      "📲 Upon Arrival: Just text me or knock and I’ll meet you at the door!",
+      "",
+      window.days === 1 ? "See ya tomorrow!!" : "See ya in 2 days!!",
+      "Reply if you need to update your appointment details.",
     ].join("\n");
-    const sms = `Lovely Locs reminder: your appointment is ${booking.client.date} at ${timeLabel(booking.client.time)}. Please arrive with hair clean and ready for service. Reply STOP to opt out or HELP for help.`;
+    const sms = `Lovely Locs reminder: your appointment is ${booking.client.date} at ${timeLabel(booking.client.time)}. Address: 4018 McIntosh Street, Unit K, Greensboro, NC 27407. Park in visitor spots or along the side of the parking lot. Upon arrival, text me or knock and I’ll meet you at the door. Reply STOP to opt out or HELP for help.`;
     sent.push(await sendClientAutomation(booking, window.type, booking.client.date, `Lovely Locs ${window.label} appointment reminder`, text, sms));
   }
   return sent;

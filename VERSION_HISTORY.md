@@ -21,3 +21,4 @@ Open the site and click **Versions** in the top navigation. You can preview the 
 ## Notes
 
 This is a visual rollback system, not a code repository. For code-level rollback, use Git once the project is initialized as a repository.
+- 2026-08-04: Deployment retry after complete confirmation and 2-day reminder upload.

@@ -1312,7 +1312,11 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("no_charge_test"), "no-charge test status missing");
   assert(server.includes("/api/automations/run"), "automation run endpoint missing");
   assert(server.includes("deposit_reminder"), "deposit reminder automation missing");
-  assert(server.includes("appointment_reminder_3_day"), "3-day appointment reminder automation missing");
+  assert(server.includes("appointment_reminder_2_day"), "2-day appointment reminder automation missing");
+  assert(server.includes("4018 McIntosh Street, Unit K"), "confirmation and reminder location address missing");
+  assert(server.includes("Please park in the visitor spots or along the side of the parking lot."), "confirmation and reminder parking details missing");
+  assert(server.includes("Just text me or knock and I’ll meet you at the door!"), "confirmation and reminder arrival instructions missing");
+  assert(server.includes('window.days === 1 ? "See ya tomorrow!!" : "See ya in 2 days!!"'), "day-appropriate reminder closing missing");
   assert(server.includes("appointment_reminder_1_day"), "1-day appointment reminder automation missing");
   assert(server.includes("review_request"), "review request automation missing");
   assert(server.includes("returning_client_credit"), "returning client credit automation missing");

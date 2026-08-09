@@ -69,8 +69,9 @@ const sprinkleJewelrySourceLabels = {
   custom: "Custom Colors or Styles"
 };
 const sprinkleOnHandAvailabilityNote = "Available colors may vary based on what is currently on hand.";
-const regularAppointmentTimes = ["11:00", "16:00"];
-const scheduledWorkAppointmentTimes = ["19:00"];
+const regularAppointmentTimes = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+const scheduledWorkAppointmentTimes = ["18:00"];
+const augustOpenDates = new Set(["2026-08-10", "2026-08-15", "2026-08-17", "2026-08-22", "2026-08-26"]);
 const scheduledWorkDates = new Set([
   "2026-06-27",
   "2026-06-30",
@@ -92,6 +93,9 @@ const scheduledWorkDates = new Set([
   "2026-07-28",
   "2026-07-29",
   "2026-07-30",
+  "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+  "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21",
+  "2026-08-24", "2026-08-25", "2026-08-27", "2026-08-28",
 ]);
 const emergencyProposalTimes = ["10:00", "12:00", "14:00", "16:00", "22:30"];
 const forcedOpenAppointmentTimes = new Map([
@@ -139,6 +143,10 @@ const services = [
   { id: "style-addon", duration: "1h 30min", featured: false, price: 30, name: "Basic Style", description: "Additional basic styling service. Must be booked with a compatible maintenance service that does not already include a style.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
   { id: "consultation", duration: "1h 15min", featured: false, price: 30, name: "Consultation", description: "Discuss parting, size, texture, and method for your loc journey.", category: "add-ons" },
   { id: "loc-repair", duration: "30 min", featured: false, price: 3, priceLabel: "$3 per loc", name: "Loc Repair", description: "Targeted repair for compatible maintenance appointments. Repair pricing is $3 per loc.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], recommendationEligible: true },
+  { id: "loc-reattachment-1-3", duration: "30 min", featured: false, price: 10, name: "Loc Reattachment (1-3 Locs)", description: "Reattach 1-3 detached locs. Detached locs must be provided to Lovely Locs at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "1-3" },
+  { id: "loc-reattachment-4-7", duration: "1h", featured: false, price: 30, name: "Loc Reattachment (4-7 Locs)", description: "Reattach 4-7 detached locs. Detached locs must be provided to Lovely Locs at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "4-7" },
+  { id: "loc-reattachment-8-10", duration: "1h 30min", featured: false, price: 45, priceLabel: "Starting at $45", name: "Loc Reattachment (8-10 Locs)", description: "Starting price. Final pricing may change based on hair and detached-loc condition, part reconstruction, and reattachment complexity. Detached locs must be provided at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "8-10" },
+  { id: "loc-reattachment-consultation", duration: "30 min", featured: true, price: 20, name: "Loc Reattachment Consultation (11+ Locs)", description: "Required for 11+ reattachments or extensive reconstruction. In-person is preferred; a clear assisted video consultation is available. The $20 fee may become a single-use client-linked credit for 90 days if you proceed with the recommended service.", category: "add-ons", standaloneAppointment: true, consultationOnly: true },
   { id: "small-adult-starter", duration: "5h 30min", featured: false, price: 225, name: "Small Adult Starter Locs", description: "Small-sized starter locs for adults. Consultation required before booking.", category: "starter-locs" },
   { id: "overdue-retwist", duration: "4-5 hours", featured: true, price: 125, name: "Overdue Retwist (4+ Months)", description: "For clients who haven't had a retwist in over 3 months. Includes full retwist and basic style.", category: "loc-maintenance", includedAddOnIds: ["style-addon"] }
 ];
@@ -962,6 +970,7 @@ function isAdminTestBooking(items = cart) {
 
 function bookingDeposit(total, items = cart) {
   if (isAdminTestBooking(items)) return 0;
+  if (items.length === 1 && items[0]?.id === "loc-reattachment-consultation") return 20;
   return items.length ? Math.max(Math.round(total * 0.3), 30) : 30;
 }
 
@@ -1456,6 +1465,7 @@ function googleSignupFormMarkup() {
 function clientCreditLabel(type) {
   if (type === "birthday") return "Birthday";
   if (type === "returning") return "Returning Client";
+  if (type === "consultation") return "Loc Reattachment Consultation";
   return "Referral";
 }
 
@@ -2473,6 +2483,7 @@ function dayOfWeek(date) {
 }
 
 function appointmentTimesForDate(date) {
+  if (String(date).startsWith("2026-08-") && !scheduledWorkDates.has(date) && !augustOpenDates.has(date)) return [];
   return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
 }
 
@@ -2709,12 +2720,21 @@ function renderTimeSlots(availability, preferredSlot = null) {
   bindTimeSlotButtons();
 }
 
+function cartDurationMinutes(items = cart) {
+  return items.reduce((sum, item) => {
+    const text = String(item.duration || "").toLowerCase();
+    const hours = Number((text.match(/(\d+(?:\.\d+)?)\s*h/) || [])[1] || 0);
+    const minutes = Number((text.match(/(\d+)\s*min/) || [])[1] || 0);
+    return sum + Math.round(hours * 60 + minutes);
+  }, 0);
+}
+
 async function loadAvailabilityForDate(date, preferredSlot = null) {
   if (!date) return;
   const grid = document.getElementById("timeSlotGrid");
   if (grid) grid.innerHTML = `<p class="time-slot-placeholder">Loading open times...</p>`;
   try {
-    const response = await fetch(`/api/availability?date=${encodeURIComponent(date)}`);
+    const response = await fetch(`/api/availability?date=${encodeURIComponent(date)}&duration=${cartDurationMinutes()}`);
     const result = await response.json();
     if (!result.ok) throw new Error(result.error || "Availability could not be loaded.");
     renderTimeSlots(result, preferredSlot);
@@ -2972,6 +2992,13 @@ function currentRoute() {
 function addToCart(item) {
   bookingConfirmation = null;
   addOnCompatibilityMessage = "";
+  if (item?.consultationOnly) cart = [];
+  if (cart.some(existing => existing.consultationOnly) && !item?.consultationOnly) {
+    addOnCompatibilityMessage = "The Loc Reattachment Consultation must be booked by itself. Remove it before adding another service.";
+    render(currentRoute());
+    openCart();
+    return;
+  }
   if (!cart.some(existing => existing.id === item.id)) cart.push(item);
   saveCart();
   render(currentRoute());

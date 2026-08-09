@@ -1273,6 +1273,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("loc-reattachment-consultation") && server.includes("consultationOnly"), "consultation-only service rules missing");
   assert(server.includes("manual.payment.recorded") && server.includes("cumulativeReceived"), "cumulative payment tracking missing");
   assert(server.includes("paymentUpdatePageHtml") && server.includes("Optional tip"), "prefilled Update Payment and separate tip controls missing");
+  assert(server.includes('const suggestedAmount = initialPayment ? Math.min(remaining, Number(booking.deposit || 0)) : "";'), "initial owner payment form should prefill the expected deposit but allow edits");
+  assert(server.includes("Amount actually received") && server.includes('step="0.01"'), "initial owner payment form should accept an editable exact amount");
   assert(server.includes("consultation.credit.approved") && server.includes("expires.setDate(expires.getDate() + 90)"), "90-day consultation credit workflow missing");
   assert(server.includes("Remaining Balance") && server.includes("Payment Received"), "client confirmation balance breakdown missing");
   assert(!server.includes("bookingUnavailableFromDate"), "future months should not be blocked by a hard cutoff");

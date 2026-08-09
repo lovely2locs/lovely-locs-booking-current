@@ -1217,8 +1217,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(fs.readFileSync("local-server.js", "utf8").includes("manualPayment: record.manualPayment"), "admin appointment payment method event missing");
   assert(fs.readFileSync("script.js", "utf8").includes("selectAdminAppointment"), "admin appointment selector missing");
   assert(fs.readFileSync("styles.css", "utf8").includes(".admin-appointment-card"), "admin appointment styles missing");
-  assert(server.includes("booking ID is captured automatically"), "owner confirmation fallback should mention automatic booking ID capture from email link");
-  assert(server.includes("pay-options page or payment note"), "owner confirmation fallback should still mention pay-options or payment note");
+  assert(server.includes("paymentUpdatePageHtml"), "owner email workflow should open a prefilled booking-specific payment page");
+  assert(server.includes("Booking:") && server.includes("Expected deposit"), "prefilled owner payment page should identify the booking and expected deposit");
   assert(server.includes("sanitizeFriendTest"), "friend-test payload sanitizer missing");
   assert(server.includes('const cleanTest = test && typeof test === "object" ? test : {};'), "friend-test sanitizer should handle null payloads");
   assert(server.includes('const code = String(cleanTest.code || "").trim().toUpperCase();'), "friend-test sanitizer should read from the guarded object");
@@ -1233,10 +1233,10 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("/api/admin/confirmation/resend"), "protected confirmation resend endpoint missing");
   assert(server.includes("handleAdminConfirmationResend"), "confirmation resend handler missing");
   assert(server.includes("containsAdminTestService && !tokenIsValid"), "admin test booking endpoint should require the owner token");
-  assert(server.includes("manual.deposit.confirmed"), "manual deposit confirmed event missing");
+  assert(server.includes("manual.payment.recorded"), "cumulative manual payment event missing");
   assert(server.includes("manual.deposit.released_unpaid"), "manual unpaid hold release event missing");
   assert(server.includes("released_unpaid"), "released unpaid status missing");
-  assert(server.includes("alreadyConfirmed"), "manual deposit confirmation retry guard missing");
+  assert(server.includes("paymentTotalsForBooking"), "manual payment duplicate and cumulative-total guard missing");
   assert(server.includes("/api/notifications/test"), "notification test endpoint missing");
   assert(server.includes("handleNotificationTest"), "notification test handler missing");
   assert(server.includes("TWILIO_TOLLFREE_VERIFIED"), "Twilio toll-free verification guard missing");
@@ -1246,8 +1246,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes("minimumBookingLeadMs"), "server should enforce a 24-hour booking lead time");
   assert(server.includes("Appointment must be a future time at least 24 hours away."), "server should reject past or too-soon appointment submissions");
   assert(server.includes('status: tooSoon ? "unavailable"'), "availability should mark too-soon slots unavailable");
-  assert(server.includes('const regularAppointmentTimes = ["11:00", "16:00"];'), "usual availability should allow two regular starts");
-  assert(server.includes('const scheduledWorkAppointmentTimes = ["19:00"];'), "scheduled workdays should expose only the 7 PM start");
+  assert(server.includes('const regularAppointmentTimes = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];'), "open August dates should offer hourly starts from 11 AM through 4 PM");
+  assert(server.includes('const scheduledWorkAppointmentTimes = ["18:00"];'), "scheduled August workdays should expose only the 6 PM start");
   assert(server.includes('"2026-06-27"'), "green scheduled June 27 date missing from availability override");
   const scheduledWorkDatesBlock = server.match(/const scheduledWorkDates = new Set\(\[([\s\S]*?)\]\);/);
   assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-01"'), "green scheduled July 1 date missing from availability override");
@@ -1255,7 +1255,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-16"'), "selected scheduled July 16 date missing from availability override");
   assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-21"'), "July scheduled work availability should include the 21st");
   assert(scheduledWorkDatesBlock && scheduledWorkDatesBlock[1].includes('"2026-07-30"'), "July scheduled work availability should include later green July dates");
-  assert(server.includes('"7:00 PM - 10:30 PM"'), "scheduled workday label should show the 7 PM to 10:30 PM window");
+  assert(server.includes('scheduledWorkDates.has(date)'), "scheduled workday rules should remain date driven");
   const holidayDatesBlock = server.match(/const holidayDates = new Set\(\[([\s\S]*?)\]\);/);
   assert(holidayDatesBlock && !holidayDatesBlock[1].includes('"2026-07-03"'), "July 3 should stay open for normal 11 AM or 4 PM availability");
   assert(server.includes('["2026-07-03", new Set(["11:00", "16:00"])]'), "July 3 should force both 11 AM and 4 PM open");
@@ -1266,7 +1266,15 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   ["2026-01-19", "2026-02-16", "2026-06-19", "2026-07-31", "2026-10-12", "2026-11-11"].forEach(date => {
     assert(server.includes(`"${date}"`), `major holiday emergency date missing: ${date}`);
   });
-  assert(server.includes("const emergencySlots = [];"), "public availability should stay capped at two standard starts per day");
+  assert(server.includes("bookingDurationMinutes") && server.includes("30"), "availability should account for complete duration and a 30-minute buffer");
+  assert(server.includes('"2026-08-11"') && server.includes('"2026-08-28"'), "August green work dates missing");
+  assert(server.includes('"2026-08-10"') && server.includes('"2026-08-26"'), "August open dates missing");
+  assert(server.includes("loc-reattachment-1-3") && server.includes("loc-reattachment-4-7") && server.includes("loc-reattachment-8-10"), "Loc Reattachment tiers missing");
+  assert(server.includes("loc-reattachment-consultation") && server.includes("consultationOnly"), "consultation-only service rules missing");
+  assert(server.includes("manual.payment.recorded") && server.includes("cumulativeReceived"), "cumulative payment tracking missing");
+  assert(server.includes("paymentUpdatePageHtml") && server.includes("Optional tip"), "prefilled Update Payment and separate tip controls missing");
+  assert(server.includes("consultation.credit.approved") && server.includes("expires.setDate(expires.getDate() + 90)"), "90-day consultation credit workflow missing");
+  assert(server.includes("Remaining Balance") && server.includes("Payment Received"), "client confirmation balance breakdown missing");
   assert(!server.includes("bookingUnavailableFromDate"), "future months should not be blocked by a hard cutoff");
   assert(!server.includes("August dates are not open for booking yet."), "August and future listed months should stay eligible for the normal availability workflow");
   assert(server.includes("classifyAppointmentTime"), "appointment time classifier missing");

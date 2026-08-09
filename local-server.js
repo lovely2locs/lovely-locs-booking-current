@@ -2128,7 +2128,7 @@ async function notifyDepositPaid(booking, session) {
 
 async function notifyManualPaymentPending(booking, req) {
   const details = bookingText(booking);
-  const confirmLink = manualConfirmUrl(req, booking);
+  const confirmLink = manualConfirmUrl(req, booking, "manual", "update");
   const updateLink = manualConfirmUrl(req, booking, "manual", "update");
   const consultationCreditLink = booking.cart?.some(item => item.id === "loc-reattachment-consultation")
     ? `${publicSiteUrl(req)}/api/consultation-credit?booking=${encodeURIComponent(booking.id)}&token=${encodeURIComponent(process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN || "")}`
@@ -2668,9 +2668,12 @@ function paymentTotalsForBooking(bookingId, records = readBookingRecords()) {
 
 function paymentUpdatePageHtml({ booking, token, method, totals, error = "" }) {
   const remaining = Math.max(0, Number(booking.total || 0) - totals.service);
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update Payment - Lovely Locs</title><style>body{font-family:Arial;background:#f8f0ea;color:#3b2821;padding:24px}main{max-width:560px;margin:auto;background:#fffaf7;padding:28px;border-radius:18px}label{display:block;margin:16px 0;font-weight:700}input{display:block;width:100%;box-sizing:border-box;padding:12px;margin-top:7px}button{background:#4b332c;color:white;border:0;border-radius:999px;padding:14px 20px;font-weight:800}.error{color:#a4473e}</style></head><body><main><h1>Update Payment</h1><p><strong>Booking:</strong> ${escapeHtml(booking.id)}</p><p>Service total: $${Number(booking.total || 0)}<br>Expected deposit: $${Number(booking.deposit || 0)}<br>Total received: $${totals.service}<br>Remaining balance: $${remaining}<br>Tips recorded: $${totals.tips}</p>${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}<form method="get" action="/api/manual-payment/confirm"><input type="hidden" name="booking" value="${escapeHtml(booking.id)}"><input type="hidden" name="token" value="${escapeHtml(token)}"><input type="hidden" name="method" value="${escapeHtml(method)}"><input type="hidden" name="action" value="update"><label>New service payment<input name="amount" type="number" min="0" max="${remaining}" step="1" required></label><label>Optional tip<input name="tip" type="number" min="0" step="1" value="0"></label><button type="submit">Confirm Payment & Appointment</button></form></main></body></html>`;
+  const initialPayment = totals.service === 0;
+  const suggestedAmount = initialPayment ? Math.min(remaining, Number(booking.deposit || 0)) : "";
+  const heading = initialPayment ? "Confirm Initial Payment" : "Update Payment";
+  const paymentLabel = initialPayment ? "Amount actually received" : "Additional service payment received";
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${heading} - Lovely Locs</title><style>body{font-family:Arial;background:#f8f0ea;color:#3b2821;padding:24px}main{max-width:560px;margin:auto;background:#fffaf7;padding:28px;border-radius:18px}label{display:block;margin:16px 0;font-weight:700}input{display:block;width:100%;box-sizing:border-box;padding:12px;margin-top:7px}button{background:#4b332c;color:white;border:0;border-radius:999px;padding:14px 20px;font-weight:800}.error{color:#a4473e}</style></head><body><main><h1>${heading}</h1><p><strong>Booking:</strong> ${escapeHtml(booking.id)}</p><p>Service total: $${Number(booking.total || 0)}<br>Expected deposit: $${Number(booking.deposit || 0)}<br>Total received: $${totals.service}<br>Remaining balance: $${remaining}<br>Tips recorded: $${totals.tips}</p><p>Review and change the amount below so it matches the payment you actually received.</p>${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}<form method="get" action="/api/manual-payment/confirm"><input type="hidden" name="booking" value="${escapeHtml(booking.id)}"><input type="hidden" name="token" value="${escapeHtml(token)}"><input type="hidden" name="method" value="${escapeHtml(method)}"><input type="hidden" name="action" value="update"><label>${paymentLabel}<input name="amount" type="number" min="0.01" max="${remaining}" step="0.01" value="${suggestedAmount}" required></label><label>Optional tip<input name="tip" type="number" min="0" step="0.01" value="0"></label><button type="submit">Record Payment & Confirm Appointment</button></form></main></body></html>`;
 }
-
 async function handleManualPaymentConfirm(req, res) {
   let wantsJson = false;
   try {

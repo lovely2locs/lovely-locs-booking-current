@@ -951,7 +951,6 @@ function sendHtml(res, status, html) {
   res.writeHead(status, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
-    ...extraHeaders,
   });
   res.end(html);
 }
@@ -3598,7 +3597,6 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, {
     "Content-Type": types[path.extname(filePath).toLowerCase()] || "application/octet-stream",
     "Cache-Control": "no-store",
-    ...extraHeaders,
   });
 
   if (req.method === "HEAD") {

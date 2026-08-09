@@ -87,6 +87,10 @@ const serviceCatalog = [
   { id: "style-addon", duration: "1h 30min", price: 30, name: "Basic Style", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
   { id: "consultation", duration: "1h 15min", price: 30, name: "Consultation", category: "add-ons" },
   { id: "loc-repair", duration: "30 min", price: 3, priceLabel: "$3 per loc", name: "Loc Repair", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"] },
+  { id: "loc-reattachment-1-3", duration: "30 min", price: 10, name: "Loc Reattachment (1-3 Locs)", description: "Reattach 1-3 detached locs. Detached locs must be provided to Lovely Locs at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "1-3" },
+  { id: "loc-reattachment-4-7", duration: "1h", price: 30, name: "Loc Reattachment (4-7 Locs)", description: "Reattach 4-7 detached locs. Detached locs must be provided to Lovely Locs at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "4-7" },
+  { id: "loc-reattachment-8-10", duration: "1h 30min", price: 45, priceLabel: "Starting at $45", name: "Loc Reattachment (8-10 Locs)", description: "Starting price. Final pricing may change based on hair and detached-loc condition, part reconstruction, and reattachment complexity. Detached locs must be provided at least 72 hours before the appointment.", category: "add-ons", requiresMainService: true, compatibleMainCategories: ["loc-maintenance"], reattachmentTier: "8-10" },
+  { id: "loc-reattachment-consultation", duration: "30 min", price: 20, name: "Loc Reattachment Consultation (11+ Locs)", description: "Required for 11+ reattachments or extensive reconstruction. In-person is preferred; a clear assisted video consultation is available. The $20 fee may become a single-use client-linked credit for 90 days if you proceed with the recommended service.", category: "add-ons", standaloneAppointment: true, consultationOnly: true },
   { id: "small-adult-starter", duration: "5h 30min", price: 225, name: "Small Adult Starter Locs", category: "starter-locs" },
   { id: "overdue-retwist", duration: "4-5 hours", price: 125, name: "Overdue Retwist (4+ Months)", category: "loc-maintenance", includedAddOnIds: ["style-addon"] },
   { id: "admin-test-booking", duration: "15 min", price: 0, name: "Free Admin Test Booking", category: "admin-test" },
@@ -119,8 +123,9 @@ const allowedPartingFees = new Map([
   ["Triangle Parts", 40],
 ]);
 
-const regularAppointmentTimes = ["11:00", "16:00"];
-const scheduledWorkAppointmentTimes = ["19:00"];
+const regularAppointmentTimes = ["11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+const scheduledWorkAppointmentTimes = ["18:00"];
+const augustOpenDates = new Set(["2026-08-10", "2026-08-15", "2026-08-17", "2026-08-22", "2026-08-26"]);
 const scheduledWorkDates = new Set([
   "2026-06-27",
   "2026-06-30",
@@ -142,6 +147,9 @@ const scheduledWorkDates = new Set([
   "2026-07-28",
   "2026-07-29",
   "2026-07-30",
+  "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+  "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21",
+  "2026-08-24", "2026-08-25", "2026-08-27", "2026-08-28",
 ]);
 const friendTestCheckpoints = ["home", "services", "products", "policies", "contact", "privacy", "terms"];
 const friendTestCampaign = "friends-booking-test-2026-06";
@@ -361,8 +369,12 @@ function confirmationEmail(booking, { test = false } = {}) {
     { label: "Date", value: booking.client?.date },
     { label: "Time", value: timeLabel(booking.client?.time) },
     { label: "Booking ID", value: booking.id },
-    { label: "Deposit", value: `$${booking.deposit || 0}` },
-    { label: "Estimated Total", value: `$${booking.total || 0}` },
+    { label: "Service Total", value: `$${booking.subtotal || booking.total || 0}` },
+    booking.discountAmount ? { label: booking.discountType === "consultation" ? "Consultation Credit" : "Credit / Discount", value: `-$${booking.discountAmount}` } : null,
+    { label: "Adjusted Total", value: `$${booking.total || 0}` },
+    { label: "Payment Received", value: `$${booking.paymentReceived ?? booking.deposit ?? 0}` },
+    { label: "Remaining Balance", value: `$${booking.remainingBalance ?? Math.max(0, Number(booking.total || 0) - Number(booking.deposit || 0))}` },
+    booking.tipAmount ? { label: "Tip", value: `$${booking.tipAmount}` } : null,
   ];
   const referralCode = normalizeReferralCode(booking.client?.referralCode || referralCodeForClient(booking.client));
   const siteUrl = String(process.env.PUBLIC_SITE_URL || `http://127.0.0.1:${port}`).replace(/\/+$/, "");
@@ -415,8 +427,12 @@ function depositRequestEmail(booking, payUrl) {
     { label: "Date", value: booking.client?.date },
     { label: "Time", value: timeLabel(booking.client?.time) },
     { label: "Booking ID", value: booking.id },
-    { label: "Deposit", value: `$${booking.deposit || 0}` },
-    { label: "Estimated Total", value: `$${booking.total || 0}` },
+    { label: "Service Total", value: `$${booking.subtotal || booking.total || 0}` },
+    booking.discountAmount ? { label: booking.discountType === "consultation" ? "Consultation Credit" : "Credit / Discount", value: `-$${booking.discountAmount}` } : null,
+    { label: "Adjusted Total", value: `$${booking.total || 0}` },
+    { label: "Payment Received", value: `$${booking.paymentReceived ?? booking.deposit ?? 0}` },
+    { label: "Remaining Balance", value: `$${booking.remainingBalance ?? Math.max(0, Number(booking.total || 0) - Number(booking.deposit || 0))}` },
+    booking.tipAmount ? { label: "Tip", value: `$${booking.tipAmount}` } : null,
   ];
   const paymentOptions = paymentOptionsText(booking);
   return {
@@ -494,8 +510,12 @@ function ownerBookingEmail(booking, { title, intro, ctaUrl = "", ctaLabel = "" }
     { label: "Date", value: booking.client?.date },
     { label: "Time", value: timeLabel(booking.client?.time) },
     { label: "Booking ID", value: booking.id },
-    { label: "Deposit", value: `$${booking.deposit || 0}` },
-    { label: "Estimated Total", value: `$${booking.total || 0}` },
+    { label: "Service Total", value: `$${booking.subtotal || booking.total || 0}` },
+    booking.discountAmount ? { label: booking.discountType === "consultation" ? "Consultation Credit" : "Credit / Discount", value: `-$${booking.discountAmount}` } : null,
+    { label: "Adjusted Total", value: `$${booking.total || 0}` },
+    { label: "Payment Received", value: `$${booking.paymentReceived ?? booking.deposit ?? 0}` },
+    { label: "Remaining Balance", value: `$${booking.remainingBalance ?? Math.max(0, Number(booking.total || 0) - Number(booking.deposit || 0))}` },
+    booking.tipAmount ? { label: "Tip", value: `$${booking.tipAmount}` } : null,
     booking.friendTest ? { label: "Friend Test", value: booking.friendTest.code } : null,
     booking.friendTest ? { label: "Website Coverage", value: `${booking.friendTest.completedCheckpoints}/${booking.friendTest.totalCheckpoints} checkpoints (${booking.friendTest.percentComplete}%)` } : null,
   ].filter(Boolean);
@@ -804,7 +824,7 @@ function bookingStatus(booking, records) {
   let status = booking.status || "";
   for (const record of records) {
     if (bookingRecordId(record) !== booking.id) continue;
-    if (record.status === "deposit_paid" || record.type === "stripe.checkout.session.completed" || record.type === "manual.deposit.confirmed") {
+    if (record.status === "deposit_paid" || record.type === "stripe.checkout.session.completed" || record.type === "manual.deposit.confirmed" || record.type === "manual.payment.recorded") {
       status = "deposit_paid";
     } else if (record.status === "released_unpaid" || record.type === "manual.deposit.released_unpaid") {
       status = "released_unpaid";
@@ -1353,7 +1373,7 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   const key = clientIdentityKey(client);
   if (!key) return null;
   const credits = records.filter(record => (
-    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved"].includes(record.type)
+    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved", "consultation.credit.approved"].includes(record.type)
     && record.clientKey === key
     && record.creditId
     && !creditIsUnavailable(records, record.creditId)
@@ -1391,7 +1411,7 @@ function availableClientCredit(client, total, records = readBookingRecords()) {
   const amountOff = creditAmount(best, total);
   if (!amountOff) return null;
   return {
-    type: best.type === "birthday.reward.approved" ? "birthday" : best.type === "returning_client.reward.approved" ? "returning" : "referral",
+    type: best.type === "birthday.reward.approved" ? "birthday" : best.type === "returning_client.reward.approved" ? "returning" : best.type === "consultation.credit.approved" ? "consultation" : "referral",
     creditId: best.creditId,
     creditIds: [best.creditId],
     code: best.discountCode || best.creditId,
@@ -1637,6 +1657,7 @@ function dayOfWeek(date) {
 }
 
 function appointmentTimesForDate(date) {
+  if (String(date).startsWith("2026-08-") && !scheduledWorkDates.has(date) && !augustOpenDates.has(date)) return [];
   return scheduledWorkDates.has(date) ? scheduledWorkAppointmentTimes : regularAppointmentTimes;
 }
 
@@ -1666,8 +1687,33 @@ function classifyAppointmentTime(date, time) {
   };
 }
 
-function availabilityForDate(date) {
-  const booked = bookedTimesForDate(date);
+function durationMinutes(value = "") {
+  const text = String(value).toLowerCase();
+  const hours = Number((text.match(/(\d+(?:\.\d+)?)\s*h/) || [])[1] || 0);
+  const minutes = Number((text.match(/(\d+)\s*min/) || [])[1] || 0);
+  return Math.max(0, Math.round(hours * 60 + minutes));
+}
+
+function bookingDurationMinutes(booking = {}) {
+  const items = booking.selectedServices?.length ? booking.selectedServices : booking.cart || [];
+  return items.reduce((sum, item) => sum + durationMinutes(item.duration), 0);
+}
+
+function minutesFromTime(value = "") {
+  const [hours, minutes] = String(value).split(":").map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+}
+
+function bookedAppointmentsForDate(date) {
+  const records = readBookingRecords();
+  return latestBookingRecords(records).filter(booking => {
+    const status = bookingStatus(booking, records);
+    return booking.client?.date === date && booking.client?.time && ["pending_manual_payment", "pending_payment", "deposit_paid", "no_charge_test"].includes(status);
+  }).map(booking => ({ start: minutesFromTime(booking.client.time), duration: Math.max(15, bookingDurationMinutes(booking)) }));
+}
+
+function availabilityForDate(date, requestedDuration = 0) {
+  const booked = bookedAppointmentsForDate(date);
   const holiday = isHoliday(date);
   const isSunday = dayOfWeek(date) === 0;
   const scheduledWorkDate = scheduledWorkDates.has(date);
@@ -1675,36 +1721,26 @@ function availabilityForDate(date) {
   const forcedOpenTimes = forcedOpenAppointmentTimes.get(date) || new Set();
   const holidayTimes = holidayAppointmentTimesByDate.get(date) || [];
   const holidayBookedTimes = holidayBookedAppointmentTimes.get(date) || new Set();
+  const requested = Math.max(15, Number(requestedDuration || 0));
+  const conflicts = time => {
+    const start = minutesFromTime(time);
+    const end = start + requested;
+    return booked.some(item => start < item.start + item.duration + 30 && end + 30 > item.start);
+  };
   const holidaySlots = holiday ? holidayTimes.map(time => {
-    const isBooked = holidayBookedTimes.has(time) || booked.has(time);
+    const isBooked = holidayBookedTimes.has(time) || conflicts(time);
     const tooSoon = !appointmentBookable(date, time);
-    return {
-      time,
-      label: timeLabel(time),
-      type: "emergency",
-      status: tooSoon ? "unavailable" : isBooked ? "booked" : "open",
-      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : isBooked ? "Holiday appointment time is closed. Emergency fee applies to approved holiday bookings." : "Holiday appointment includes the $45 emergency fee.",
-    };
+    return { time, label: timeLabel(time), type: "emergency", status: tooSoon ? "unavailable" : isBooked ? "booked" : "open", note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : isBooked ? "Holiday appointment time is closed." : "Holiday appointment includes the $45 emergency fee." };
   }) : [];
   const regularSlots = holiday || isSunday ? [] : appointmentTimes.map(time => {
     const tooSoon = !appointmentBookable(date, time);
-    return {
-      time,
-      label: timeLabel(time),
-      type: "standard",
-      status: tooSoon ? "unavailable" : booked.has(time) && !forcedOpenTimes.has(time) ? "booked" : "open",
-      note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : scheduledWorkDate ? "Scheduled workday opening from 7:00 PM - 10:30 PM." : "Open appointment time.",
-    };
+    const dayEnd = scheduledWorkDate ? 22 * 60 + 30 : 19 * 60;
+    const cannotFit = minutesFromTime(time) + requested > dayEnd;
+    const occupied = conflicts(time) && !forcedOpenTimes.has(time);
+    return { time, label: timeLabel(time), type: "standard", status: tooSoon || cannotFit ? "unavailable" : occupied ? "booked" : "open", note: tooSoon ? "Appointments must be booked at least 24 hours ahead." : cannotFit ? "The complete appointment will not fit this opening." : occupied ? "This time conflicts with an existing appointment and buffer." : scheduledWorkDate ? "Scheduled workday opening at 6:00 PM." : "Open appointment time." };
   });
-  const emergencySlots = [];
-  return {
-    date,
-    holiday,
-    regularHours: holiday || isSunday ? "Emergency proposals only" : regularHoursLabelForDate(date),
-    slots: [...holidaySlots, ...regularSlots, ...emergencySlots],
-  };
+  return { date, holiday, regularHours: holiday || isSunday ? "Closed" : scheduledWorkDate ? "6:00 PM only" : "11:00 AM through 4:00 PM starts", slots: [...holidaySlots, ...regularSlots] };
 }
-
 function isAdminTestBooking(cart = []) {
   return cart.length === 1 && cart[0]?.id === "admin-test-booking";
 }
@@ -1755,13 +1791,14 @@ function paymentOptionsText(booking) {
   ].join("\n")).join("\n\n");
 }
 
-function manualConfirmUrl(req, booking, method = "manual") {
+function manualConfirmUrl(req, booking, method = "manual", action = "confirm") {
   const token = process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN;
   if (!token) return "";
   const url = new URL("/", publicSiteUrl(req));
   url.searchParams.set("booking", booking.id);
   url.searchParams.set("method", method);
   url.searchParams.set("token", token);
+  url.searchParams.set("action", action);
   url.hash = "admin-confirm-deposit";
   return url.toString();
 }
@@ -1960,7 +1997,7 @@ function priceBooking(booking) {
   const missing = required.filter(field => !client[field]);
   if (missing.length) throw new Error(`Missing required booking fields: ${missing.join(", ")}.`);
   if (!appointmentBookable(client.date, client.time)) throw new Error("Appointment must be a future time at least 24 hours away.");
-  const slot = availabilityForDate(client.date).slots.find(item => item.time === client.time);
+  const slot = availabilityForDate(client.date, bookingDurationMinutes({ cart: booking.cart })).slots.find(item => item.time === client.time);
   if (!slot) throw new Error("Selected appointment time is not available.");
   if (slot.status === "booked") throw new Error("That appointment time was just booked. Please choose another time.");
   if (!Array.isArray(booking.cart) || booking.cart.length === 0) throw new Error("Booking must include at least one cart item.");
@@ -1981,7 +2018,8 @@ function priceBooking(booking) {
   const discount = isAdminTestBooking(cart) ? null : chooseBookingDiscount(subtotal, saleDiscount, clientCredit, referredClientDiscount);
   const discountAmount = isAdminTestBooking(cart) ? 0 : discountAmountForTotal(subtotal, discount);
   const total = Math.max(0, subtotal - discountAmount);
-  const deposit = isAdminTestBooking(cart) ? 0 : Math.max(Math.round(total * 0.3), 30);
+  const reattachmentConsultation = cart.length === 1 && cart[0]?.id === "loc-reattachment-consultation";
+  const deposit = isAdminTestBooking(cart) ? 0 : reattachmentConsultation ? 20 : Math.max(Math.round(total * 0.3), 30);
 
   return {
     client,
@@ -2051,8 +2089,11 @@ async function createCheckoutSession(req, booking) {
 
 async function notifyDepositPaid(booking, session) {
   const paidAt = new Date().toISOString();
+  const adjustedTotal = Math.max(0, Number(booking.total || 0));
+  const remainingBalance = Math.max(0, adjustedTotal - Number(totalReceived || 0));
+  const paymentBooking = { ...booking, paymentReceived: totalReceived, remainingBalance, tipAmount };
   const details = bookingText({
-    ...booking,
+    ...paymentBooking,
     status: "deposit_paid",
     stripe: {
       checkoutSessionId: session.id,
@@ -2061,7 +2102,7 @@ async function notifyDepositPaid(booking, session) {
       paidAt,
     },
   });
-  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your $${booking.deposit} deposit has been received. Reply STOP to opt out or HELP for help.`;
+  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Payment received: $${totalReceived}. Remaining balance: $${remainingBalance}. Reply STOP to opt out or HELP for help.`;
   const ownerText = `Stripe deposit paid for ${booking.client.fullName}: $${booking.deposit}. Preferred date: ${booking.client.date}. Total estimate: $${booking.total}.`;
   const clientEmail = confirmationEmail(booking);
   const ownerHtml = ownerBookingEmail(booking, {
@@ -2089,6 +2130,10 @@ async function notifyDepositPaid(booking, session) {
 async function notifyManualPaymentPending(booking, req) {
   const details = bookingText(booking);
   const confirmLink = manualConfirmUrl(req, booking);
+  const updateLink = manualConfirmUrl(req, booking, "manual", "update");
+  const consultationCreditLink = booking.cart?.some(item => item.id === "loc-reattachment-consultation")
+    ? `${publicSiteUrl(req)}/api/consultation-credit?booking=${encodeURIComponent(booking.id)}&token=${encodeURIComponent(process.env.MANUAL_DEPOSIT_CONFIRM_TOKEN || process.env.AUTOMATION_RUN_TOKEN || "")}`
+    : "";
   const payUrl = bookingPaymentOptionsUrl(booking);
   const clientEmail = depositRequestEmail(booking, payUrl);
   const ownerText = [
@@ -2101,6 +2146,18 @@ async function notifyManualPaymentPending(booking, req) {
     "",
     "After you see the matching Venmo, Cash App, or Apple Pay receipt, approve the deposit here:",
     confirmLink || "Set MANUAL_DEPOSIT_CONFIRM_TOKEN in Render to enable one-click approval links.",
+    "",
+    "UPDATE PAYMENT:",
+    updateLink || "Owner payment update link unavailable.",
+    consultationCreditLink ? "" : null,
+    consultationCreditLink ? "AFTER THE CONSULTATION - ISSUE $20 CREDIT:" : null,
+    consultationCreditLink || null,
+    "",
+    "Record a different or additional payment:",
+    updateLink || "Owner payment update link unavailable.",
+    consultationCreditLink ? "" : null,
+    consultationCreditLink ? "AFTER THE CONSULTATION - ISSUE $20 CREDIT:" : null,
+    consultationCreditLink || null,
     "",
     details,
   ].join("\n");
@@ -2127,19 +2184,22 @@ async function notifyManualPaymentPending(booking, req) {
   return results;
 }
 
-async function notifyManualDepositPaid(booking, method) {
+async function notifyManualDepositPaid(booking, method, amountReceived = booking.deposit, tipAmount = 0, totalReceived = amountReceived) {
   const confirmedAt = new Date().toISOString();
+  const adjustedTotal = Math.max(0, Number(booking.total || 0));
+  const remainingBalance = Math.max(0, adjustedTotal - Number(totalReceived || 0));
+  const paymentBooking = { ...booking, paymentReceived: totalReceived, remainingBalance, tipAmount };
   const details = bookingText({
-    ...booking,
+    ...paymentBooking,
     status: "deposit_paid",
     manualPayment: {
       method,
       confirmedAt,
     },
   });
-  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Your $${booking.deposit} deposit has been received. Reply STOP to opt out or HELP for help.`;
-  const ownerText = `Manual deposit confirmed for ${booking.client.fullName}: $${booking.deposit}. Method: ${method}. Preferred date/time: ${booking.client.date} at ${timeLabel(booking.client.time)}.`;
-  const clientEmail = confirmationEmail(booking);
+  const clientText = `Lovely Locs: your appointment is confirmed for ${booking.client.date} at ${timeLabel(booking.client.time)}. Payment received: $${totalReceived}. Remaining balance: $${remainingBalance}. Reply STOP to opt out or HELP for help.`;
+  const ownerText = `Manual payment recorded for ${booking.client.fullName}: $${amountReceived}${tipAmount ? ` plus $${tipAmount} tip` : ""}. Total received: $${totalReceived}. Remaining balance: $${remainingBalance}. Method: ${method}.`;
+  const clientEmail = confirmationEmail(paymentBooking);
   const ownerHtml = ownerBookingEmail(booking, {
     title: "Deposit confirmed",
     intro: `The ${method} deposit has been marked paid. The client confirmation email has been queued through the connected email provider.`,
@@ -2516,6 +2576,12 @@ async function handleBooking(req, res) {
     const booking = JSON.parse(raw || "{}");
     const containsAdminTestService = Array.isArray(booking.cart)
       && booking.cart.some(item => item?.id === "admin-test-booking");
+    const containsReattachmentConsultation = Array.isArray(booking.cart)
+      && booking.cart.some(item => item?.id === "loc-reattachment-consultation");
+    if (containsReattachmentConsultation && (booking.cart.length !== 1 || booking.cart[0]?.id !== "loc-reattachment-consultation")) {
+      sendJson(res, 400, { ok: false, error: "The Loc Reattachment Consultation must be booked by itself." });
+      return;
+    }
     if (containsAdminTestService && !isAdminTestBooking(booking.cart)) {
       sendJson(res, 400, { ok: false, error: "The admin test service cannot be combined with other items." });
       return;
@@ -2596,112 +2662,82 @@ async function handleBooking(req, res) {
   }
 }
 
+function paymentTotalsForBooking(bookingId, records = readBookingRecords()) {
+  return records.filter(record => bookingRecordId(record) === bookingId && record.type === "manual.payment.recorded")
+    .reduce((totals, record) => ({ service: totals.service + Number(record.manualPayment?.amount || 0), tips: totals.tips + Number(record.manualPayment?.tip || 0) }), { service: 0, tips: 0 });
+}
+
+function paymentUpdatePageHtml({ booking, token, method, totals, error = "" }) {
+  const remaining = Math.max(0, Number(booking.total || 0) - totals.service);
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update Payment - Lovely Locs</title><style>body{font-family:Arial;background:#f8f0ea;color:#3b2821;padding:24px}main{max-width:560px;margin:auto;background:#fffaf7;padding:28px;border-radius:18px}label{display:block;margin:16px 0;font-weight:700}input{display:block;width:100%;box-sizing:border-box;padding:12px;margin-top:7px}button{background:#4b332c;color:white;border:0;border-radius:999px;padding:14px 20px;font-weight:800}.error{color:#a4473e}</style></head><body><main><h1>Update Payment</h1><p><strong>Booking:</strong> ${escapeHtml(booking.id)}</p><p>Service total: $${Number(booking.total || 0)}<br>Expected deposit: $${Number(booking.deposit || 0)}<br>Total received: $${totals.service}<br>Remaining balance: $${remaining}<br>Tips recorded: $${totals.tips}</p>${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}<form method="get" action="/api/manual-payment/confirm"><input type="hidden" name="booking" value="${escapeHtml(booking.id)}"><input type="hidden" name="token" value="${escapeHtml(token)}"><input type="hidden" name="method" value="${escapeHtml(method)}"><input type="hidden" name="action" value="update"><label>New service payment<input name="amount" type="number" min="0" max="${remaining}" step="1" required></label><label>Optional tip<input name="tip" type="number" min="0" step="1" value="0"></label><button type="submit">Confirm Payment & Appointment</button></form></main></body></html>`;
+}
+
 async function handleManualPaymentConfirm(req, res) {
   let wantsJson = false;
   try {
-    const siteUrl = publicSiteUrl(req);
-    const url = new URL(req.url || "/", siteUrl);
+    const url = new URL(req.url || "/", publicSiteUrl(req));
     const token = url.searchParams.get("token") || "";
     const bookingId = url.searchParams.get("booking") || "";
     const method = url.searchParams.get("method") || "manual";
-    const adminUrl = `${siteUrl}/?booking=${encodeURIComponent(bookingId)}&method=${encodeURIComponent(method)}#admin-confirm-deposit`;
+    const action = url.searchParams.get("action") || "confirm";
     wantsJson = url.searchParams.get("format") === "json";
     if (!ownerRequestIsValid(req, token)) {
-      if (wantsJson) {
-        sendJson(res, 403, { ok: false, error: "The owner confirmation token is missing or invalid." });
-        return;
-      }
-      sendHtml(res, 403, ownerConfirmPageHtml({
-        title: "Token needed before confirming",
-        intro: "This confirmation link is missing a valid owner token. Open the owner admin form, enter the booking ID and your manual deposit token, then confirm the deposit from there.",
-        bookingId,
-        adminUrl,
-      }));
-      return;
+      if (wantsJson) return sendJson(res, 403, { ok: false, error: "The owner confirmation token is missing or invalid." });
+      return sendHtml(res, 403, ownerConfirmPageHtml({ title: "Token needed", intro: "This link is missing valid owner authorization.", bookingId }));
     }
-
     const booking = findBookingById(bookingId);
     if (!booking) {
-      if (wantsJson) {
-        sendJson(res, 404, { ok: false, error: "No matching Lovely Locs booking was found for this confirmation link." });
-        return;
-      }
-      sendHtml(res, 404, ownerConfirmPageHtml({
-        title: "Booking not found",
-        intro: "No matching Lovely Locs booking was found for this confirmation link. Open the owner confirmation email link again so the booking ID is captured automatically, or double-check the booking ID from the pay-options page or payment note.",
-        bookingId,
-        adminUrl,
-      }));
-      return;
+      if (wantsJson) return sendJson(res, 404, { ok: false, error: "No matching booking was found." });
+      return sendHtml(res, 404, ownerConfirmPageHtml({ title: "Booking not found", intro: "No matching Lovely Locs booking was found.", bookingId }));
     }
-
-    const existingConfirmation = readBookingRecords()
-      .reverse()
-      .find(record => bookingRecordId(record) === bookingId && record.type === "manual.deposit.confirmed");
-    if (existingConfirmation) {
-      const notificationResults = Array.isArray(existingConfirmation.notificationResults)
-        ? existingConfirmation.notificationResults
-        : [];
-      if (wantsJson) {
-        sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: true, notificationResults });
-        return;
-      }
-      sendHtml(res, 200, ownerConfirmPageHtml({
-        title: "Deposit already confirmed",
-        intro: "This booking was already marked paid. No duplicate confirmation messages were sent.",
-        bookingId,
-        adminUrl,
-        notificationResults,
-      }));
-      return;
+    if (!["manual", "venmo", "cash-app", "apple-pay", "cash", "other"].includes(method)) throw new Error("Choose a valid payment method.");
+    const totals = paymentTotalsForBooking(bookingId);
+    const remaining = Math.max(0, Number(booking.total || 0) - totals.service);
+    if (action === "update" && !url.searchParams.has("amount")) return sendHtml(res, 200, paymentUpdatePageHtml({ booking, token, method, totals }));
+    const amount = action === "confirm" ? Math.min(remaining, Number(booking.deposit || 0)) : Number(url.searchParams.get("amount") || 0);
+    const tip = Number(url.searchParams.get("tip") || 0);
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Enter a service payment greater than zero.");
+    if (amount > remaining) {
+      if (action === "update") return sendHtml(res, 400, paymentUpdatePageHtml({ booking, token, method, totals, error: `Service payment cannot exceed the $${remaining} remaining balance. Record extra money as a tip.` }));
+      throw new Error("Payment exceeds the remaining service balance.");
     }
-
-    const allowedMethods = new Set(["venmo", "cash-app", "apple-pay", "cash", "other"]);
-    if (!allowedMethods.has(method)) {
-      sendJson(res, 400, { ok: false, error: "Choose how the payment was received before confirming the deposit." });
-      return;
-    }
-    const notificationResults = await notifyManualDepositPaid(booking, method);
-    const referralReward = approveReferralReward(booking);
-    const referralRewardNotification = referralReward
-      ? await notifyReferralRewardApproved(referralReward, booking)
-      : null;
-    const redeemedCredit = redeemBookingCredit(booking);
-    appendBookingRecord({
-      type: "manual.deposit.confirmed",
-      bookingId,
-      receivedAt: new Date().toISOString(),
-      status: "deposit_paid",
-      manualPayment: { method },
-      notificationResults,
-      referralReward,
-      referralRewardNotification,
-      redeemedCredit,
-    });
-
-    if (wantsJson) {
-      sendJson(res, 200, { ok: true, bookingId, alreadyConfirmed: false, notificationResults, referralReward, referralRewardNotification, redeemedCredit });
-      return;
-    }
-    sendHtml(res, 200, ownerConfirmPageHtml({
-      title: "Deposit confirmed",
-      intro: "Lovely Locs marked this deposit paid. Review the provider results below; if the client email was blocked, use the email draft link shown here.",
-      bookingId,
-      adminUrl,
-      notificationResults,
-    }));
+    if (!Number.isFinite(tip) || tip < 0) throw new Error("Tip cannot be negative.");
+    const nextTotal = totals.service + amount;
+    const remainingBalance = Math.max(0, Number(booking.total || 0) - nextTotal);
+    const notificationResults = await notifyManualDepositPaid(booking, method, amount, tip, nextTotal);
+    const redeemedCredit = totals.service === 0 ? redeemBookingCredit(booking) : null;
+    const referralReward = totals.service === 0 ? approveReferralReward(booking) : null;
+    const referralRewardNotification = referralReward ? await notifyReferralRewardApproved(referralReward, booking) : null;
+    appendBookingRecord({ type: "manual.payment.recorded", bookingId, receivedAt: new Date().toISOString(), status: "deposit_paid", manualPayment: { method, amount, tip, cumulativeReceived: nextTotal, remainingBalance }, notificationResults, redeemedCredit, referralReward, referralRewardNotification });
+    if (wantsJson) return sendJson(res, 200, { ok: true, bookingId, amount, tip, totalReceived: nextTotal, remainingBalance, notificationResults, redeemedCredit, referralReward, referralRewardNotification });
+    return sendHtml(res, 200, ownerConfirmPageHtml({ title: action === "confirm" ? "Deposit confirmed" : "Payment updated", intro: `Recorded $${amount}${tip ? ` plus $${tip} tip` : ""}. Total received is $${nextTotal}; remaining service balance is $${remainingBalance}.`, bookingId, notificationResults }));
   } catch (error) {
-    if (wantsJson) {
-      sendJson(res, 400, { ok: false, error: error.message });
-      return;
-    }
-    sendHtml(res, 400, ownerConfirmPageHtml({
-      title: "Confirmation failed",
-      intro: error.message,
-    }));
+    if (wantsJson) return sendJson(res, 400, { ok: false, error: error.message });
+    return sendHtml(res, 400, ownerConfirmPageHtml({ title: "Payment update failed", intro: error.message }));
   }
 }
-
+async function handleConsultationCredit(req, res) {
+  try {
+    const url = new URL(req.url || "/", publicSiteUrl(req));
+    const token = url.searchParams.get("token") || "";
+    const bookingId = url.searchParams.get("booking") || "";
+    if (!ownerRequestIsValid(req, token)) return sendJson(res, 403, { ok: false, error: "Owner authorization is required." });
+    const booking = findBookingById(bookingId);
+    if (!booking || !booking.cart?.some(item => item.id === "loc-reattachment-consultation")) return sendJson(res, 404, { ok: false, error: "No matching Loc Reattachment Consultation was found." });
+    const clientKey = clientIdentityKey(booking.client);
+    const creditId = `consultation:${booking.id}`;
+    const records = readBookingRecords();
+    const existing = records.find(record => record.type === "consultation.credit.approved" && record.creditId === creditId);
+    if (existing) return sendJson(res, 200, { ok: true, alreadyIssued: true, credit: existing });
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 90);
+    const event = { type: "consultation.credit.approved", creditId, clientKey, sourceBookingId: booking.id, discountCode: `CONSULT20-${booking.id.slice(-6)}`.toUpperCase(), amountOff: 20, approvedAt: new Date().toISOString(), expiresAt: dateKey(expires), singleUse: true };
+    appendBookingRecord(event);
+    return sendJson(res, 200, { ok: true, alreadyIssued: false, credit: event });
+  } catch (error) {
+    return sendJson(res, 400, { ok: false, error: error.message });
+  }
+}
 async function handleManualPaymentRelease(req, res) {
   try {
     const raw = await readBody(req);
@@ -3071,7 +3107,7 @@ function clientSettingsFor(client, req) {
     services: (booking.selectedServices?.length ? booking.selectedServices : booking.cart || []).map(item => item.name).filter(Boolean),
   }));
   const credits = records.filter(record => (
-    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved"].includes(record.type)
+    ["referral.reward.approved", "birthday.reward.approved", "returning_client.reward.approved", "consultation.credit.approved"].includes(record.type)
     && record.clientKey === key
   )).map(record => {
     const reserved = records.some(item => item.type === "discount.credit.reserved" && item.creditId === record.creditId);
@@ -3082,7 +3118,9 @@ function clientSettingsFor(client, req) {
         ? "birthday"
         : record.type === "returning_client.reward.approved"
           ? "returning"
-          : "referral",
+          : record.type === "consultation.credit.approved"
+            ? "consultation"
+            : "referral",
       status: redeemed ? "redeemed" : reserved ? "reserved" : expired ? "expired" : "available",
       creditId: record.creditId,
       discountCode: record.discountCode,
@@ -3472,7 +3510,8 @@ const server = http.createServer((req, res) => {
       sendJson(res, 400, { ok: false, error: "A valid date is required." });
       return;
     }
-    sendJson(res, 200, { ok: true, ...availabilityForDate(date) });
+    const duration = Math.max(0, Number(url.searchParams.get("duration") || 0));
+    sendJson(res, 200, { ok: true, ...availabilityForDate(date, duration) });
     return;
   }
 
@@ -3513,6 +3552,11 @@ const server = http.createServer((req, res) => {
 
   if (["GET", "POST"].includes(req.method) && (req.url || "").split("?")[0] === "/api/automations/run") {
     handleAutomationRun(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && (req.url || "").split("?")[0] === "/api/consultation-credit") {
+    handleConsultationCredit(req, res);
     return;
   }
 

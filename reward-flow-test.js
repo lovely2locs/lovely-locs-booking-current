@@ -232,11 +232,11 @@ async function main() {
     const promo = await request("POST", "/api/discount/validate", { code: "TEST20" });
     assert(promo.status === 200 && promo.body.percent === 20, "Temporary TEST20 promo validates at 20 percent off.", promo.body);
 
-    const saleClient = client({ fullName: "Sale Tester", email: "sale.tester@example.test", date: "2026-08-05" });
+    const saleClient = client({ fullName: "Sale Tester", email: "sale.tester@example.test", date: "2026-08-15" });
     const saleOne = await createBooking(saleClient, { discountCode: "TEST20" });
     assert(saleOne.discountCode === "TEST20" && saleOne.discountAmount === 18 && saleOne.total === 72, "TEST20 applies once on a booking total.", saleOne);
 
-    const saleTwo = await createBooking({ ...saleClient, date: "2026-08-12", time: "18:30" }, { discountCode: "TEST20" });
+    const saleTwo = await createBooking({ ...saleClient, date: "2026-08-12", time: "18:00" }, { discountCode: "TEST20" });
     assert(saleTwo.discountCode === "TEST20" && saleTwo.discountAmount === 18 && saleTwo.total === 72, "Same client can use TEST20 on another booking before the deadline.", saleTwo);
 
     const futureBirthdayClient = client({ fullName: "Future Birthday", email: "future.bday@example.test", birthday: "1998-07-31", date: "2026-08-19" });

@@ -1277,7 +1277,7 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes('const suggestedAmount = initialPayment ? Math.min(remaining, Number(booking.deposit || 0)) : "";'), "initial owner payment form should prefill the expected deposit but allow edits");
   assert(server.includes("Amount actually received") && server.includes('step="0.01"'), "initial owner payment form should accept an editable exact amount");
   assert(server.includes("consultation.credit.approved") && server.includes("expires.setDate(expires.getDate() + 90)"), "90-day consultation credit workflow missing");
-  assert(server.includes("latestPastRetwistAppointment") && fs.readFileSync("script.js", "utf8").includes("Most recent Lovely Locs retwist on file"), "retwist advisory should acknowledge saved Lovely Locs appointment history");
+  assert(server.includes("latestPastRetwistAppointment") && server.includes("latestAppointmentOnFile") && fs.readFileSync("script.js", "utf8").includes("Your Lovely Locs account and booking history are recognized"), "retwist advisory should acknowledge saved Lovely Locs account and appointment history");
   assert(fs.readFileSync("script.js", "utf8").includes("Adult + child scheduling") && fs.readFileSync("script.js", "utf8").includes("11:00 AM and 4:00 PM"), "adult and child same-day scheduling guidance missing");
   assert(fs.readFileSync("script.js", "utf8").includes("Inside 24h") && fs.readFileSync("script.js", "utf8").includes("estimated finish time"), "availability should explain the lead window and appointment time expectation");
   assert(server.includes("Remaining Balance") && server.includes("Payment Received"), "client confirmation balance breakdown missing");

@@ -645,6 +645,20 @@ test("starter locs ask parting preference and triangle parts add forty dollars",
   assert(html.includes("$190"), "triangle parting total price missing");
 });
 
+test("removing children's starter locs clears its stale parting banner", () => {
+  const originalCart = localStore.get("lovelyLocsCart") || "[]";
+  try {
+    context.clearCart();
+    context.openPartingPreference({ id: "child-starter-coils", type: "service", name: "Children's Starter Locs Coils & Two Strand Twist", price: 75, duration: "3h 30min", category: "starter-locs" });
+    context.handlePartingPreference("Square Parts", "0");
+    assert(appHtml().includes("includes Square Parts"), "child starter parting banner should appear while selected");
+    vm.runInContext('removeCartItem(cart.find(item => item.partingPreference)?.id || "")', context);
+    assert(!appHtml().includes("includes Square Parts"), "child starter parting banner should clear after removal");
+  } finally {
+    localStore.set("lovelyLocsCart", originalCart);
+    vm.runInContext('cart = loadCart(); partingMessage = ""; render(currentRoute());', context);
+  }
+});
 test("top booking buttons route clients to services instead of default checkout", () => {
   const script = fs.readFileSync("script.js", "utf8");
   assert(script.includes("function goToServices()"), "service routing helper missing");

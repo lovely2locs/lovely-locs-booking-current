@@ -3083,6 +3083,22 @@ async function handleStripeWebhook(req, res) {
   }
 }
 
+function latestPastRetwistAppointment(client, records = readBookingRecords()) {
+  const key = clientIdentityKey(client);
+  const today = dateKey(new Date());
+  if (!key) return null;
+  const matches = latestBookingRecords(records).filter(booking => {
+    if (clientIdentityKey(booking.client) !== key || String(booking.client?.date || "") > today) return false;
+    if (!["deposit_paid", "no_charge_test"].includes(bookingStatus(booking, records))) return false;
+    const items = booking.selectedServices?.length ? booking.selectedServices : booking.cart || [];
+    return items.some(item => ["adult-retwist", "overdue-retwist", "children-retwist"].includes(item.id) || /retwist/i.test(item.name || ""));
+  }).sort((left, right) => String(right.client?.date || "").localeCompare(String(left.client?.date || "")));
+  const booking = matches[0];
+  if (!booking) return null;
+  const items = booking.selectedServices?.length ? booking.selectedServices : booking.cart || [];
+  const service = items.find(item => ["adult-retwist", "overdue-retwist", "children-retwist"].includes(item.id) || /retwist/i.test(item.name || ""));
+  return { bookingId: booking.id, date: booking.client?.date || "", service: service?.name || "Retwist", status: bookingStatus(booking, records) };
+}
 function clientSettingsFor(client, req) {
   const records = readBookingRecords();
   const latest = latestClientBooking(client, records);
@@ -3099,6 +3115,7 @@ function clientSettingsFor(client, req) {
   const siteUrl = publicSiteUrl(req);
   const shareUrl = `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
   const reviewUrl = String(process.env.REVIEW_REQUEST_URL || "").trim();
+  const lastRetwistAppointment = latestPastRetwistAppointment(profile, records);
   const pendingReferrals = records.filter(record => record.type === "referral.reward.pending" && record.referrerKey === key);
   const approvedReferrals = records.filter(record => record.type === "referral.reward.approved" && record.clientKey === key);
   const completedVisits = completedClientBookings(profile, records).slice().reverse().map(booking => ({
@@ -3148,6 +3165,7 @@ function clientSettingsFor(client, req) {
       marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
       referralOptIn: Boolean(profile.referralOptIn),
       specialRequests: profile.specialRequests || "",
+      lastRetwistAppointment,
     },
     referralCode,
     shareUrl,

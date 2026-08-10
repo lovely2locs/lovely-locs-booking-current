@@ -1214,6 +1214,8 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(fs.readFileSync("script.js", "utf8").includes("Previous Bookings"), "previous bookings column missing");
   assert(fs.readFileSync("script.js", "utf8").includes("Payment received by"), "appointment payment method detail missing");
   assert(fs.readFileSync("script.js", "utf8").includes("Choose payment method"), "admin confirmation should ask how payment was received");
+  assert(fs.readFileSync("script.js", "utf8").includes('name="amount"') && fs.readFileSync("script.js", "utf8").includes("Amount Received"), "admin initial confirmation should require an editable received amount");
+  assert(fs.readFileSync("script.js", "utf8").includes("action=update&amount=") && fs.readFileSync("script.js", "utf8").includes("depositForm.elements.amount.value"), "admin confirmation should submit and prefill the reviewed amount before notifying the client");
   assert(fs.readFileSync("local-server.js", "utf8").includes("ownerSessionCookieName"), "verified owner session support missing");
   assert(fs.readFileSync("local-server.js", "utf8").includes("manualPayment: record.manualPayment"), "admin appointment payment method event missing");
   assert(fs.readFileSync("script.js", "utf8").includes("selectAdminAppointment"), "admin appointment selector missing");

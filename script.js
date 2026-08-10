@@ -3117,6 +3117,22 @@ function addServiceWithPartingPreference(service, partingPreference, partingFee)
   openCart();
 }
 
+function syncCartSetupMessages() {
+  if (!cart.some(item => item.partingPreference)) partingMessage = "";
+  if (!cart.some(item => item.baseProduct)) baseProductMessage = "";
+  if (!cart.some(item => item.id === "shampoo-service" || item.shampooDeclined)) shampooMessage = "";
+  if (!cart.some(item => ["adult-retwist", "overdue-retwist"].includes(item.id))) advisoryMessage = "";
+  selectedService = cart.find(item => item.type === "service") || null;
+}
+
+function removeCartItem(itemId) {
+  cart = cart.filter(item => item.id !== itemId);
+  syncCartSetupMessages();
+  bookingConfirmation = null;
+  saveCart();
+  render(currentRoute());
+  openCart();
+}
 function openAdvisory(service) {
   pendingAdvisoryService = service;
   document.getElementById("advisoryModal")?.classList.add("open");
@@ -3417,13 +3433,7 @@ function bindDynamic() {
   });
 
   document.querySelectorAll("[data-remove]").forEach(button => {
-    button.addEventListener("click", () => {
-      cart = cart.filter(item => item.id !== button.dataset.remove);
-      bookingConfirmation = null;
-      saveCart();
-      render(currentRoute());
-      openCart();
-    });
+    button.addEventListener("click", () => removeCartItem(button.dataset.remove));
   });
 
   document.querySelectorAll("[data-open-booking]").forEach(button => button.addEventListener("click", openBooking));

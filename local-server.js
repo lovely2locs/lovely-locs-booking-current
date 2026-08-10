@@ -3116,6 +3116,12 @@ function clientSettingsFor(client, req) {
   const shareUrl = `${siteUrl}/?ref=${encodeURIComponent(referralCode)}#services`;
   const reviewUrl = String(process.env.REVIEW_REQUEST_URL || "").trim();
   const lastRetwistAppointment = latestPastRetwistAppointment(profile, records);
+  const latestAppointmentOnFile = latest ? {
+    bookingId: latest.id,
+    date: latest.client?.date || "",
+    services: (latest.selectedServices?.length ? latest.selectedServices : latest.cart || []).map(item => item.name).filter(Boolean),
+    status: bookingStatus(latest, records),
+  } : null;
   const pendingReferrals = records.filter(record => record.type === "referral.reward.pending" && record.referrerKey === key);
   const approvedReferrals = records.filter(record => record.type === "referral.reward.approved" && record.clientKey === key);
   const completedVisits = completedClientBookings(profile, records).slice().reverse().map(booking => ({
@@ -3166,6 +3172,7 @@ function clientSettingsFor(client, req) {
       referralOptIn: Boolean(profile.referralOptIn),
       specialRequests: profile.specialRequests || "",
       lastRetwistAppointment,
+      latestAppointmentOnFile,
     },
     referralCode,
     shareUrl,

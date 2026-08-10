@@ -676,6 +676,9 @@ function saveClientProfile(profile = {}) {
     specialRequests: profile.specialRequests || "",
     lastRetwistAppointment: profile.lastRetwistAppointment && typeof profile.lastRetwistAppointment === "object"
       ? { bookingId: profile.lastRetwistAppointment.bookingId || "", date: profile.lastRetwistAppointment.date || "", service: profile.lastRetwistAppointment.service || "", status: profile.lastRetwistAppointment.status || "" }
+      : null,
+    latestAppointmentOnFile: profile.latestAppointmentOnFile && typeof profile.latestAppointmentOnFile === "object"
+      ? { bookingId: profile.latestAppointmentOnFile.bookingId || "", date: profile.latestAppointmentOnFile.date || "", services: Array.isArray(profile.latestAppointmentOnFile.services) ? profile.latestAppointmentOnFile.services.slice(0, 10) : [], status: profile.latestAppointmentOnFile.status || "" }
       : null
   };
   localStorage.setItem("lovelyLocsClientProfile", JSON.stringify(clean));
@@ -1109,11 +1112,17 @@ function serviceCard(service) {
 
 function advisoryModal() {
   const history = savedClientProfile?.lastRetwistAppointment || clientSettingsResult?.client?.lastRetwistAppointment;
+  const latestAppointment = savedClientProfile?.latestAppointmentOnFile || clientSettingsResult?.client?.latestAppointmentOnFile;
   const historyDate = validAppointmentDateValue(history?.date) ? new Date(`${history.date}T12:00:00`) : null;
+  const latestDate = validAppointmentDateValue(latestAppointment?.date) ? new Date(`${latestAppointment.date}T12:00:00`) : null;
   const weeksAgo = historyDate ? Math.max(0, Math.floor((Date.now() - historyDate.getTime()) / (7 * 24 * 60 * 60 * 1000))) : null;
   const historyMarkup = historyDate
     ? `<div class="policy-box"><strong>Most recent Lovely Locs retwist on file</strong><p>${escapeAttr(history.service || "Retwist")} — ${historyDate.toLocaleDateString()}${weeksAgo !== null ? ` (about ${weeksAgo} weeks ago)` : ""}. Please confirm whether you have had another retwist elsewhere since then.</p></div>`
-    : `<p class="field-note">Returning client? Log in with the email used for booking so Lovely Locs can acknowledge your previous retwist history.</p>`;
+    : latestDate
+      ? `<div class="policy-box"><strong>Your Lovely Locs account and booking history are recognized</strong><p>Latest booking on file: ${escapeAttr((latestAppointment.services || []).join(", ") || "Appointment")} — ${latestDate.toLocaleDateString()}. A completed retwist date is not stored, so please answer based on your actual last retwist, including services received elsewhere.</p></div>`
+      : savedClientProfile
+        ? `<div class="policy-box"><strong>Your Lovely Locs account is recognized</strong><p>No completed retwist date is stored yet. Please answer based on your actual last retwist, including services received elsewhere.</p></div>`
+        : `<p class="field-note">Returning client? Log in with the email used for booking so Lovely Locs can acknowledge your previous retwist history.</p>`;
   return `
     <div class="modal advisory-modal" id="advisoryModal">
       <div class="modal-panel advisory-panel">

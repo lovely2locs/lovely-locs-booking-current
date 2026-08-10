@@ -2288,6 +2288,9 @@ function adminPage() {
                 ${methodOptions}
               </select>
             </label>
+            <label>Amount Received<input name="amount" type="number" min="0.01" step="0.01" required placeholder="Enter exact service payment"></label>
+            <label>Optional Tip<input name="tip" type="number" min="0" step="0.01" value="0"></label>
+            <p class="field-note full">Review the amount before confirming. The client confirmation is sent only after you press the button below.</p>
             <p class="form-error" id="manualDepositConfirmStatus" aria-live="polite"></p>
             <button class="primary-btn" type="button" data-confirm-manual-deposit>Confirm Deposit &amp; Send Client Confirmation</button>
             <button class="outline-btn" type="button" data-release-unpaid-hold>Deposit Not Received - Release Slot</button>
@@ -4067,17 +4070,27 @@ async function confirmManualDeposit() {
   const booking = String(data.get("booking") || "").trim();
   const token = String(data.get("token") || "").trim();
   const method = String(data.get("method") || "manual").trim();
+  const amount = Number(data.get("amount"));
+  const tip = Number(data.get("tip") || 0);
   if (!booking) {
     if (status) status.textContent = "Choose the appointment first.";
     return;
   }
-  if (status) status.textContent = `Confirming deposit for ${booking}...`;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    if (status) status.textContent = "Enter the exact service-payment amount received before confirming.";
+    return;
+  }
+  if (!Number.isFinite(tip) || tip < 0) {
+    if (status) status.textContent = "Tip cannot be negative.";
+    return;
+  }
+  if (status) status.textContent = `Recording ${money(amount)} for ${booking} before sending confirmation...`;
   if (button) {
     button.disabled = true;
     button.textContent = "Confirming...";
   }
   try {
-    const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}&format=json`;
+    const url = `/api/manual-payment/confirm?booking=${encodeURIComponent(booking)}&method=${encodeURIComponent(method)}&token=${encodeURIComponent(token)}&action=update&amount=${encodeURIComponent(amount)}&tip=${encodeURIComponent(tip)}&format=json`;
     const response = await fetch(url, { method: "POST" });
     const responseText = await response.text();
     let result;
@@ -4089,7 +4102,7 @@ async function confirmManualDeposit() {
     if (!response.ok || !result.ok) throw new Error(result.error || "Deposit confirmation failed.");
     const heading = result.alreadyConfirmed
       ? `${escapeAttr(booking)} was already confirmed. No duplicate messages were sent.`
-      : `${escapeAttr(booking)} is confirmed.`;
+      : `${escapeAttr(booking)} is confirmed. ${money(result.amount)} recorded; ${money(result.remainingBalance)} remains.`;
     if (status) status.innerHTML = `${heading}<br>${notificationResultsHtml(result.notificationResults)}`;
   } catch (error) {
     if (status) status.textContent = `${error.message} The booking is not shown as confirmed until this panel displays a success result.`;
@@ -4295,6 +4308,10 @@ function selectAdminAppointment(id) {
   const resendForm = document.getElementById("confirmationResendForm");
   if (!booking) return;
   depositForm.elements.booking.value = booking.id;
+  const serviceReceived = (booking.events || []).reduce((sum, event) => sum + Number(event.manualPayment?.amount || 0), 0);
+  const remaining = Math.max(0, Number(booking.total || 0) - serviceReceived);
+  depositForm.elements.amount.value = Math.min(remaining, Number(booking.deposit || remaining)).toFixed(2);
+  depositForm.elements.tip.value = "0";
   resendForm.elements.bookingId.value = booking.id;
   resendForm.elements.email.value = booking.client?.email || "";
   resendForm.elements.fullName.value = booking.client?.fullName || "";
@@ -4334,6 +4351,8 @@ async function loadAdminAppointments() {
     adminAppointments = result.bookings || [];
     status.textContent = adminAppointments.length + " appointments loaded in received order.";
     renderAdminAppointments();
+    const requestedBooking = manualDepositConfirmParams().booking;
+    if (requestedBooking && adminAppointments.some(item => item.id === requestedBooking)) selectAdminAppointment(requestedBooking);
   } catch (error) {
     status.textContent = error.message;
   }

@@ -591,6 +591,7 @@ test("maintenance services require shampoo choice before cart", () => {
     assert(elements.shampooPreferenceModal.classList.contains("open"), "shampoo preference modal should open after product preference");
     let html = appHtml();
     assert(html.includes("Would you like Lovely Locs to include Shampoo Service?"), "shampoo preference question missing");
+    assert(html.includes("Shampoo Service is $15") && html.includes("Add Shampoo Service — $15"), "shampoo choice should disclose price before cart");
     assert(html.includes("By declining the Shampoo Service, you agree to arrive with your scalp and locs freshly shampooed, thoroughly rinsed, and free from heavy oils, product buildup, odor, lint, or debris."), "full shampoo policy missing from shampoo step");
     assert(html.includes("I understand I must arrive freshly shampooed if I decline this service."), "short shampoo acknowledgement missing from shampoo step");
     elements.shampooPreferenceAcknowledgement.checked = false;
@@ -1276,6 +1277,9 @@ test("server includes manual deposit confirmation and legacy Stripe webhook endp
   assert(server.includes('const suggestedAmount = initialPayment ? Math.min(remaining, Number(booking.deposit || 0)) : "";'), "initial owner payment form should prefill the expected deposit but allow edits");
   assert(server.includes("Amount actually received") && server.includes('step="0.01"'), "initial owner payment form should accept an editable exact amount");
   assert(server.includes("consultation.credit.approved") && server.includes("expires.setDate(expires.getDate() + 90)"), "90-day consultation credit workflow missing");
+  assert(server.includes("latestPastRetwistAppointment") && fs.readFileSync("script.js", "utf8").includes("Most recent Lovely Locs retwist on file"), "retwist advisory should acknowledge saved Lovely Locs appointment history");
+  assert(fs.readFileSync("script.js", "utf8").includes("Adult + child scheduling") && fs.readFileSync("script.js", "utf8").includes("11:00 AM and 4:00 PM"), "adult and child same-day scheduling guidance missing");
+  assert(fs.readFileSync("script.js", "utf8").includes("Inside 24h") && fs.readFileSync("script.js", "utf8").includes("estimated finish time"), "availability should explain the lead window and appointment time expectation");
   assert(server.includes("Remaining Balance") && server.includes("Payment Received"), "client confirmation balance breakdown missing");
   assert(!server.includes("bookingUnavailableFromDate"), "future months should not be blocked by a hard cutoff");
   assert(!server.includes("August dates are not open for booking yet."), "August and future listed months should stay eligible for the normal availability workflow");

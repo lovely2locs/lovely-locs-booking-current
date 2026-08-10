@@ -673,7 +673,10 @@ function saveClientProfile(profile = {}) {
     marketingEmailOptIn: Boolean(profile.marketingEmailOptIn),
     referralOptIn: Boolean(profile.referralOptIn),
     referralCode: profile.referralCode || "",
-    specialRequests: profile.specialRequests || ""
+    specialRequests: profile.specialRequests || "",
+    lastRetwistAppointment: profile.lastRetwistAppointment && typeof profile.lastRetwistAppointment === "object"
+      ? { bookingId: profile.lastRetwistAppointment.bookingId || "", date: profile.lastRetwistAppointment.date || "", service: profile.lastRetwistAppointment.service || "", status: profile.lastRetwistAppointment.status || "" }
+      : null
   };
   localStorage.setItem("lovelyLocsClientProfile", JSON.stringify(clean));
   savedClientProfile = clean;
@@ -1105,6 +1108,12 @@ function serviceCard(service) {
 }
 
 function advisoryModal() {
+  const history = savedClientProfile?.lastRetwistAppointment || clientSettingsResult?.client?.lastRetwistAppointment;
+  const historyDate = validAppointmentDateValue(history?.date) ? new Date(`${history.date}T12:00:00`) : null;
+  const weeksAgo = historyDate ? Math.max(0, Math.floor((Date.now() - historyDate.getTime()) / (7 * 24 * 60 * 60 * 1000))) : null;
+  const historyMarkup = historyDate
+    ? `<div class="policy-box"><strong>Most recent Lovely Locs retwist on file</strong><p>${escapeAttr(history.service || "Retwist")} — ${historyDate.toLocaleDateString()}${weeksAgo !== null ? ` (about ${weeksAgo} weeks ago)` : ""}. Please confirm whether you have had another retwist elsewhere since then.</p></div>`
+    : `<p class="field-note">Returning client? Log in with the email used for booking so Lovely Locs can acknowledge your previous retwist history.</p>`;
   return `
     <div class="modal advisory-modal" id="advisoryModal">
       <div class="modal-panel advisory-panel">
@@ -1119,7 +1128,9 @@ function advisoryModal() {
           <p class="eyebrow">Before selecting Adult Retwist</p>
           <h3>When was your last retwist?</h3>
           <p>If it has been longer than 3 months, your appointment usually needs more time for separation, cleanup, and a full maintenance finish.</p>
+          ${historyMarkup}
           <div class="advisory-actions">
+            <button class="outline-btn" data-retwist-answer="standard">Under 2 months</button>
             <button class="primary-btn" data-retwist-answer="standard">2-3 months</button>
             <button class="outline-btn" data-retwist-answer="overdue">4+ months</button>
           </div>
@@ -1128,7 +1139,6 @@ function advisoryModal() {
     </div>
   `;
 }
-
 function productPreferenceModal() {
   return `
     <div class="modal advisory-modal" id="productPreferenceModal">
@@ -1160,6 +1170,9 @@ function productPreferenceModal() {
 function shampooPreferenceModal() {
   if (!pendingShampooService) return "";
   const serviceName = pendingShampooService?.name || "your maintenance service";
+  const shampoo = services.find(item => item.id === "shampoo-service");
+  const shampooPrice = money(shampoo?.price || 15);
+  const shampooDuration = shampoo?.duration || "30 min";
   return `
     <div class="modal advisory-modal" id="shampooPreferenceModal">
       <div class="modal-panel advisory-panel">
@@ -1173,9 +1186,9 @@ function shampooPreferenceModal() {
         <div class="advisory-box">
           <p class="eyebrow">Maintenance Service Prep</p>
           <h3>Would you like Lovely Locs to include Shampoo Service?</h3>
-          <p>Choose one option so your cart shows whether Shampoo Service is being added or declined.</p>
+          <p>Shampoo Service is ${shampooPrice} and adds approximately ${shampooDuration}. Choose one option before the appointment enters your cart.</p>
           <div class="advisory-actions product-actions">
-            <button class="primary-btn" data-shampoo-preference="add">Add Shampoo Service</button>
+            <button class="primary-btn" data-shampoo-preference="add">Add Shampoo Service — ${shampooPrice}</button>
           </div>
           <div class="shampoo-prep-ack">
             <p>${shampooDeclinePolicy}</p>
@@ -1190,7 +1203,6 @@ function shampooPreferenceModal() {
     </div>
   `;
 }
-
 function partingPreferenceModal() {
   return `
     <div class="modal advisory-modal" id="partingPreferenceModal">
@@ -2602,10 +2614,10 @@ function localAvailability(date, bookedTimes = []) {
 
 function slotStatusLabel(slot) {
   if (slot.status === "booked") return "Booked";
-  if (slot.status === "unavailable") return "Too soon";
+  if (slot.status === "unavailable" && /24 hours/i.test(slot.note || "")) return "Inside 24h";
+  if (slot.status === "unavailable") return "Does not fit";
   return slot.type === "emergency" ? "Emergency +$45" : "Open";
 }
-
 function slotPickerMarkup(profile = {}) {
   return `
     <div class="full time-slot-field">
@@ -2692,10 +2704,12 @@ function renderTimeSlots(availability, preferredSlot = null) {
     if (note) note.textContent = availability.note || "Choose another date to see open appointment times.";
     return;
   }
+  const duration = cartDurationMinutes();
   grid.innerHTML = availability.slots.map(slot => `
     <button type="button" class="time-slot ${slot.type} ${slot.status} ${restoredSlot?.time === slot.time ? "selected" : ""}" data-time-slot="${slot.time}" data-slot-type="${slot.type}" data-slot-note="${slot.note}" aria-pressed="${restoredSlot?.time === slot.time ? "true" : "false"}" ${slot.status !== "open" ? "disabled" : ""}>
       <strong>${slot.label}</strong>
       <span>${slotStatusLabel(slot)}</span>
+      ${slot.status === "open" && duration ? `<small>${slot.label}–${timeLabel(timeFromMinutes(minutesFromTime(slot.time) + duration))} estimated</small>` : ""}
     </button>
   `).join("");
   const restoredType = restoredSlot?.type || "";
@@ -2709,10 +2723,13 @@ function renderTimeSlots(availability, preferredSlot = null) {
   };
   setEmergencyFeeForSlot(restoredType === "emergency");
   if (note) {
+    const allInsideLeadWindow = availability.slots.length && availability.slots.every(slot => slot.status === "unavailable" && /24 hours/i.test(slot.note || ""));
     note.textContent = restoredSlot
       ? restoredType === "emergency"
         ? `${restoredSlot.note} Emergency details are listed before you submit.`
         : "Your saved regular appointment time has been restored."
+      : allInsideLeadWindow
+        ? "This date is inside the 24-hour booking window. Choose a later open date; the slots are not unavailable because of your selected services."
       : availability.holiday
         ? "Holiday/key dates are emergency proposals and include the $45 emergency fee."
         : "Choose a purple regular slot or a brown emergency proposal.";
@@ -2729,6 +2746,26 @@ function cartDurationMinutes(items = cart) {
   }, 0);
 }
 
+function minutesFromTime(value = "") {
+  const [hours, minutes] = String(value).split(":").map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+}
+
+function timeFromMinutes(value = 0) {
+  const normalized = ((Number(value) % (24 * 60)) + (24 * 60)) % (24 * 60);
+  return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
+}
+
+function durationLabelFromMinutes(value = 0) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return [hours ? `${hours}h` : "", minutes ? `${minutes}min` : ""].filter(Boolean).join(" ") || "0min";
+}
+
+function adultChildPairSelected(items = cart) {
+  const ids = new Set(items.map(item => item.id));
+  return (ids.has("adult-retwist") || ids.has("overdue-retwist")) && ids.has("children-retwist");
+}
 async function loadAvailabilityForDate(date, preferredSlot = null) {
   if (!date) return;
   const grid = document.getElementById("timeSlotGrid");
@@ -2846,6 +2883,8 @@ function bookingModal() {
   const emergencySubmitHidden = profile.emergencySlot ? "" : " hidden";
   const servicesSummary = selectedServices.length ? selectedServices.map(item => item.name).join(", ") : "No service selected yet. Please choose from the service menu before submitting.";
   const durationSummary = selectedServices.length ? selectedServices.map(item => item.duration).join(" + ") : "";
+  const combinedDuration = cartDurationMinutes();
+  const familyScheduleNotice = adultChildPairSelected() ? `<div class="policy-box"><strong>Adult + child scheduling</strong><p>This request reserves one continuous appointment block of about ${durationLabelFromMinutes(combinedDuration)} under one client contact. Choose one start time; each open slot shows the estimated finish time. For separate same-day appointments such as 11:00 AM and 4:00 PM, submit the adult and child services as two separate bookings. Each time must remain open and at least 24 hours away.</p></div>` : "";
   const baseProductSummary = selectedServices.filter(item => item.baseProduct).map(item => `${item.name} - ${item.baseProduct}`).join(", ");
   const shampooPrepSummary = selectedServices.some(item => item.shampooDeclined) ? "Client will arrive freshly shampooed." : "";
   const partingSummary = selectedServices.filter(item => item.partingPreference).map(item => `${item.name} - ${item.partingPreference}${item.partingFee ? ` (+${money(item.partingFee)})` : ""}`).join(", ");
@@ -2873,6 +2912,7 @@ function bookingModal() {
           ${partingMessage ? `<p class="advisory-copy">${partingMessage}</p>` : ""}
           <div class="summary-line"><span>Services</span><strong>${servicesSummary}</strong></div>
           ${durationSummary ? `<div class="summary-line"><span>Time</span><strong>${durationSummary}</strong></div>` : ""}
+          ${familyScheduleNotice}
           ${baseProductSummary ? `<div class="summary-line"><span>Products</span><strong>${baseProductSummary}</strong></div>` : ""}
           ${shampooPrepSummary ? `<div class="summary-line"><span>Shampoo</span><strong>${shampooPrepSummary}</strong></div>` : ""}
           ${partingSummary ? `<div class="summary-line"><span>Parting</span><strong>${partingSummary}</strong></div>` : ""}
